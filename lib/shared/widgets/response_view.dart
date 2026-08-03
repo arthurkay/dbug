@@ -15,10 +15,18 @@ class ResponseView extends StatefulWidget {
 class _ResponseViewState extends State<ResponseView> {
   int _selectedTab = 0;
 
+  static const _keyColor = Color(0xFF93C5FD);
+  static const _stringColor = Color(0xFF86EFAC);
+  static const _numberColor = Color(0xFFFDE68A);
+  static const _boolColor = Color(0xFFC4B5FD);
+  static const _nullColor = Color(0xFF9CA3AF);
+  static const _bracketColor = Color(0xFFD1D5DB);
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = shad.Theme.of(context).colorScheme;
     final resp = widget.response;
+    final isJson = _isJsonBody(resp);
 
     return shad.Card(
       child: Padding(
@@ -31,21 +39,44 @@ class _ResponseViewState extends State<ResponseView> {
             shad.Tabs(
               index: _selectedTab,
               onChanged: (i) => setState(() => _selectedTab = i),
-              children: const [
-                shad.TabItem(child: Text('Body')),
+              children: [
+                shad.TabItem(child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Body'),
+                    if (isJson) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Text('JSON', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF22C55E))),
+                      ),
+                    ],
+                  ],
+                )),
                 shad.TabItem(child: Text('Headers')),
               ],
             ),
             const SizedBox(height: 10),
             Expanded(
               child: _selectedTab == 0
-                  ? _buildBody(colorScheme, resp)
+                  ? _buildBody(colorScheme, resp, isJson)
                   : _buildHeaders(colorScheme, resp),
             ),
           ],
         ),
       ),
     );
+  }
+
+  bool _isJsonBody(HttpResponse resp) {
+    final contentType = resp.headers['content-type'] ?? '';
+    if (contentType.contains('application/json')) return true;
+    final body = resp.body.trimLeft();
+    return body.startsWith('{') || body.startsWith('[');
   }
 
   Widget _buildStatusBar(shad.ColorScheme colorScheme, HttpResponse resp) {
@@ -60,28 +91,21 @@ class _ResponseViewState extends State<ResponseView> {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: statusColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
             resp.statusCode == 0 ? 'ERR' : '${resp.statusCode}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: statusColor,
-            ),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: statusColor),
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          resp.statusCodeLabel,
-          style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground),
-        ),
+        Text(resp.statusCodeLabel, style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
         const Spacer(),
         _buildMetaChip(Icons.timer_outlined, '${resp.timeMs}ms', colorScheme),
-        const SizedBox(width: 8),
+        const SizedBox(width: 12),
         _buildMetaChip(Icons.data_usage_outlined, _formatSize(resp.sizeBytes), colorScheme),
       ],
     );
@@ -91,32 +115,98 @@ class _ResponseViewState extends State<ResponseView> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12, color: colorScheme.mutedForeground),
-        const SizedBox(width: 3),
-        Text(label, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
+        Icon(icon, size: 13, color: colorScheme.mutedForeground),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground, fontWeight: FontWeight.w500)),
       ],
     );
   }
 
-  Widget _buildBody(shad.ColorScheme colorScheme, HttpResponse resp) {
+  Widget _buildBody(shad.ColorScheme colorScheme, HttpResponse resp, bool isJson) {
     if (resp.body.isEmpty) {
       return Center(
-        child: Text('Empty response body', style: TextStyle(color: colorScheme.mutedForeground)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.inbox_outlined, size: 32, color: colorScheme.mutedForeground),
+            const SizedBox(height: 8),
+            Text('Empty response body', style: TextStyle(color: colorScheme.mutedForeground, fontSize: 13)),
+          ],
+        ),
       );
     }
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colorScheme.muted.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(6),
+        color: const Color(0xFF0D1117),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: SelectableText(
-        _prettyPrintJson(resp.body),
-        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(14),
+        child: isJson
+            ? _buildHighlightedJson(resp.body)
+            : SelectableText(resp.body, style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFFE6EDF3))),
       ),
     );
+  }
+
+  Widget _buildHighlightedJson(String body) {
+    try {
+      final dynamic parsed = convert.jsonDecode(body);
+      final spans = <TextSpan>[];
+      _writeJsonSpans(parsed, spans, 0);
+      return SelectableText.rich(
+        TextSpan(style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFFE6EDF3), height: 1.5), children: spans),
+      );
+    } catch (_) {
+      return SelectableText(body, style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFFE6EDF3)));
+    }
+  }
+
+  void _writeJsonSpans(dynamic obj, List<TextSpan> spans, int indent) {
+    final pad = '  ' * indent;
+    final pad1 = '  ' * (indent + 1);
+
+    if (obj is Map) {
+      if (obj.isEmpty) {
+        spans.add(TextSpan(text: '{}', style: TextStyle(color: _bracketColor)));
+        return;
+      }
+      spans.add(TextSpan(text: '{\n', style: TextStyle(color: _bracketColor)));
+      final entries = obj.entries.toList();
+      for (var i = 0; i < entries.length; i++) {
+        final e = entries[i];
+        spans.add(TextSpan(text: pad1));
+        spans.add(TextSpan(text: '"${e.key}"', style: TextStyle(color: _keyColor, fontWeight: FontWeight.w600)));
+        spans.add(TextSpan(text: ': ', style: TextStyle(color: _bracketColor)));
+        _writeJsonSpans(e.value, spans, indent + 1);
+        if (i < entries.length - 1) spans.add(TextSpan(text: ',', style: TextStyle(color: _bracketColor)));
+        spans.add(TextSpan(text: '\n'));
+      }
+      spans.add(TextSpan(text: '$pad}', style: TextStyle(color: _bracketColor)));
+    } else if (obj is List) {
+      if (obj.isEmpty) {
+        spans.add(TextSpan(text: '[]', style: TextStyle(color: _bracketColor)));
+        return;
+      }
+      spans.add(TextSpan(text: '[\n', style: TextStyle(color: _bracketColor)));
+      for (var i = 0; i < obj.length; i++) {
+        spans.add(TextSpan(text: pad1));
+        _writeJsonSpans(obj[i], spans, indent + 1);
+        if (i < obj.length - 1) spans.add(TextSpan(text: ',', style: TextStyle(color: _bracketColor)));
+        spans.add(TextSpan(text: '\n'));
+      }
+      spans.add(TextSpan(text: '$pad]', style: TextStyle(color: _bracketColor)));
+    } else if (obj is String) {
+      spans.add(TextSpan(text: '"$obj"', style: TextStyle(color: _stringColor)));
+    } else if (obj is num) {
+      spans.add(TextSpan(text: '$obj', style: TextStyle(color: _numberColor)));
+    } else if (obj is bool) {
+      spans.add(TextSpan(text: '$obj', style: TextStyle(color: _boolColor)));
+    } else if (obj == null) {
+      spans.add(TextSpan(text: 'null', style: TextStyle(color: _nullColor, fontStyle: FontStyle.italic)));
+    }
   }
 
   Widget _buildHeaders(shad.ColorScheme colorScheme, HttpResponse resp) {
@@ -126,74 +216,36 @@ class _ResponseViewState extends State<ResponseView> {
       );
     }
 
-    return ListView.builder(
-      itemCount: resp.headers.length,
-      itemBuilder: (context, i) {
-        final key = resp.headers.keys.elementAt(i);
-        final value = resp.headers[key]!;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 180,
-                child: Text(
-                  key,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.foreground,
-                  ),
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1117),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: ListView.separated(
+        padding: const EdgeInsets.all(12),
+        separatorBuilder: (_, __) => Divider(height: 1, color: const Color(0xFF30363D)),
+        itemCount: resp.headers.length,
+        itemBuilder: (context, i) {
+          final key = resp.headers.keys.elementAt(i);
+          final value = resp.headers[key]!;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 200,
+                  child: Text(key, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _keyColor, fontFamily: 'monospace')),
                 ),
-              ),
-              Expanded(
-                child: Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontFamily: 'monospace',
-                    color: colorScheme.mutedForeground,
-                  ),
+                Expanded(
+                  child: Text(value, style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Color(0xFFE6EDF3))),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
-  }
-
-  String _prettyPrintJson(String body) {
-    try {
-      final dynamic parsed = _jsonDecode(body);
-      return _jsonPrettyPrint(parsed, 0);
-    } catch (_) {
-      return body;
-    }
-  }
-
-  dynamic _jsonDecode(String s) {
-    return convert.jsonDecode(s);
-  }
-
-  String _jsonPrettyPrint(dynamic obj, int indent) {
-    final pad = '  ' * indent;
-    if (obj is Map) {
-      if (obj.isEmpty) return '{}';
-      final entries = obj.entries.map((e) =>
-        '$pad  "${e.key}": ${_jsonPrettyPrint(e.value, indent + 1)}').join(',\n');
-      return '{\n$entries\n$pad}';
-    } else if (obj is List) {
-      if (obj.isEmpty) return '[]';
-      final items = obj.map((e) =>
-        '$pad  ${_jsonPrettyPrint(e, indent + 1)}').join(',\n');
-      return '[\n$items\n$pad]';
-    } else if (obj is String) {
-      return '"${obj.replaceAll('"', '\\"')}"';
-    } else {
-      return '$obj';
-    }
   }
 
   String _formatSize(int bytes) {

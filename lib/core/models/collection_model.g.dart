@@ -13,6 +13,11 @@ _$CollectionImpl _$$CollectionImplFromJson(Map<String, dynamic> json) =>
       description: json['description'] as String?,
       sourceType: json['sourceType'] as String? ?? 'manual',
       sourceSpecId: json['sourceSpecId'] as String?,
+      globalHeaders:
+          (json['globalHeaders'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(k, e as String),
+          ) ??
+          const {},
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
@@ -24,6 +29,7 @@ Map<String, dynamic> _$$CollectionImplToJson(_$CollectionImpl instance) =>
       'description': instance.description,
       'sourceType': instance.sourceType,
       'sourceSpecId': instance.sourceSpecId,
+      'globalHeaders': instance.globalHeaders,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
     };

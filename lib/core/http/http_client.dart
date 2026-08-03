@@ -4,7 +4,7 @@ import '../constants/app_constants.dart';
 class DbugHttpClient {
   late final Dio _dio;
 
-  HttpClient() {
+  DbugHttpClient() {
     _dio = Dio(BaseOptions(
       connectTimeout: AppConstants.defaultTimeout,
       receiveTimeout: AppConstants.defaultTimeout,

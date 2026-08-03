@@ -29,6 +29,7 @@ class DatabaseService {
       path,
       version: AppConstants.dbVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -118,6 +119,12 @@ class DatabaseService {
     await db.execute(
       'CREATE INDEX idx_requests_collection ON requests(collection_id)',
     );
+  }
+
+  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute("ALTER TABLE collections ADD COLUMN global_headers TEXT DEFAULT '{}'");
+    }
   }
 
   static Future<void> close() async {

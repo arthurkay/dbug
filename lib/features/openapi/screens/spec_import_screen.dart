@@ -85,6 +85,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
       await ref.read(openApiRepositoryProvider).saveParsedSpec(parsed, sourceType: 'file');
       ref.invalidate(allSpecsProvider);
       ref.invalidate(collectionsProvider);
+      ref.invalidate(environmentsProvider);
 
       if (mounted) {
         showDbugToast(context, message: 'Imported "${parsed.title ?? sourceName}" — ${parsed.endpoints.length} endpoints', type: ToastType.success);

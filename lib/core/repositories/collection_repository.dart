@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import '../database/database_service.dart';
 import '../models/collection_model.dart';
@@ -10,6 +11,7 @@ class CollectionRepository {
     String? description,
     String sourceType = 'manual',
     String? sourceSpecId,
+    Map<String, String> globalHeaders = const {},
   }) async {
     final db = await DatabaseService.database;
     final id = _uuid.v4();
@@ -21,6 +23,7 @@ class CollectionRepository {
       'description': description,
       'source_type': sourceType,
       'source_spec_id': sourceSpecId,
+      'global_headers': jsonEncode(globalHeaders),
       'created_at': now.millisecondsSinceEpoch,
       'updated_at': now.millisecondsSinceEpoch,
     });
@@ -31,6 +34,7 @@ class CollectionRepository {
       description: description,
       sourceType: sourceType,
       sourceSpecId: sourceSpecId,
+      globalHeaders: globalHeaders,
       createdAt: now,
       updatedAt: now,
     );
@@ -40,15 +44,7 @@ class CollectionRepository {
     final db = await DatabaseService.database;
     final rows = await db.query('collections', orderBy: 'created_at DESC');
 
-    return rows.map((row) => Collection(
-      id: row['id'] as String,
-      name: row['name'] as String,
-      description: row['description'] as String?,
-      sourceType: row['source_type'] as String,
-      sourceSpecId: row['source_spec_id'] as String?,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at'] as int),
-    )).toList();
+    return rows.map(_rowToCollection).toList();
   }
 
   Future<void> updateCollection(Collection collection) async {
@@ -60,6 +56,7 @@ class CollectionRepository {
         'description': collection.description,
         'source_type': collection.sourceType,
         'source_spec_id': collection.sourceSpecId,
+        'global_headers': jsonEncode(collection.globalHeaders),
         'updated_at': DateTime.now().millisecondsSinceEpoch,
       },
       where: 'id = ?',
@@ -76,14 +73,23 @@ class CollectionRepository {
     final db = await DatabaseService.database;
     final rows = await db.query('collections', where: 'id = ?', whereArgs: [id]);
     if (rows.isEmpty) return null;
+    return _rowToCollection(rows.first);
+  }
 
-    final row = rows.first;
+  Collection _rowToCollection(Map<String, dynamic> row) {
+    final headersRaw = row['global_headers'] as String? ?? '{}';
+    Map<String, String> globalHeaders = {};
+    try {
+      globalHeaders = Map<String, String>.from(jsonDecode(headersRaw));
+    } catch (_) {}
+
     return Collection(
       id: row['id'] as String,
       name: row['name'] as String,
       description: row['description'] as String?,
       sourceType: row['source_type'] as String,
       sourceSpecId: row['source_spec_id'] as String?,
+      globalHeaders: globalHeaders,
       createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at'] as int),
     );

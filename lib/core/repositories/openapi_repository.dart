@@ -41,7 +41,7 @@ class OpenApiRepository {
     final baseUrl = parsed.baseUrl ?? '';
     for (final ep in parsed.endpoints) {
       final requestId = _uuid.v4();
-      final url = baseUrl.isNotEmpty ? '$baseUrl${ep.path}' : ep.path;
+      final url = baseUrl.isNotEmpty ? '{{baseUrl}}${ep.path}' : ep.path;
 
       await db.insert('requests', {
         'id': requestId,
@@ -55,6 +55,17 @@ class OpenApiRepository {
         'query_params': '{}',
         'created_at': now.millisecondsSinceEpoch,
         'updated_at': now.millisecondsSinceEpoch,
+      });
+    }
+
+    if (baseUrl.isNotEmpty) {
+      final envId = _uuid.v4();
+      final envName = parsed.title != null ? '${parsed.title} API' : 'Imported API';
+      await db.insert('environments', {
+        'id': envId,
+        'name': envName,
+        'variables': jsonEncode({'baseUrl': baseUrl}),
+        'is_active': 0,
       });
     }
 

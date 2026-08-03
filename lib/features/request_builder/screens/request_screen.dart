@@ -14,8 +14,9 @@ import '../../../shared/widgets/toast_helper.dart';
 
 class RequestScreen extends ConsumerStatefulWidget {
   final RequestModel? initialRequest;
+  final Map<String, String> collectionHeaders;
 
-  const RequestScreen({super.key, this.initialRequest});
+  const RequestScreen({super.key, this.initialRequest, this.collectionHeaders = const {}});
 
   @override
   ConsumerState<RequestScreen> createState() => _RequestScreenState();
@@ -155,7 +156,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
       final variables = ref.read(activeVariablesProvider);
       final resolvedUrl = substituteVariables(url, variables);
 
-      final headers = entriesToMap(_headers);
+      final headers = <String, String>{};
+      headers.addAll(widget.collectionHeaders);
+      headers.addAll(entriesToMap(_headers));
       headers.addAll(_buildAuthHeaders());
       final resolvedHeaders = headers.map((k, v) => MapEntry(k, substituteVariables(v, variables)));
 
@@ -401,8 +404,49 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     return shad.Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: SingleChildScrollView(
-          child: KeyValueEditor(entries: _headers, keyHint: 'Header', valueHint: 'Value', onChanged: () => setState(() {})),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (widget.collectionHeaders.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.vpn_key_outlined, size: 12, color: colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Text('Collection Headers (inherited)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.primary, letterSpacing: 0.5)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ...widget.collectionHeaders.entries.map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Row(
+                        children: [
+                          Text(e.key, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.foreground, fontFamily: 'monospace')),
+                          Text(': ', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
+                          Expanded(child: Text(e.value, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis)),
+                        ],
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            Expanded(
+              child: SingleChildScrollView(
+                child: KeyValueEditor(entries: _headers, keyHint: 'Header', valueHint: 'Value', onChanged: () => setState(() {})),
+              ),
+            ),
+          ],
         ),
       ),
     );

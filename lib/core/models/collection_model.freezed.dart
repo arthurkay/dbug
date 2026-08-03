@@ -26,6 +26,7 @@ mixin _$Collection {
   String? get description => throw _privateConstructorUsedError;
   String get sourceType => throw _privateConstructorUsedError;
   String? get sourceSpecId => throw _privateConstructorUsedError;
+  Map<String, String> get globalHeaders => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime get updatedAt => throw _privateConstructorUsedError;
 
@@ -52,6 +53,7 @@ abstract class $CollectionCopyWith<$Res> {
     String? description,
     String sourceType,
     String? sourceSpecId,
+    Map<String, String> globalHeaders,
     DateTime createdAt,
     DateTime updatedAt,
   });
@@ -77,6 +79,7 @@ class _$CollectionCopyWithImpl<$Res, $Val extends Collection>
     Object? description = freezed,
     Object? sourceType = null,
     Object? sourceSpecId = freezed,
+    Object? globalHeaders = null,
     Object? createdAt = null,
     Object? updatedAt = null,
   }) {
@@ -102,6 +105,10 @@ class _$CollectionCopyWithImpl<$Res, $Val extends Collection>
                 ? _value.sourceSpecId
                 : sourceSpecId // ignore: cast_nullable_to_non_nullable
                       as String?,
+            globalHeaders: null == globalHeaders
+                ? _value.globalHeaders
+                : globalHeaders // ignore: cast_nullable_to_non_nullable
+                      as Map<String, String>,
             createdAt: null == createdAt
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
@@ -131,6 +138,7 @@ abstract class _$$CollectionImplCopyWith<$Res>
     String? description,
     String sourceType,
     String? sourceSpecId,
+    Map<String, String> globalHeaders,
     DateTime createdAt,
     DateTime updatedAt,
   });
@@ -155,6 +163,7 @@ class __$$CollectionImplCopyWithImpl<$Res>
     Object? description = freezed,
     Object? sourceType = null,
     Object? sourceSpecId = freezed,
+    Object? globalHeaders = null,
     Object? createdAt = null,
     Object? updatedAt = null,
   }) {
@@ -180,6 +189,10 @@ class __$$CollectionImplCopyWithImpl<$Res>
             ? _value.sourceSpecId
             : sourceSpecId // ignore: cast_nullable_to_non_nullable
                   as String?,
+        globalHeaders: null == globalHeaders
+            ? _value._globalHeaders
+            : globalHeaders // ignore: cast_nullable_to_non_nullable
+                  as Map<String, String>,
         createdAt: null == createdAt
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
@@ -202,9 +215,10 @@ class _$CollectionImpl implements _Collection {
     this.description,
     this.sourceType = 'manual',
     this.sourceSpecId,
+    final Map<String, String> globalHeaders = const {},
     required this.createdAt,
     required this.updatedAt,
-  });
+  }) : _globalHeaders = globalHeaders;
 
   factory _$CollectionImpl.fromJson(Map<String, dynamic> json) =>
       _$$CollectionImplFromJson(json);
@@ -220,6 +234,15 @@ class _$CollectionImpl implements _Collection {
   final String sourceType;
   @override
   final String? sourceSpecId;
+  final Map<String, String> _globalHeaders;
+  @override
+  @JsonKey()
+  Map<String, String> get globalHeaders {
+    if (_globalHeaders is EqualUnmodifiableMapView) return _globalHeaders;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(_globalHeaders);
+  }
+
   @override
   final DateTime createdAt;
   @override
@@ -227,7 +250,7 @@ class _$CollectionImpl implements _Collection {
 
   @override
   String toString() {
-    return 'Collection(id: $id, name: $name, description: $description, sourceType: $sourceType, sourceSpecId: $sourceSpecId, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'Collection(id: $id, name: $name, description: $description, sourceType: $sourceType, sourceSpecId: $sourceSpecId, globalHeaders: $globalHeaders, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -243,6 +266,10 @@ class _$CollectionImpl implements _Collection {
                 other.sourceType == sourceType) &&
             (identical(other.sourceSpecId, sourceSpecId) ||
                 other.sourceSpecId == sourceSpecId) &&
+            const DeepCollectionEquality().equals(
+              other._globalHeaders,
+              _globalHeaders,
+            ) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -258,6 +285,7 @@ class _$CollectionImpl implements _Collection {
     description,
     sourceType,
     sourceSpecId,
+    const DeepCollectionEquality().hash(_globalHeaders),
     createdAt,
     updatedAt,
   );
@@ -283,6 +311,7 @@ abstract class _Collection implements Collection {
     final String? description,
     final String sourceType,
     final String? sourceSpecId,
+    final Map<String, String> globalHeaders,
     required final DateTime createdAt,
     required final DateTime updatedAt,
   }) = _$CollectionImpl;
@@ -300,6 +329,8 @@ abstract class _Collection implements Collection {
   String get sourceType;
   @override
   String? get sourceSpecId;
+  @override
+  Map<String, String> get globalHeaders;
   @override
   DateTime get createdAt;
   @override

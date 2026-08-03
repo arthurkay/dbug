@@ -7,10 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 
 import '../../../core/providers/repository_providers.dart';
+import '../../../core/providers/active_environment_provider.dart';
 import '../../../core/repositories/request_repository.dart';
 import '../../../core/models/collection_model.dart';
 import '../../../core/models/request_model.dart';
 import '../../../shared/widgets/file_explorer.dart';
+import '../../../shared/widgets/key_value_editor.dart';
 import '../../../shared/widgets/toast_helper.dart';
 
 class CollectionsScreen extends ConsumerStatefulWidget {
@@ -158,8 +160,8 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     });
   }
 
-  void _openRequest(RequestModel request) {
-    context.go('/request', extra: request);
+  void _openRequest(RequestModel request, Map<String, String> collectionHeaders) {
+    context.go('/request', extra: {'request': request, 'collectionHeaders': collectionHeaders});
   }
 
   @override
@@ -195,7 +197,9 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
               ],
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          _buildEnvSection(colorScheme),
+          const SizedBox(height: 12),
           Expanded(
             child: _showFileExplorer
                 ? FileExplorer(
@@ -234,6 +238,143 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                       );
                     },
                   ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnvSection(shad.ColorScheme colorScheme) {
+    final activeEnv = ref.watch(activeEnvironmentProvider);
+
+    if (activeEnv == null) {
+      return shad.Card(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.warning_amber, size: 16, color: const Color(0xFFF59E0B)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'No active environment — {{variables}} will not be substituted',
+                  style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground),
+                ),
+              ),
+              shad.Button.outline(
+                onPressed: () => context.go('/environments'),
+                child: const Text('Set Up', style: TextStyle(fontSize: 11)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final variables = activeEnv.variables;
+
+    return shad.Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.code, size: 14, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  activeEnv.name,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.foreground),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${variables.length} var${variables.length == 1 ? '' : 's'}',
+                  style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground),
+                ),
+                const Spacer(),
+                shad.Button.ghost(
+                  onPressed: () => _showQuickAddVarDialog(context),
+                  leading: const Icon(Icons.add, size: 14),
+                  child: const Text('Add Var', style: TextStyle(fontSize: 11)),
+                ),
+                shad.Button.ghost(
+                  onPressed: () => context.go('/environments'),
+                  child: const Text('Manage', style: TextStyle(fontSize: 11)),
+                ),
+              ],
+            ),
+            if (variables.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: variables.entries.map((e) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: colorScheme.muted.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '{{${e.key}}}',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.primary, fontFamily: 'monospace'),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '= ${e.value}',
+                          style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground, fontFamily: 'monospace'),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showQuickAddVarDialog(BuildContext context) {
+    final nameController = TextEditingController();
+    final valueController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => shad.AlertDialog(
+        title: const Text('Add Variable'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            shad.TextField(controller: nameController, placeholder: const Text('Variable name')),
+            const SizedBox(height: 12),
+            shad.TextField(controller: valueController, placeholder: const Text('Value')),
+          ],
+        ),
+        actions: [
+          shad.Button.ghost(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          shad.Button.primary(
+            onPressed: () async {
+              if (nameController.text.isNotEmpty) {
+                final env = ref.read(activeEnvironmentProvider);
+                if (env != null) {
+                  final updated = Map<String, String>.from(env.variables);
+                  updated[nameController.text] = valueController.text;
+                  final updatedEnv = env.copyWith(variables: updated);
+                  await ref.read(environmentRepositoryProvider).updateEnvironment(updatedEnv);
+                  ref.read(activeEnvironmentProvider.notifier).state = updatedEnv;
+                  ref.invalidate(environmentsProvider);
+                }
+                if (context.mounted) Navigator.pop(context);
+              }
+            },
+            child: const Text('Add'),
           ),
         ],
       ),
@@ -303,12 +444,12 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
   }
 }
 
-class _CollectionExpandable extends StatelessWidget {
+class _CollectionExpandable extends ConsumerWidget {
   final Collection collection;
   final bool isExpanded;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
-  final ValueChanged<RequestModel> onRequestTap;
+  final void Function(RequestModel request, Map<String, String> headers) onRequestTap;
 
   const _CollectionExpandable({
     required this.collection,
@@ -319,8 +460,9 @@ class _CollectionExpandable extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = shad.Theme.of(context).colorScheme;
+    final headerCount = collection.globalHeaders.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -343,6 +485,26 @@ class _CollectionExpandable extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (headerCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.key, size: 10, color: colorScheme.primary),
+                        const SizedBox(width: 3),
+                        Text('$headerCount', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: colorScheme.primary)),
+                      ],
+                    ),
+                  ),
+                shad.IconButton.ghost(
+                  icon: Icon(Icons.vpn_key_outlined, size: 16, color: headerCount > 0 ? colorScheme.primary : colorScheme.mutedForeground),
+                  onPressed: () => _showHeadersDialog(context, ref),
+                ),
                 Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 18, color: colorScheme.mutedForeground),
                 const SizedBox(width: 4),
                 shad.IconButton.ghost(icon: const Icon(Icons.delete_outline, size: 14), onPressed: onDelete),
@@ -350,18 +512,121 @@ class _CollectionExpandable extends StatelessWidget {
             ),
           ),
         ),
-        if (isExpanded)
-          _RequestList(collectionId: collection.id, onRequestTap: onRequestTap),
+        if (isExpanded) ...[
+          if (headerCount > 0)
+            _buildHeadersPreview(colorScheme),
+          _RequestList(
+            collectionId: collection.id,
+            onRequestTap: onRequestTap,
+            collectionHeaders: collection.globalHeaders,
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildHeadersPreview(shad.ColorScheme colorScheme) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: colorScheme.muted.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.vpn_key_outlined, size: 12, color: colorScheme.primary),
+              const SizedBox(width: 6),
+              Text('Collection Headers', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.mutedForeground, letterSpacing: 0.5)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...collection.globalHeaders.entries.map((e) => Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Row(
+              children: [
+                Text(e.key, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.foreground, fontFamily: 'monospace')),
+                Text(': ', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
+                Expanded(
+                  child: Text(e.value, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  void _showHeadersDialog(BuildContext context, WidgetRef ref) {
+    final entries = collection.globalHeaders.entries
+        .map((e) => KeyValueEntry(key: e.key, value: e.value))
+        .toList();
+    if (entries.isEmpty) entries.add(KeyValueEntry());
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => shad.AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.vpn_key_outlined, size: 18, color: shad.Theme.of(dialogContext).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text('${collection.name} Headers'),
+            ],
+          ),
+          content: SizedBox(
+            width: 450,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'These headers are automatically included in every request in this collection. Request-level headers take precedence.',
+                  style: TextStyle(fontSize: 12, color: shad.Theme.of(dialogContext).colorScheme.mutedForeground),
+                ),
+                const SizedBox(height: 16),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: KeyValueEditor(
+                      entries: entries,
+                      keyHint: 'Header name',
+                      valueHint: 'Value',
+                      onChanged: () => setDialogState(() {}),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            shad.Button.ghost(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            shad.Button.primary(
+              onPressed: () async {
+                final headers = entriesToMap(entries);
+                final updated = collection.copyWith(globalHeaders: headers);
+                await ref.read(collectionRepositoryProvider).updateCollection(updated);
+                ref.invalidate(collectionsProvider);
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 class _RequestList extends ConsumerWidget {
   final String collectionId;
-  final ValueChanged<RequestModel> onRequestTap;
+  final void Function(RequestModel request, Map<String, String> headers) onRequestTap;
+  final Map<String, String> collectionHeaders;
 
-  const _RequestList({required this.collectionId, required this.onRequestTap});
+  const _RequestList({required this.collectionId, required this.onRequestTap, this.collectionHeaders = const {}});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -388,7 +653,7 @@ class _RequestList extends ConsumerWidget {
           padding: const EdgeInsets.only(left: 16),
           child: Column(
             children: requests.map((req) => InkWell(
-              onTap: () => onRequestTap(req),
+            onTap: () => onRequestTap(req, collectionHeaders),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 child: Row(

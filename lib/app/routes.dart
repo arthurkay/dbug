@@ -28,8 +28,16 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/request',
           pageBuilder: (context, state) {
-            final req = state.extra as RequestModel?;
-            return NoTransitionPage(child: RequestScreen(initialRequest: req));
+            RequestModel? req;
+            Map<String, String> collectionHeaders = {};
+            if (state.extra is RequestModel) {
+              req = state.extra as RequestModel;
+            } else if (state.extra is Map) {
+              final extra = state.extra as Map;
+              req = extra['request'] as RequestModel?;
+              collectionHeaders = Map<String, String>.from(extra['collectionHeaders'] ?? {});
+            }
+            return NoTransitionPage(child: RequestScreen(initialRequest: req, collectionHeaders: collectionHeaders));
           },
         ),
         GoRoute(

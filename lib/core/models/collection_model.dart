@@ -11,6 +11,7 @@ class Collection with _$Collection {
     String? description,
     @Default('manual') String sourceType,
     String? sourceSpecId,
+    @Default({}) Map<String, String> globalHeaders,
     required DateTime createdAt,
     required DateTime updatedAt,
   }) = _Collection;
