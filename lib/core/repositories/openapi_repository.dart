@@ -7,15 +7,15 @@ import '../../features/openapi/data/openapi_parser.dart';
 class OpenApiRepository {
   static const _uuid = Uuid();
 
-  static Future<OpenApiSpec> saveParsedSpec(ParsedSpec parsed, {String sourceType = 'file', String? sourceUrl}) async {
+  Future<OpenApiSpec> saveParsedSpec(ParsedSpec parsed, {String sourceType = 'file', String? sourceUrl}) async {
     final db = await DatabaseService.database;
-    final id = _uuid.v4();
+    final specId = _uuid.v4();
     final now = DateTime.now();
 
     final endpointsJson = parsed.endpoints.map((e) => e.toJson()).toList();
 
     await db.insert('openapi_specs', {
-      'id': id,
+      'id': specId,
       'title': parsed.title,
       'version': parsed.version,
       'base_url': parsed.baseUrl,
@@ -27,8 +27,39 @@ class OpenApiRepository {
       'updated_at': now.millisecondsSinceEpoch,
     });
 
+    final collectionId = _uuid.v4();
+    await db.insert('collections', {
+      'id': collectionId,
+      'name': parsed.title ?? 'Imported Spec',
+      'description': '${parsed.endpoints.length} endpoints • ${parsed.version ?? ''}',
+      'source_type': 'openapi',
+      'source_spec_id': specId,
+      'created_at': now.millisecondsSinceEpoch,
+      'updated_at': now.millisecondsSinceEpoch,
+    });
+
+    final baseUrl = parsed.baseUrl ?? '';
+    for (final ep in parsed.endpoints) {
+      final requestId = _uuid.v4();
+      final url = baseUrl.isNotEmpty ? '$baseUrl${ep.path}' : ep.path;
+
+      await db.insert('requests', {
+        'id': requestId,
+        'collection_id': collectionId,
+        'name': ep.summary ?? '${ep.method} ${ep.path}',
+        'method': ep.method,
+        'url': url,
+        'headers': '{}',
+        'body_type': null,
+        'body': null,
+        'query_params': '{}',
+        'created_at': now.millisecondsSinceEpoch,
+        'updated_at': now.millisecondsSinceEpoch,
+      });
+    }
+
     return OpenApiSpec(
-      id: id,
+      id: specId,
       title: parsed.title,
       version: parsed.version,
       baseUrl: parsed.baseUrl,
@@ -41,7 +72,7 @@ class OpenApiRepository {
     );
   }
 
-  static Future<List<OpenApiSpec>> getAllSpecs() async {
+  Future<List<OpenApiSpec>> getAllSpecs() async {
     final db = await DatabaseService.database;
     final rows = await db.query('openapi_specs', orderBy: 'imported_at DESC');
 
@@ -66,12 +97,17 @@ class OpenApiRepository {
     }).toList();
   }
 
-  static Future<void> deleteSpec(String id) async {
+  Future<void> deleteSpec(String id) async {
     final db = await DatabaseService.database;
+    final collections = await db.query('collections', where: 'source_spec_id = ?', whereArgs: [id]);
+    for (final c in collections) {
+      await db.delete('requests', where: 'collection_id = ?', whereArgs: [c['id']]);
+    }
+    await db.delete('collections', where: 'source_spec_id = ?', whereArgs: [id]);
     await db.delete('openapi_specs', where: 'id = ?', whereArgs: [id]);
   }
 
-  static Future<OpenApiSpec?> getSpec(String id) async {
+  Future<OpenApiSpec?> getSpec(String id) async {
     final db = await DatabaseService.database;
     final rows = await db.query('openapi_specs', where: 'id = ?', whereArgs: [id]);
     if (rows.isEmpty) return null;

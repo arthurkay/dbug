@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import '../constants/app_constants.dart';
 
-class HttpClient {
+class DbugHttpClient {
   late final Dio _dio;
 
   HttpClient() {

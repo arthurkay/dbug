@@ -1,33 +1,28 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 
-import '../../../core/repositories/collection_repository.dart';
+import '../../../core/providers/repository_providers.dart';
+import '../../../core/repositories/request_repository.dart';
 import '../../../core/models/collection_model.dart';
+import '../../../core/models/request_model.dart';
 import '../../../shared/widgets/file_explorer.dart';
+import '../../../shared/widgets/toast_helper.dart';
 
-class CollectionsScreen extends StatefulWidget {
+class CollectionsScreen extends ConsumerStatefulWidget {
   const CollectionsScreen({super.key});
 
   @override
-  State<CollectionsScreen> createState() => _CollectionsScreenState();
+  ConsumerState<CollectionsScreen> createState() => _CollectionsScreenState();
 }
 
-class _CollectionsScreenState extends State<CollectionsScreen> {
+class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
   bool _showFileExplorer = false;
-  List<Collection> _collections = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCollections();
-  }
-
-  Future<void> _loadCollections() async {
-    final collections = await CollectionRepository.getAllCollections();
-    if (mounted) setState(() => _collections = collections);
-  }
+  final Set<String> _expandedCollections = {};
 
   Future<void> _importFromFile() async {
     final result = await FilePicker.platform.pickFiles(
@@ -44,46 +39,133 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
   Future<void> _parseCollection(String content, String fileName) async {
     try {
-      await CollectionRepository.createCollection(
-        name: fileName.replaceAll('.json', ''),
-        description: 'Imported from $fileName',
-        sourceType: 'import',
-      );
-      await _loadCollections();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Imported "$fileName"'),
-            backgroundColor: const Color(0xFF22C55E),
-          ),
+      final json = jsonDecode(content);
+      final collectionRepo = ref.read(collectionRepositoryProvider);
+      final requestRepo = ref.read(requestRepositoryProvider);
+
+      if (json is Map<String, dynamic> && json.containsKey('info')) {
+        // Postman Collection v2.1
+        final name = json['info']['name'] ?? fileName.replaceAll('.json', '');
+        final desc = json['info']['description']?.toString();
+
+        final collection = await collectionRepo.createCollection(
+          name: name,
+          description: desc ?? 'Imported from $fileName',
+          sourceType: 'postman',
         );
+
+        final items = json['item'] as List? ?? [];
+        await _parsePostmanItems(items, requestRepo, collection.id, '');
+
+        ref.invalidate(collectionsProvider);
+        if (mounted) {
+          showDbugToast(context, message: 'Imported "$name"', type: ToastType.success);
+        }
+      } else {
+        // Unknown format — create empty collection
+        await collectionRepo.createCollection(
+          name: fileName.replaceAll('.json', ''),
+          description: 'Imported from $fileName',
+          sourceType: 'import',
+        );
+        ref.invalidate(collectionsProvider);
+        if (mounted) {
+          showDbugToast(context, message: 'Imported "$fileName" (no requests parsed)', type: ToastType.warning);
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to import: $e'),
-            backgroundColor: const Color(0xFFEF4444),
-          ),
+        showDbugToast(context, message: 'Failed to import: $e', type: ToastType.error);
+      }
+    }
+  }
+
+  Future<void> _parsePostmanItems(List items, RequestRepository requestRepo, String collectionId, String prefix) async {
+    for (final item in items) {
+      if (item is! Map<String, dynamic>) continue;
+
+      if (item.containsKey('item') && item['item'] is List) {
+        // It's a folder — recurse
+        final folderName = item['name'] ?? 'Folder';
+        final subCollection = await ref.read(collectionRepositoryProvider).createCollection(
+          name: '$prefix$folderName',
+          description: 'Subfolder',
+          sourceType: 'postman',
+        );
+        await _parsePostmanItems(item['item'] as List, requestRepo, subCollection.id, '');
+      } else if (item.containsKey('request')) {
+        // It's a request
+        final req = item['request'] as Map<String, dynamic>;
+        final name = item['name'] ?? 'Untitled';
+        final method = (req['method'] ?? 'GET').toString().toUpperCase();
+
+        String url = '';
+        final urlData = req['url'];
+        if (urlData is String) {
+          url = urlData;
+        } else if (urlData is Map<String, dynamic>) {
+          final raw = urlData['raw']?.toString() ?? '';
+          url = raw;
+        }
+
+        final headers = <String, String>{};
+        for (final h in (req['header'] as List? ?? [])) {
+          if (h is Map<String, dynamic> && h['key'] != null && h['value'] != null) {
+            headers[h['key'].toString()] = h['value'].toString();
+          }
+        }
+
+        String? body;
+        String? bodyType;
+        final bodyData = req['body'];
+        if (bodyData is Map<String, dynamic>) {
+          bodyType = bodyData['mode']?.toString();
+          if (bodyType == 'raw') {
+            body = bodyData['raw']?.toString();
+          }
+        }
+
+        final queryParams = <String, String>{};
+        if (urlData is Map<String, dynamic>) {
+          for (final q in (urlData['query'] as List? ?? [])) {
+            if (q is Map<String, dynamic> && q['key'] != null) {
+              queryParams[q['key'].toString()] = q['value']?.toString() ?? '';
+            }
+          }
+        }
+
+        await requestRepo.createRequest(
+          collectionId: collectionId,
+          name: name,
+          method: method,
+          url: url,
+          headers: headers,
+          bodyType: bodyType,
+          body: body,
+          queryParams: queryParams,
         );
       }
     }
   }
 
-  Future<void> _deleteCollection(Collection collection) async {
-    await CollectionRepository.deleteCollection(collection.id);
-    await _loadCollections();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Deleted "${collection.name}"')),
-      );
-    }
+  void _toggleExpand(String collectionId) {
+    setState(() {
+      if (_expandedCollections.contains(collectionId)) {
+        _expandedCollections.remove(collectionId);
+      } else {
+        _expandedCollections.add(collectionId);
+      }
+    });
+  }
+
+  void _openRequest(RequestModel request) {
+    context.go('/request', extra: request);
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = shad.Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = shad.Theme.of(context).colorScheme;
+    final collectionsAsync = ref.watch(collectionsProvider);
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -96,49 +178,20 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Collections',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.foreground,
-                      ),
-                    ),
+                    Text('Collections', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.foreground)),
                     const SizedBox(height: 4),
-                    Text(
-                      'Organize your requests into collections',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.mutedForeground,
-                      ),
-                    ),
+                    Text('Organize your requests into collections', style: TextStyle(fontSize: 13, color: colorScheme.mutedForeground)),
                   ],
                 ),
               ),
-              if (_showFileExplorer) ...[
-                shad.Button.ghost(
-                  onPressed: () => setState(() => _showFileExplorer = false),
-                  leading: const Icon(Icons.close, size: 16),
-                  child: const Text('Close Explorer'),
-                ),
-              ] else ...[
-                shad.Button.outline(
-                  onPressed: _importFromFile,
-                  leading: const Icon(Icons.file_upload_outlined, size: 16),
-                  child: const Text('Import'),
-                ),
+              if (_showFileExplorer)
+                shad.Button.ghost(onPressed: () => setState(() => _showFileExplorer = false), leading: const Icon(Icons.close, size: 16), child: const Text('Close Explorer'))
+              else ...[
+                shad.Button.outline(onPressed: _importFromFile, leading: const Icon(Icons.file_upload_outlined, size: 16), child: const Text('Import')),
                 const SizedBox(width: 8),
-                shad.Button.outline(
-                  onPressed: () => setState(() => _showFileExplorer = true),
-                  leading: const Icon(Icons.folder_open, size: 16),
-                  child: const Text('Browse'),
-                ),
+                shad.Button.outline(onPressed: () => setState(() => _showFileExplorer = true), leading: const Icon(Icons.folder_open, size: 16), child: const Text('Browse')),
                 const SizedBox(width: 8),
-                shad.Button.primary(
-                  onPressed: () => _showCreateDialog(context),
-                  leading: const Icon(Icons.add, size: 16),
-                  child: const Text('New Collection'),
-                ),
+                shad.Button.primary(onPressed: () => _showCreateDialog(context), leading: const Icon(Icons.add, size: 16), child: const Text('New Collection')),
               ],
             ],
           ),
@@ -152,29 +205,37 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                       await _parseCollection(content, file.path.split('/').last);
                     },
                   )
-                : _buildCollectionList(colorScheme),
+                : collectionsAsync.when(
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(child: Text('Error: $e')),
+                    data: (collections) {
+                      if (collections.isEmpty) return _buildEmptyState(colorScheme);
+                      return shad.Card(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          itemCount: collections.length,
+                          itemBuilder: (context, index) {
+                            final collection = collections[index];
+                            final isExpanded = _expandedCollections.contains(collection.id);
+                            return _CollectionExpandable(
+                              collection: collection,
+                              isExpanded: isExpanded,
+                              onToggle: () => _toggleExpand(collection.id),
+                              onDelete: () async {
+                                final requestRepo = ref.read(requestRepositoryProvider);
+                                await requestRepo.deleteByCollection(collection.id);
+                                await ref.read(collectionRepositoryProvider).deleteCollection(collection.id);
+                                ref.invalidate(collectionsProvider);
+                              },
+                              onRequestTap: _openRequest,
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCollectionList(shad.ColorScheme colorScheme) {
-    if (_collections.isEmpty) {
-      return _buildEmptyState(colorScheme);
-    }
-
-    return shad.Card(
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        itemCount: _collections.length,
-        itemBuilder: (context, index) {
-          final collection = _collections[index];
-          return _CollectionTile(
-            collection: collection,
-            onDelete: () => _deleteCollection(collection),
-          );
-        },
       ),
     );
   }
@@ -185,40 +246,18 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.folder_open,
-              size: 48,
-              color: colorScheme.mutedForeground,
-            ),
+            Icon(Icons.folder_open, size: 48, color: colorScheme.mutedForeground),
             const SizedBox(height: 16),
-            Text(
-              'No collections yet',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: colorScheme.foreground,
-              ),
-            ),
+            Text('No collections yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
             const SizedBox(height: 8),
-            Text(
-              'Create a collection or import a Postman/Insomnia file',
-              style: TextStyle(color: colorScheme.mutedForeground),
-            ),
+            Text('Create a collection or import an OpenAPI spec', style: TextStyle(color: colorScheme.mutedForeground)),
             const SizedBox(height: 16),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                shad.Button.primary(
-                  onPressed: () => _showCreateDialog(context),
-                  leading: const Icon(Icons.add, size: 16),
-                  child: const Text('New Collection'),
-                ),
+                shad.Button.primary(onPressed: () => _showCreateDialog(context), leading: const Icon(Icons.add, size: 16), child: const Text('New Collection')),
                 const SizedBox(width: 8),
-                shad.Button.outline(
-                  onPressed: _importFromFile,
-                  leading: const Icon(Icons.file_upload_outlined, size: 16),
-                  child: const Text('Import File'),
-                ),
+                shad.Button.outline(onPressed: _importFromFile, leading: const Icon(Icons.file_upload_outlined, size: 16), child: const Text('Import File')),
               ],
             ),
           ],
@@ -238,30 +277,21 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            shad.TextField(
-              controller: nameController,
-              placeholder: const Text('Collection name'),
-            ),
+            shad.TextField(controller: nameController, placeholder: const Text('Collection name')),
             const SizedBox(height: 12),
-            shad.TextField(
-              controller: descController,
-              placeholder: const Text('Description (optional)'),
-            ),
+            shad.TextField(controller: descController, placeholder: const Text('Description (optional)')),
           ],
         ),
         actions: [
-          shad.Button.ghost(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          shad.Button.ghost(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           shad.Button.primary(
             onPressed: () async {
               if (nameController.text.isNotEmpty) {
-                await CollectionRepository.createCollection(
+                await ref.read(collectionRepositoryProvider).createCollection(
                   name: nameController.text,
                   description: descController.text.isNotEmpty ? descController.text : null,
                 );
-                await _loadCollections();
+                ref.invalidate(collectionsProvider);
                 if (context.mounted) Navigator.pop(context);
               }
             },
@@ -273,59 +303,122 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   }
 }
 
-class _CollectionTile extends StatelessWidget {
+class _CollectionExpandable extends StatelessWidget {
   final Collection collection;
+  final bool isExpanded;
+  final VoidCallback onToggle;
   final VoidCallback onDelete;
+  final ValueChanged<RequestModel> onRequestTap;
 
-  const _CollectionTile({required this.collection, required this.onDelete});
+  const _CollectionExpandable({
+    required this.collection,
+    required this.isExpanded,
+    required this.onToggle,
+    required this.onDelete,
+    required this.onRequestTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = shad.Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-      child: shad.Button.ghost(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              Icon(Icons.folder, size: 16, color: const Color(0xFFF59E0B)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: onToggle,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Icon(isExpanded ? Icons.folder_open : Icons.folder, size: 16, color: const Color(0xFFF59E0B)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(collection.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.foreground), overflow: TextOverflow.ellipsis),
+                      if (collection.description != null)
+                        Text(collection.description!, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground), overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 18, color: colorScheme.mutedForeground),
+                const SizedBox(width: 4),
+                shad.IconButton.ghost(icon: const Icon(Icons.delete_outline, size: 14), onPressed: onDelete),
+              ],
+            ),
+          ),
+        ),
+        if (isExpanded)
+          _RequestList(collectionId: collection.id, onRequestTap: onRequestTap),
+      ],
+    );
+  }
+}
+
+class _RequestList extends ConsumerWidget {
+  final String collectionId;
+  final ValueChanged<RequestModel> onRequestTap;
+
+  const _RequestList({required this.collectionId, required this.onRequestTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = shad.Theme.of(context).colorScheme;
+    final requestsAsync = ref.watch(requestsByCollectionProvider(collectionId));
+
+    return requestsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(12),
+        child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.all(12),
+        child: Text('Error: $e', style: TextStyle(color: colorScheme.mutedForeground)),
+      ),
+      data: (requests) {
+        if (requests.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text('No requests', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Column(
+            children: requests.map((req) => InkWell(
+              onTap: () => onRequestTap(req),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                child: Row(
                   children: [
-                    Text(
-                      collection.name,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: colorScheme.foreground,
+                    Container(
+                      width: 52,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _methodColor(req.method).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      overflow: TextOverflow.ellipsis,
+                      child: Text(req.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _methodColor(req.method)), textAlign: TextAlign.center),
                     ),
-                    if (collection.description != null)
-                      Text(
-                        collection.description!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: colorScheme.mutedForeground,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(req.name, style: TextStyle(fontSize: 12, color: colorScheme.foreground), overflow: TextOverflow.ellipsis)),
                   ],
                 ),
               ),
-              shad.IconButton.ghost(
-                icon: const Icon(Icons.delete_outline, size: 14),
-                onPressed: onDelete,
-              ),
-            ],
+            )).toList(),
           ),
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  Color _methodColor(String method) {
+    const colors = {
+      'GET': Color(0xFF22C55E), 'POST': Color(0xFF3B82F6), 'PUT': Color(0xFFF59E0B),
+      'PATCH': Color(0xFFF97316), 'DELETE': Color(0xFFEF4444),
+    };
+    return colors[method.toUpperCase()] ?? const Color(0xFF6B7280);
   }
 }

@@ -5,7 +5,7 @@ import '../models/collection_model.dart';
 class CollectionRepository {
   static const _uuid = Uuid();
 
-  static Future<Collection> createCollection({
+  Future<Collection> createCollection({
     required String name,
     String? description,
     String sourceType = 'manual',
@@ -36,7 +36,7 @@ class CollectionRepository {
     );
   }
 
-  static Future<List<Collection>> getAllCollections() async {
+  Future<List<Collection>> getAllCollections() async {
     final db = await DatabaseService.database;
     final rows = await db.query('collections', orderBy: 'created_at DESC');
 
@@ -51,12 +51,28 @@ class CollectionRepository {
     )).toList();
   }
 
-  static Future<void> deleteCollection(String id) async {
+  Future<void> updateCollection(Collection collection) async {
+    final db = await DatabaseService.database;
+    await db.update(
+      'collections',
+      {
+        'name': collection.name,
+        'description': collection.description,
+        'source_type': collection.sourceType,
+        'source_spec_id': collection.sourceSpecId,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [collection.id],
+    );
+  }
+
+  Future<void> deleteCollection(String id) async {
     final db = await DatabaseService.database;
     await db.delete('collections', where: 'id = ?', whereArgs: [id]);
   }
 
-  static Future<Collection?> getCollection(String id) async {
+  Future<Collection?> getCollection(String id) async {
     final db = await DatabaseService.database;
     final rows = await db.query('collections', where: 'id = ?', whereArgs: [id]);
     if (rows.isEmpty) return null;
