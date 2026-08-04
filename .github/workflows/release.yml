@@ -36,9 +36,7 @@ jobs:
         run: flutter build linux --release
 
       - name: Package Linux build
-        run: |
-          cd build/linux/x64/release/bundle
-          tar -czf ../../../dbug-linux-x64.tar.gz .
+        run: tar -czf build/dbug-linux-x64.tar.gz -C build/linux/x64/release/bundle .
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
@@ -64,9 +62,7 @@ jobs:
         run: flutter build macos --release
 
       - name: Package macOS build
-        run: |
-          cd build/macos/Build/Products/Release
-          ditto -c -k --sequesterRsrc --keepParent dbug.app ../../../dbug-macos.zip
+        run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/dbug.app build/dbug-macos.zip
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
