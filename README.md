@@ -111,6 +111,29 @@ The release build output is in `build/<platform>/...`:
 - macOS: `build/macos/Build/Products/Release/`
 - Windows: `build/windows/x64/runner/Release/`
 
+### Uninstallation
+
+```bash
+# Using the install script (recommended)
+./install.sh --uninstall
+```
+
+Or remove manually:
+
+**Linux:**
+```bash
+rm -rf ~/.local/share/dbug
+rm -f ~/.local/bin/dbug
+rm -f ~/.local/share/applications/zm.co.cloud.dbug.desktop
+find ~/.local/share/icons/hicolor -name "dbug*" -delete
+```
+
+**macOS:**
+```bash
+rm -rf /Applications/dbug.app
+rm -rf ~/.local/share/dbug
+```
+
 ## Usage
 
 ### Sending Requests
