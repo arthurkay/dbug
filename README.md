@@ -16,13 +16,29 @@ A local API testing tool like Postman, built with Flutter.
 
 ### Quick Install (Linux & macOS)
 
-Run the install script to download and set up the latest release:
+**One-line install from GitHub:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/arthurkay/dbug/main/install.sh | bash
 ```
 
-Or clone and run locally:
+This downloads and executes the install script directly — no clone needed. You can pass options through `bash -s`:
+
+```bash
+# Install a specific version
+curl -fsSL https://raw.githubusercontent.com/arthurkay/dbug/main/install.sh | bash -s -- --version 0.0.1
+
+# Check for updates without installing
+curl -fsSL https://raw.githubusercontent.com/arthurkay/dbug/main/install.sh | bash -s -- --check
+
+# Force reinstall
+curl -fsSL https://raw.githubusercontent.com/arthurkay/dbug/main/install.sh | bash -s -- --force
+
+# Uninstall
+curl -fsSL https://raw.githubusercontent.com/arthurkay/dbug/main/install.sh | bash -s -- --uninstall
+```
+
+**Or clone and run locally:**
 
 ```bash
 git clone https://github.com/arthurkay/dbug.git
@@ -30,13 +46,14 @@ cd dbug
 ./install.sh
 ```
 
-The script will:
-- Detect your platform (Linux x64 / macOS) and download the correct binary
-- Install to `~/.local/share/dbug/` (Linux) or `/Applications/dbug.app` (macOS)
-- Create a symlink at `~/.local/bin/dbug` (Linux)
-- Install the desktop entry and icons for app menu integration (Linux)
+**What the script does:**
+- Detects your platform (Linux x64 / macOS ARM64) and downloads the correct binary
+- Installs to `~/.local/share/dbug/` (Linux) or `/Applications/dbug.app` (macOS)
+- Creates a symlink at `~/.local/bin/dbug` (Linux)
+- Installs the desktop entry and icons for app menu integration (Linux)
+- Tracks installed version in `~/.local/share/dbug/.version` for upgrade detection
 
-#### Script Options
+**Script Options:**
 
 | Command | Description |
 |---------|-------------|
@@ -47,7 +64,7 @@ The script will:
 | `./install.sh --uninstall` | Remove dbug from the system |
 | `./install.sh --help` | Show all options |
 
-Running the script again when already up-to-date will skip the download. When a new version is released, run `./install.sh` again to upgrade — it will detect the new version and replace the existing installation.
+**Upgrade behavior:** Running the script again when already up-to-date will skip the download. When a new version is released, run `./install.sh` again — it will detect the new version and replace the existing installation automatically.
 
 ### Download Pre-built Binaries
 
