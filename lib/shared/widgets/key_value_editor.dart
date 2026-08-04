@@ -41,15 +41,18 @@ class KeyValueEditor extends StatefulWidget {
 
 class _KeyValueEditorState extends State<KeyValueEditor> {
   void _addEntry() {
+    setState(() {
+      widget.entries.add(KeyValueEntry());
+    });
     widget.onChanged?.call();
   }
 
   void _removeEntry(int index) {
-    widget.entries.removeAt(index);
+    setState(() {
+      widget.entries.removeAt(index);
+    });
     widget.onChanged?.call();
   }
-
-  @override
 
   @override
   Widget build(BuildContext context) {

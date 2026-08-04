@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 
@@ -61,6 +62,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
   @override
   void initState() {
     super.initState();
+    _loadSplitRatio();
     _params = [KeyValueEntry()];
     _headers = [KeyValueEntry()];
     if (widget.historyEntry != null) {
@@ -68,6 +70,19 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     } else if (widget.initialRequest != null) {
       _loadFromRequest(widget.initialRequest!);
     }
+  }
+
+  Future<void> _loadSplitRatio() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getDouble('response_split_ratio');
+    if (saved != null && mounted) {
+      setState(() => _responseSplitRatio = saved.clamp(0.2, 0.8));
+    }
+  }
+
+  void _saveSplitRatio() {
+    SharedPreferences.getInstance().then((prefs) =>
+      prefs.setDouble('response_split_ratio', _responseSplitRatio));
   }
 
   void _loadFromHistoryEntry(HistoryEntry entry) {
@@ -591,6 +606,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                   _responseSplitRatio += details.delta.dy / totalHeight;
                   _responseSplitRatio = _responseSplitRatio.clamp(0.2, 0.8);
                 });
+                _saveSplitRatio();
               },
               child: MouseRegion(
                 cursor: SystemMouseCursors.resizeUpDown,
@@ -642,12 +658,13 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
           value: _selectedMethod,
           onChanged: (v) { if (v != null) setState(() => _selectedMethod = v); },
           itemBuilder: (context, value) => Text(value, style: TextStyle(color: methodColor(value), fontWeight: FontWeight.w600, fontSize: 12)),
-          popup: (context) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: _methods.map((m) => shad.SelectItemButton<String>(
-              value: m,
-              child: Text(m, style: TextStyle(color: methodColor(m), fontWeight: FontWeight.w600, fontSize: 12)),
-            )).toList(),
+          popup: (context) => shad.SelectPopup<String>(
+            items: shad.SelectItemList(
+              children: _methods.map((m) => shad.SelectItemButton<String>(
+                value: m,
+                child: Text(m, style: TextStyle(color: methodColor(m), fontWeight: FontWeight.w600, fontSize: 12)),
+              )).toList(),
+            ),
           ),
         ),
         const SizedBox(width: 8),

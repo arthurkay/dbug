@@ -230,11 +230,12 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
                       value: statusCode,
                       onChanged: (v) { if (v != null) setDialogState(() => statusCode = v); },
                       itemBuilder: (context, value) => Text('$value', style: const TextStyle(fontSize: 12)),
-                      popup: (context) => Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [200, 201, 204, 400, 401, 403, 404, 500].map((c) =>
-                          shad.SelectItemButton<int>(value: c, child: Text('$c'))
-                        ).toList(),
+                      popup: (context) => shad.SelectPopup<int>(
+                        items: shad.SelectItemList(
+                          children: [200, 201, 204, 400, 401, 403, 404, 500].map((c) =>
+                            shad.SelectItemButton<int>(value: c, child: Text('$c'))
+                          ).toList(),
+                        ),
                       ),
                     ),
                   ),

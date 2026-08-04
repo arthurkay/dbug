@@ -181,7 +181,7 @@ class _Sidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = shad.Theme.of(context).colorScheme;
     final activeEnv = ref.watch(activeEnvironmentProvider);
-    final envsAsync = ref.watch(userEnvironmentsProvider);
+    final envsAsync = ref.watch(environmentsProvider);
 
     return Container(
       color: colorScheme.card,
@@ -249,23 +249,34 @@ class _Sidebar extends ConsumerWidget {
                         final env = envs.where((e) => e.id == value).firstOrNull;
                         return Text(env?.name ?? 'Unknown', style: TextStyle(fontSize: 12, color: colorScheme.foreground));
                       },
-                      popup: (context) => Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          shad.SelectItemButton<String?>(
-                            value: null,
-                            child: Text('None', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
-                          ),
-                          ...envs.map((env) => shad.SelectItemButton<String?>(
-                            value: env.id,
-                            child: Row(
-                              children: [
-                                Expanded(child: Text(env.name, style: const TextStyle(fontSize: 12))),
-                                Text('${env.variables.length} vars', style: TextStyle(fontSize: 10, color: colorScheme.mutedForeground)),
-                              ],
+                      popup: (context) => shad.SelectPopup<String?>(
+                        items: shad.SelectItemList(
+                          children: [
+                            shad.SelectItemButton<String?>(
+                              value: null,
+                              child: Text('None', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
                             ),
-                          )),
-                        ],
+                            ...envs.map((env) => shad.SelectItemButton<String?>(
+                              value: env.id,
+                              child: Row(
+                                children: [
+                                  Expanded(child: Text(env.name, style: const TextStyle(fontSize: 12))),
+                                  if (env.isOpenApiDefined)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                      child: const Text('API', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: Color(0xFF3B82F6))),
+                                    ),
+                                  const SizedBox(width: 4),
+                                  Text('${env.variables.length} vars', style: TextStyle(fontSize: 10, color: colorScheme.mutedForeground)),
+                                ],
+                              ),
+                            )),
+                          ],
+                        ),
                       ),
                     ),
                   ],

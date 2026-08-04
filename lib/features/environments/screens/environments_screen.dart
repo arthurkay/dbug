@@ -83,7 +83,7 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
                       return _EnvironmentTile(
                         env: env,
                         isActive: activeEnv?.id == env.id,
-                        canActivate: env.isUserDefined,
+                        canActivate: true,
                         onActivate: () {
                           ref.read(activeEnvironmentProvider.notifier).setActive(env);
                         },
