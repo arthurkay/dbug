@@ -7,22 +7,20 @@ final activeEnvironmentProvider = StateNotifierProvider<ActiveEnvironmentNotifie
 });
 
 class ActiveEnvironmentNotifier extends StateNotifier<Environment?> {
-  final Ref ref;
-  bool _loaded = false;
+  final Ref _ref;
 
-  ActiveEnvironmentNotifier(this.ref) : super(null) {
+  ActiveEnvironmentNotifier(this._ref) : super(null) {
     _loadActive();
   }
 
   Future<void> _loadActive() async {
-    final repo = ref.read(environmentRepositoryProvider);
+    final repo = _ref.read(environmentRepositoryProvider);
     final env = await repo.getActive();
     state = env;
-    _loaded = true;
   }
 
   Future<void> setActive(Environment? env) async {
-    final repo = ref.read(environmentRepositoryProvider);
+    final repo = _ref.read(environmentRepositoryProvider);
     if (env != null) {
       await repo.setActive(env.id);
     } else {
@@ -30,8 +28,6 @@ class ActiveEnvironmentNotifier extends StateNotifier<Environment?> {
     }
     state = env;
   }
-
-  bool get isLoaded => _loaded;
 }
 
 final activeVariablesProvider = Provider<Map<String, String>>((ref) {

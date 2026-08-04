@@ -200,28 +200,31 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => shad.AlertDialog(
-        title: const Text('New Environment'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            shad.TextField(controller: nameController, placeholder: const Text('Environment name (e.g. dev, staging)')),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => shad.AlertDialog(
+          title: const Text('New Environment'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              shad.TextField(controller: nameController, placeholder: const Text('Environment name (e.g. dev, staging)')),
+            ],
+          ),
+          actions: [
+            shad.Button.ghost(onPressed: () { nameController.dispose(); Navigator.pop(context); }, child: const Text('Cancel')),
+            shad.Button.primary(
+              onPressed: () async {
+                if (nameController.text.isNotEmpty) {
+                  await ref.read(environmentRepositoryProvider).createEnvironment(name: nameController.text);
+                  ref.invalidate(environmentsProvider);
+                  ref.invalidate(userEnvironmentsProvider);
+                  nameController.dispose();
+                  if (context.mounted) Navigator.pop(context);
+                }
+              },
+              child: const Text('Create'),
+            ),
           ],
         ),
-        actions: [
-          shad.Button.ghost(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          shad.Button.primary(
-            onPressed: () async {
-              if (nameController.text.isNotEmpty) {
-                await ref.read(environmentRepositoryProvider).createEnvironment(name: nameController.text);
-                ref.invalidate(environmentsProvider);
-                ref.invalidate(userEnvironmentsProvider);
-                if (context.mounted) Navigator.pop(context);
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
       ),
     );
   }

@@ -382,36 +382,40 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => shad.AlertDialog(
-        title: const Text('Add Variable'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            shad.TextField(controller: nameController, placeholder: const Text('Variable name')),
-            const SizedBox(height: 12),
-            shad.TextField(controller: valueController, placeholder: const Text('Value')),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => shad.AlertDialog(
+          title: const Text('Add Variable'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              shad.TextField(controller: nameController, placeholder: const Text('Variable name')),
+              const SizedBox(height: 12),
+              shad.TextField(controller: valueController, placeholder: const Text('Value')),
+            ],
+          ),
+          actions: [
+            shad.Button.ghost(onPressed: () { nameController.dispose(); valueController.dispose(); Navigator.pop(context); }, child: const Text('Cancel')),
+            shad.Button.primary(
+              onPressed: () async {
+                if (nameController.text.isNotEmpty) {
+                  final env = ref.read(activeEnvironmentProvider);
+                  if (env != null) {
+                    final updated = Map<String, String>.from(env.variables);
+                    updated[nameController.text] = valueController.text;
+                    final updatedEnv = env.copyWith(variables: updated);
+                    await ref.read(environmentRepositoryProvider).updateEnvironment(updatedEnv);
+                    ref.read(activeEnvironmentProvider.notifier).setActive(updatedEnv);
+                    ref.invalidate(environmentsProvider);
+                  }
+                  nameController.dispose();
+                  valueController.dispose();
+                  if (context.mounted) Navigator.pop(context);
+                }
+              },
+              child: const Text('Add'),
+            ),
           ],
         ),
-        actions: [
-          shad.Button.ghost(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          shad.Button.primary(
-            onPressed: () async {
-              if (nameController.text.isNotEmpty) {
-                final env = ref.read(activeEnvironmentProvider);
-                if (env != null) {
-                  final updated = Map<String, String>.from(env.variables);
-                  updated[nameController.text] = valueController.text;
-                  final updatedEnv = env.copyWith(variables: updated);
-                  await ref.read(environmentRepositoryProvider).updateEnvironment(updatedEnv);
-                  ref.read(activeEnvironmentProvider.notifier).setActive(updatedEnv);
-                  ref.invalidate(environmentsProvider);
-                }
-                if (context.mounted) Navigator.pop(context);
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
       ),
     );
   }
@@ -448,32 +452,36 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => shad.AlertDialog(
-        title: const Text('New Collection'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            shad.TextField(controller: nameController, placeholder: const Text('Collection name')),
-            const SizedBox(height: 12),
-            shad.TextField(controller: descController, placeholder: const Text('Description (optional)')),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => shad.AlertDialog(
+          title: const Text('New Collection'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              shad.TextField(controller: nameController, placeholder: const Text('Collection name')),
+              const SizedBox(height: 12),
+              shad.TextField(controller: descController, placeholder: const Text('Description (optional)')),
+            ],
+          ),
+          actions: [
+            shad.Button.ghost(onPressed: () { nameController.dispose(); descController.dispose(); Navigator.pop(context); }, child: const Text('Cancel')),
+            shad.Button.primary(
+              onPressed: () async {
+                if (nameController.text.isNotEmpty) {
+                  await ref.read(collectionRepositoryProvider).createCollection(
+                    name: nameController.text,
+                    description: descController.text.isNotEmpty ? descController.text : null,
+                  );
+                  ref.invalidate(collectionsProvider);
+                  nameController.dispose();
+                  descController.dispose();
+                  if (context.mounted) Navigator.pop(context);
+                }
+              },
+              child: const Text('Create'),
+            ),
           ],
         ),
-        actions: [
-          shad.Button.ghost(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          shad.Button.primary(
-            onPressed: () async {
-              if (nameController.text.isNotEmpty) {
-                await ref.read(collectionRepositoryProvider).createCollection(
-                  name: nameController.text,
-                  description: descController.text.isNotEmpty ? descController.text : null,
-                );
-                ref.invalidate(collectionsProvider);
-                if (context.mounted) Navigator.pop(context);
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
       ),
     );
   }

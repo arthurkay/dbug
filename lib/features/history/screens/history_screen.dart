@@ -140,7 +140,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                 try {
                                   final decoded = jsonDecode(entry.collectionHeaders);
                                   collHeaders.addAll(Map<String, String>.from(decoded));
-                                } catch (_) {}
+                                } catch (e) { debugPrint('Failed to parse collection headers: $e'); }
                                 context.go('/request', extra: {
                                   'historyEntry': entry,
                                   'collectionId': entry.collectionId,

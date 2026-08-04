@@ -5,6 +5,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/active_environment_provider.dart';
 import '../../../core/providers/repository_providers.dart';
+import '../../../core/constants/app_constants.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -116,7 +117,7 @@ class SettingsScreen extends ConsumerWidget {
                       children: [
                         Text('About', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
                         const SizedBox(height: 12),
-                        Text('dbug v1.0.0', style: TextStyle(fontSize: 13, color: colorScheme.foreground)),
+                        Text('dbug v${AppConstants.appVersion}', style: TextStyle(fontSize: 13, color: colorScheme.foreground)),
                         const SizedBox(height: 4),
                         Text('A local API testing tool built with Flutter', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
                       ],

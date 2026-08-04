@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:uuid/uuid.dart';
 import '../database/database_service.dart';
 import '../models/collection_model.dart';
@@ -81,7 +82,7 @@ class CollectionRepository {
     Map<String, String> globalHeaders = {};
     try {
       globalHeaders = Map<String, String>.from(jsonDecode(headersRaw));
-    } catch (_) {}
+    } catch (e) { debugPrint('Failed to parse collection headers: $e'); }
 
     return Collection(
       id: row['id'] as String,

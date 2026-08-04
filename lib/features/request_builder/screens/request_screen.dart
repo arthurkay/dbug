@@ -16,6 +16,7 @@ import '../../../shared/widgets/response_view.dart';
 import '../../../shared/widgets/toast_helper.dart';
 import '../../../shared/widgets/dbug_spinner.dart';
 import '../../../shared/utils/method_colors.dart';
+import '../../../shared/utils/body_type_helpers.dart';
 
 class RequestScreen extends ConsumerStatefulWidget {
   final RequestModel? initialRequest;
@@ -69,7 +70,141 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
       _loadFromHistoryEntry(widget.historyEntry!);
     } else if (widget.initialRequest != null) {
       _loadFromRequest(widget.initialRequest!);
+    } else {
+      _loadBuilderState();
     }
+  }
+
+  static const _kBuilderStateKey = 'request_builder_state';
+
+  Future<void> _saveBuilderState() async {
+    final params = entriesToMap(_params);
+    final headers = entriesToMap(_headers);
+
+    String authType = 'none';
+    String authData = '{}';
+    if (_selectedAuthType == 1) {
+      authType = 'bearer';
+      authData = jsonEncode({'token': _bearerTokenController.text});
+    } else if (_selectedAuthType == 2) {
+      authType = 'basic';
+      authData = jsonEncode({'username': _basicUserController.text, 'password': _basicPassController.text});
+    } else if (_selectedAuthType == 3) {
+      authType = 'apikey';
+      authData = jsonEncode({'name': _apiKeyNameController.text, 'value': _apiKeyValueController.text, 'location': _apiKeyLocation});
+    }
+
+    final state = {
+      'method': _selectedMethod,
+      'url': _urlController.text,
+      'body': _bodyController.text,
+      'requestName': _requestNameController.text,
+      'tab': _selectedTab,
+      'bodyType': _selectedBodyType,
+      'authType': authType,
+      'authData': authData,
+      'headers': jsonEncode(headers),
+      'params': jsonEncode(params),
+      'collectionId': widget.collectionId,
+      'collectionHeaders': jsonEncode(widget.collectionHeaders),
+      'currentRequestId': _currentRequestId,
+      'bearerToken': _bearerTokenController.text,
+      'basicUser': _basicUserController.text,
+      'basicPass': _basicPassController.text,
+      'apiKeyName': _apiKeyNameController.text,
+      'apiKeyValue': _apiKeyValueController.text,
+      'apiKeyLocation': _apiKeyLocation,
+      'response': _lastResponse != null ? {
+        'statusCode': _lastResponse!.statusCode,
+        'body': _lastResponse!.body,
+        'timeMs': _lastResponse!.timeMs,
+        'sizeBytes': _lastResponse!.sizeBytes,
+      } : null,
+    };
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kBuilderStateKey, jsonEncode(state));
+  }
+
+  Future<void> _loadBuilderState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kBuilderStateKey);
+      if (raw == null || !mounted) return;
+
+      final state = jsonDecode(raw) as Map<String, dynamic>;
+
+      _selectedMethod = state['method'] ?? 'GET';
+      _urlController.text = state['url'] ?? '';
+      _bodyController.text = state['body'] ?? '';
+      _requestNameController.text = state['requestName'] ?? '';
+      _selectedTab = state['tab'] ?? 0;
+      _selectedBodyType = state['bodyType'] ?? 0;
+      _currentRequestId = state['currentRequestId'];
+      _apiKeyLocation = state['apiKeyLocation'] ?? 'header';
+
+      final savedAuthType = state['authType'];
+      if (savedAuthType is String) {
+        switch (savedAuthType) {
+          case 'bearer': _selectedAuthType = 1; break;
+          case 'basic': _selectedAuthType = 2; break;
+          case 'apikey': _selectedAuthType = 3; break;
+          default: _selectedAuthType = 0;
+        }
+      } else {
+        _selectedAuthType = savedAuthType ?? 0;
+      }
+
+      final savedAuthData = state['authData'];
+      if (savedAuthData is String && savedAuthData != '{}') {
+        try {
+          final data = jsonDecode(savedAuthData) as Map<String, dynamic>;
+          _bearerTokenController.text = data['token'] ?? '';
+          _basicUserController.text = data['username'] ?? '';
+          _basicPassController.text = data['password'] ?? '';
+          _apiKeyNameController.text = data['name'] ?? '';
+          _apiKeyValueController.text = data['value'] ?? '';
+          if (data['location'] != null) _apiKeyLocation = data['location'];
+        } catch (e) { debugPrint('Failed to parse auth data: $e'); }
+      } else {
+        _bearerTokenController.text = state['bearerToken'] ?? '';
+        _basicUserController.text = state['basicUser'] ?? '';
+        _basicPassController.text = state['basicPass'] ?? '';
+        _apiKeyNameController.text = state['apiKeyName'] ?? '';
+        _apiKeyValueController.text = state['apiKeyValue'] ?? '';
+      }
+
+      try {
+        final headersMap = Map<String, String>.from(jsonDecode(state['headers'] ?? '{}'));
+        _headers..clear()..addAll(mapToEntries(headersMap));
+      } catch (e) {
+        debugPrint('Failed to parse headers: $e');
+        _headers.clear();
+      }
+      if (_headers.isEmpty) _headers.add(KeyValueEntry());
+
+      try {
+        final paramsMap = Map<String, String>.from(jsonDecode(state['params'] ?? '{}'));
+        _params..clear()..addAll(mapToEntries(paramsMap));
+      } catch (e) {
+        debugPrint('Failed to parse params: $e');
+        _params.clear();
+      }
+      if (_params.isEmpty) _params.add(KeyValueEntry());
+
+      final resp = state['response'];
+      if (resp != null && resp['statusCode'] != null) {
+        _lastResponse = HttpResponse(
+          statusCode: resp['statusCode'],
+          headers: const {},
+          body: resp['body'] ?? '',
+          timeMs: resp['timeMs'] ?? 0,
+          sizeBytes: resp['sizeBytes'] ?? 0,
+        );
+      }
+
+      if (mounted) setState(() {});
+    } catch (e) { debugPrint('Failed to load saved request state: $e'); }
   }
 
   Future<void> _loadSplitRatio() async {
@@ -92,21 +227,14 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     _requestNameController.text = entry.requestName ?? '';
 
     // Restore body type
-    if (entry.bodyType == 'json') {
-      _selectedBodyType = 1;
-    } else if (entry.bodyType == 'form') {
-      _selectedBodyType = 2;
-    } else if (entry.bodyType == 'raw') {
-      _selectedBodyType = 3;
-    } else {
-      _selectedBodyType = 0;
-    }
+    _selectedBodyType = bodyTypeStringToIndex(entry.bodyType);
 
     // Restore headers
     try {
       final headersMap = Map<String, String>.from(jsonDecode(entry.headers));
       _headers..clear()..addAll(mapToEntries(headersMap));
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Failed to parse history headers: $e');
       _headers.clear();
     }
     if (_headers.isEmpty) _headers.add(KeyValueEntry());
@@ -115,7 +243,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     try {
       final paramsMap = Map<String, String>.from(jsonDecode(entry.queryParams));
       _params..clear()..addAll(mapToEntries(paramsMap));
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Failed to parse history params: $e');
       _params.clear();
     }
     if (_params.isEmpty) _params.add(KeyValueEntry());
@@ -127,7 +256,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
         try {
           final data = jsonDecode(entry.authData);
           _bearerTokenController.text = data['token'] ?? '';
-        } catch (_) {}
+        } catch (e) { debugPrint('Failed to parse bearer auth: $e'); }
         break;
       case 'basic':
         _selectedAuthType = 2;
@@ -135,7 +264,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
           final data = jsonDecode(entry.authData);
           _basicUserController.text = data['username'] ?? '';
           _basicPassController.text = data['password'] ?? '';
-        } catch (_) {}
+        } catch (e) { debugPrint('Failed to parse basic auth: $e'); }
         break;
       case 'apikey':
         _selectedAuthType = 3;
@@ -144,7 +273,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
           _apiKeyNameController.text = data['name'] ?? '';
           _apiKeyValueController.text = data['value'] ?? '';
           _apiKeyLocation = data['location'] ?? 'header';
-        } catch (_) {}
+        } catch (e) { debugPrint('Failed to parse apikey auth: $e'); }
         break;
       default:
         _selectedAuthType = 0;
@@ -157,15 +286,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     _urlController.text = req.url;
     _bodyController.text = req.body ?? '';
     _requestNameController.text = req.name;
-    if (req.bodyType == 'json') {
-      _selectedBodyType = 1;
-    } else if (req.bodyType == 'form') {
-      _selectedBodyType = 2;
-    } else if (req.bodyType == 'raw') {
-      _selectedBodyType = 3;
-    } else {
-      _selectedBodyType = 0;
-    }
+    _selectedBodyType = bodyTypeStringToIndex(req.bodyType);
     _params
       ..clear()
       ..addAll(mapToEntries(req.queryParams));
@@ -186,6 +307,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
 
   @override
   void dispose() {
+    _saveBuilderState();
     _urlController.dispose();
     _bodyController.dispose();
     _requestNameController.dispose();
@@ -289,14 +411,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
         authData = jsonEncode({'name': _apiKeyNameController.text.trim(), 'value': _apiKeyValueController.text.trim(), 'location': _apiKeyLocation});
       }
 
-      String? bodyType;
-      if (_selectedBodyType == 1) {
-        bodyType = 'json';
-      } else if (_selectedBodyType == 2) {
-        bodyType = 'form';
-      } else if (_selectedBodyType == 3) {
-        bodyType = 'raw';
-      }
+      final bodyType = bodyTypeIndexToString(_selectedBodyType);
 
       // Save to history
       final historyRepo = ref.read(historyRepositoryProvider);
@@ -321,6 +436,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
         authData: authData,
       );
       ref.invalidate(historyProvider);
+      _saveBuilderState();
     } catch (e) {
       if (mounted) {
         showDbugToast(context, message: 'Request failed: $e', type: ToastType.error);
@@ -337,14 +453,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     final url = _urlController.text.trim();
     if (url.isEmpty) return;
 
-    String? bodyType;
-    if (_selectedBodyType == 1) {
-      bodyType = 'json';
-    } else if (_selectedBodyType == 2) {
-      bodyType = 'form';
-    } else if (_selectedBodyType == 3) {
-      bodyType = 'raw';
-    }
+    final bodyType = bodyTypeIndexToString(_selectedBodyType);
 
     final requestRepo = ref.read(requestRepositoryProvider);
     final headers = entriesToMap(_headers);
@@ -567,15 +676,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
       _bodyController.text = req.body ?? '';
       _requestNameController.text = req.name;
       _lastResponse = null;
-      if (req.bodyType == 'json') {
-        _selectedBodyType = 1;
-      } else if (req.bodyType == 'form') {
-        _selectedBodyType = 2;
-      } else if (req.bodyType == 'raw') {
-        _selectedBodyType = 3;
-      } else {
-        _selectedBodyType = 0;
-      }
+      _selectedBodyType = bodyTypeStringToIndex(req.bodyType);
       _params
         ..clear()
         ..addAll(mapToEntries(req.queryParams));
@@ -585,6 +686,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
         ..addAll(mapToEntries(req.headers));
       if (_headers.isEmpty) _headers.add(KeyValueEntry());
     });
+    _saveBuilderState();
   }
 
   Widget _buildResponseSplit(shad.ColorScheme colorScheme) {

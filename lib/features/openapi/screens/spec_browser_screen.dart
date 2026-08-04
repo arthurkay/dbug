@@ -48,6 +48,8 @@ class _SpecBrowserBodyState extends State<_SpecBrowserBody> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   OpenApiEndpoint? _selectedEndpoint;
+  bool _docsMode = false;
+  int _detailTab = 0;
 
   @override
   void initState() {
@@ -105,7 +107,30 @@ class _SpecBrowserBodyState extends State<_SpecBrowserBody> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(widget.spec.title ?? 'API Spec', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.foreground)),
-                    Text('${widget.spec.version ?? ''} • ${widget.spec.endpoints.length} endpoints', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
+                    Text('${widget.spec.version ?? ''} \u2022 ${widget.spec.endpoints.length} endpoints', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              shad.Button.ghost(
+                onPressed: () => setState(() { _docsMode = false; _detailTab = 0; }),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.code, size: 14, color: !_docsMode ? colorScheme.primary : colorScheme.mutedForeground),
+                    const SizedBox(width: 4),
+                    Text('API', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: !_docsMode ? colorScheme.primary : colorScheme.mutedForeground)),
+                  ],
+                ),
+              ),
+              shad.Button.ghost(
+                onPressed: () => setState(() { _docsMode = true; _detailTab = 0; }),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.bookOpen, size: 14, color: _docsMode ? colorScheme.primary : colorScheme.mutedForeground),
+                    const SizedBox(width: 4),
+                    Text('Docs', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _docsMode ? colorScheme.primary : colorScheme.mutedForeground)),
                   ],
                 ),
               ),
@@ -137,18 +162,7 @@ class _SpecBrowserBodyState extends State<_SpecBrowserBody> {
                                 ...entry.value.map((ep) => _EndpointTile(
                                   endpoint: ep,
                                   isSelected: _selectedEndpoint == ep,
-                                  onTap: () => setState(() => _selectedEndpoint = ep),
-                                  onSend: (context) {
-                                    final base = widget.spec.baseUrl ?? '';
-                                    final path = ep.path.startsWith('/') ? ep.path : '/${ep.path}';
-                                    final url = base.endsWith('/') ? '$base$path'.substring(1) : '$base$path';
-                                    final req = RequestModel(
-                                      id: '', name: ep.summary ?? '${ep.method} ${ep.path}',
-                                      method: ep.method, url: url,
-                                      createdAt: DateTime.now(), updatedAt: DateTime.now(),
-                                    );
-                                    context.go('/request', extra: req);
-                                  },
+                                  onTap: () => setState(() { _selectedEndpoint = ep; _detailTab = 0; }),
                                 )),
                               ];
                             }).toList(),
@@ -159,10 +173,18 @@ class _SpecBrowserBodyState extends State<_SpecBrowserBody> {
                   const SizedBox(width: 12),
                   Expanded(
                     flex: 3,
-                    child: _EndpointDetail(
-                      endpoint: _selectedEndpoint!,
-                      baseUrl: widget.spec.baseUrl ?? '',
-                    ),
+                    child: _docsMode
+                        ? _EndpointDocDetail(
+                            endpoint: _selectedEndpoint!,
+                            baseUrl: widget.spec.baseUrl ?? '',
+                            rawContent: widget.spec.rawContent,
+                            detailTab: _detailTab,
+                            onTabChanged: (i) => setState(() => _detailTab = i),
+                          )
+                        : _EndpointApiDetail(
+                            endpoint: _selectedEndpoint!,
+                            baseUrl: widget.spec.baseUrl ?? '',
+                          ),
                   ),
                 ],
               ],
@@ -178,9 +200,8 @@ class _EndpointTile extends StatelessWidget {
   final OpenApiEndpoint endpoint;
   final bool isSelected;
   final VoidCallback onTap;
-  final void Function(BuildContext context) onSend;
 
-  const _EndpointTile({required this.endpoint, required this.isSelected, required this.onTap, required this.onSend});
+  const _EndpointTile({required this.endpoint, required this.isSelected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -221,11 +242,11 @@ class _EndpointTile extends StatelessWidget {
   }
 }
 
-class _EndpointDetail extends ConsumerWidget {
+class _EndpointApiDetail extends ConsumerWidget {
   final OpenApiEndpoint endpoint;
   final String baseUrl;
 
-  const _EndpointDetail({required this.endpoint, required this.baseUrl});
+  const _EndpointApiDetail({required this.endpoint, required this.baseUrl});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -333,6 +354,386 @@ class _EndpointDetail extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _EndpointDocDetail extends StatelessWidget {
+  final OpenApiEndpoint endpoint;
+  final String baseUrl;
+  final String rawContent;
+  final int detailTab;
+  final ValueChanged<int> onTabChanged;
+
+  const _EndpointDocDetail({
+    required this.endpoint,
+    required this.baseUrl,
+    required this.rawContent,
+    required this.detailTab,
+    required this.onTabChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = shad.Theme.of(context).colorScheme;
+
+    return shad.Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: methodColor(endpoint.method).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(endpoint.method, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: methodColor(endpoint.method))),
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Text(endpoint.path, style: const TextStyle(fontSize: 13, fontFamily: 'monospace'))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: shad.Tabs(
+              index: detailTab,
+              onChanged: onTabChanged,
+              children: const [
+                shad.TabItem(child: Text('Documentation')),
+                shad.TabItem(child: Text('Raw Spec')),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: detailTab == 0
+                ? _buildDocumentation(colorScheme)
+                : _buildRawSpec(colorScheme),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocumentation(shad.ColorScheme colorScheme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (endpoint.summary != null) ...[
+            Text(endpoint.summary!, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+            const SizedBox(height: 4),
+          ],
+          if (endpoint.description != null) ...[
+            Text(endpoint.description!, style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
+            const SizedBox(height: 16),
+          ],
+          if (endpoint.parameters.isNotEmpty) ...[
+            _buildSectionHeader('Parameters', colorScheme),
+            const SizedBox(height: 8),
+            ...endpoint.parameters.map((p) => _buildParameterTile(p, colorScheme)),
+            const SizedBox(height: 16),
+          ],
+          if (endpoint.requestBodySchema != null) ...[
+            _buildSectionHeader('Request Body', colorScheme),
+            const SizedBox(height: 8),
+            _SchemaView(schema: endpoint.requestBodySchema!),
+            const SizedBox(height: 16),
+          ],
+          if (endpoint.responseSchemas != null && endpoint.responseSchemas!.isNotEmpty) ...[
+            _buildSectionHeader('Responses', colorScheme),
+            const SizedBox(height: 8),
+            ...endpoint.responseSchemas!.entries.map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _statusColor(e.key, colorScheme).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(e.key, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _statusColor(e.key, colorScheme))),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  _SchemaView(schema: e.value),
+                ],
+              ),
+            )),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRawSpec(shad.ColorScheme colorScheme) {
+    final lines = rawContent.split('\n');
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: colorScheme.card,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: colorScheme.border.withValues(alpha: 0.5)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: colorScheme.border.withValues(alpha: 0.5))),
+              ),
+              child: Row(
+                children: [
+                  Icon(LucideIcons.fileText, size: 14, color: colorScheme.mutedForeground),
+                  const SizedBox(width: 6),
+                  Text('Raw Spec Content', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+                  const Spacer(),
+                  Text('${lines.length} lines', style: TextStyle(fontSize: 10, color: colorScheme.mutedForeground)),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text.rich(TextSpan(
+                children: [
+                  for (var i = 0; i < lines.length; i++) ...[
+                    TextSpan(
+                      text: '${(i + 1).toString().padLeft(4)}  ',
+                      style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.mutedForeground.withValues(alpha: 0.5)),
+                    ),
+                    TextSpan(
+                      text: '${lines[i]}\n',
+                      style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.foreground),
+                    ),
+                  ],
+                ],
+              )),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, shad.ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: colorScheme.muted.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(title, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: colorScheme.foreground, letterSpacing: 0.3)),
+    );
+  }
+
+  Widget _buildParameterTile(OpenApiParameter p, shad.ColorScheme colorScheme) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: colorScheme.border.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            decoration: BoxDecoration(
+              color: colorScheme.muted.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Text(p.location, style: TextStyle(fontSize: 9, color: colorScheme.mutedForeground)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(p.name, style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600)),
+                    if (p.required) ...[
+                      const SizedBox(width: 4),
+                      Text('*', style: TextStyle(fontSize: 12, color: colorScheme.destructive)),
+                    ],
+                    if (p.type != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(p.type!, style: TextStyle(fontSize: 9, color: colorScheme.primary)),
+                      ),
+                    ],
+                  ],
+                ),
+                if (p.description != null) ...[
+                  const SizedBox(height: 2),
+                  Text(p.description!, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _statusColor(String code, shad.ColorScheme colorScheme) {
+    final c = int.tryParse(code) ?? 0;
+    if (c >= 200 && c < 300) return const Color(0xFF22C55E);
+    if (c >= 300 && c < 400) return const Color(0xFFF59E0B);
+    if (c >= 400) return const Color(0xFFEF4444);
+    return colorScheme.mutedForeground;
+  }
+}
+
+class _SchemaView extends StatelessWidget {
+  final OpenApiSchema schema;
+  final int depth;
+
+  const _SchemaView({required this.schema, this.depth = 0});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = shad.Theme.of(context).colorScheme;
+
+    return Container(
+      margin: EdgeInsets.only(left: depth > 0 ? 12.0 : 0),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border(
+          left: depth > 0 ? BorderSide(color: colorScheme.border.withValues(alpha: 0.5), width: 2) : BorderSide.none,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildTypeBadge(schema, colorScheme),
+          if (schema.description != null) ...[
+            const SizedBox(height: 4),
+            Text(schema.description!, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
+          ],
+          if (schema.requiredFields.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                Text('required:', style: TextStyle(fontSize: 10, color: colorScheme.mutedForeground)),
+                ...schema.requiredFields.map((f) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: colorScheme.destructive.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(f, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.destructive)),
+                )),
+              ],
+            ),
+          ],
+          if (schema.enumValues.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                Text('enum:', style: TextStyle(fontSize: 10, color: colorScheme.mutedForeground)),
+                ...schema.enumValues.map((v) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(v, style: TextStyle(fontSize: 10, color: colorScheme.primary)),
+                )),
+              ],
+            ),
+          ],
+          if (schema.properties.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...schema.properties.entries.map((e) => _buildPropertyRow(e.key, e.value, schema.requiredFields.contains(e.key), colorScheme)),
+          ],
+          if (schema.items != null) ...[
+            const SizedBox(height: 8),
+            Text('items:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.mutedForeground)),
+            const SizedBox(height: 4),
+            _SchemaView(schema: schema.items!, depth: depth + 1),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypeBadge(OpenApiSchema schema, shad.ColorScheme colorScheme) {
+    final parts = <String>[];
+    if (schema.ref != null) {
+      parts.add(schema.ref!.split('/').last);
+    }
+    if (schema.type != null) {
+      parts.add(schema.type!);
+    }
+    if (schema.format != null) {
+      parts.add('(${schema.format})');
+    }
+    if (parts.isEmpty) return const SizedBox.shrink();
+
+    final label = parts.join(' ');
+    final isRef = schema.ref != null;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isRef
+            ? colorScheme.primary.withValues(alpha: 0.08)
+            : colorScheme.muted.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Text(label, style: TextStyle(
+        fontSize: 11,
+        fontFamily: 'monospace',
+        fontWeight: FontWeight.w600,
+        color: isRef ? colorScheme.primary : colorScheme.foreground,
+      )),
+    );
+  }
+
+  Widget _buildPropertyRow(String name, OpenApiSchema prop, bool isRequired, shad.ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(width: 4),
+          Text('\u2022 ', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
+          Text(name, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w500, color: colorScheme.foreground)),
+          if (isRequired) ...[
+            const SizedBox(width: 4),
+            Text('*', style: TextStyle(fontSize: 12, color: colorScheme.destructive)),
+          ],
+          const SizedBox(width: 8),
+          if (prop.type != null || prop.ref != null)
+            _SchemaView(schema: prop, depth: depth + 1),
+        ],
       ),
     );
   }

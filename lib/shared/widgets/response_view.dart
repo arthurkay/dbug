@@ -1,5 +1,6 @@
 import 'dart:convert' as convert;
 import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart' show SelectableText, SelectionArea;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 import '../../core/http/http_client.dart';
@@ -191,38 +192,36 @@ class _ResponseViewState extends State<ResponseView> {
     try {
       final parsed = convert.jsonDecode(body);
       return const convert.JsonEncoder.withIndent('  ').convert(parsed);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Failed to pretty print JSON: $e');
       return body;
     }
   }
 
   Widget _buildLineView(shad.ColorScheme colorScheme, String body) {
     final lines = body.split('\n');
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: List.generate(lines.length, (i) => Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Text(
-                '${i + 1}',
-                style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: colorScheme.mutedForeground, height: 1.5),
-              ),
-            )),
+    final numberedBody = List.generate(lines.length, (i) {
+      final lineNum = '${(i + 1).toString().padLeft(4)}  ';
+      return '$lineNum${lines[i]}';
+    }).join('\n');
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: colorScheme.muted,
+        borderRadius: const BorderRadius.all(Radius.circular(8)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(14),
+        child: SelectableText(
+          numberedBody,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 12,
+            color: colorScheme.foreground,
+            height: 1.5,
           ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: List.generate(lines.length, (i) => Text(
-                lines[i].isEmpty ? ' ' : lines[i],
-                style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: colorScheme.foreground, height: 1.5),
-              )),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -239,31 +238,33 @@ class _ResponseViewState extends State<ResponseView> {
         color: colorScheme.muted,
         borderRadius: const BorderRadius.all(Radius.circular(8)),
       ),
-      child: ListView.separated(
-        padding: const EdgeInsets.all(12),
-        separatorBuilder: (_, __) => const SizedBox(height: 1),
-        itemCount: resp.headers.length,
-        itemBuilder: (context, i) {
-          final key = resp.headers.keys.elementAt(i);
-          final value = resp.headers[key]!;
-          final isEven = i.isEven;
-          return Container(
-            color: isEven ? colorScheme.muted : colorScheme.muted.withValues(alpha: 0.5),
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 200,
-                  child: Text(key, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.primary, fontFamily: 'monospace')),
-                ),
-                Expanded(
-                  child: Text(value, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.mutedForeground)),
-                ),
-              ],
-            ),
-          );
-        },
+      child: SelectionArea(
+        child: ListView.separated(
+          padding: const EdgeInsets.all(12),
+          separatorBuilder: (_, __) => const SizedBox(height: 1),
+          itemCount: resp.headers.length,
+          itemBuilder: (context, i) {
+            final key = resp.headers.keys.elementAt(i);
+            final value = resp.headers[key]!;
+            final isEven = i.isEven;
+            return Container(
+              color: isEven ? colorScheme.muted : colorScheme.muted.withValues(alpha: 0.5),
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 200,
+                    child: SelectableText(key, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.primary, fontFamily: 'monospace')),
+                  ),
+                  Expanded(
+                    child: SelectableText(value, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.mutedForeground)),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
