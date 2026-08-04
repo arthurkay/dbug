@@ -7,7 +7,7 @@ class OpenApiParser {
   static ParsedSpec? parse(String content) {
     try {
       Map<String, dynamic> json;
-      if (content.trimLeft().startsWith('{')) {
+      if (content.trimLeft().startsWith('{') || content.trimLeft().startsWith('[')) {
         json = jsonDecode(content) as Map<String, dynamic>;
       } else {
         final yaml = loadYaml(content);
@@ -34,9 +34,23 @@ class OpenApiParser {
     return yaml;
   }
 
+  static Map<String, dynamic>? _resolveRef(Map<String, dynamic> root, String ref) {
+    if (!ref.startsWith('#/')) return null;
+    final parts = ref.substring(2).split('/');
+    dynamic current = root;
+    for (final part in parts) {
+      if (current is Map && current.containsKey(part)) {
+        current = current[part];
+      } else {
+        return null;
+      }
+    }
+    return current is Map<String, dynamic> ? current : null;
+  }
+
   static ParsedSpec _parseSpec(Map<String, dynamic> json, String rawContent) {
     final info = json['info'] as Map<String, dynamic>? ?? {};
-    final servers = (json['servers'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final servers = (json['servers'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
     final baseUrl = servers.isNotEmpty ? servers.first['url']?.toString() : null;
 
     final paths = json['paths'] as Map<String, dynamic>? ?? {};
@@ -46,23 +60,24 @@ class OpenApiParser {
       if (pathItem is! Map) return;
       final item = pathItem as Map<String, dynamic>;
 
-      for (final method in ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']) {
+      for (final method in ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace']) {
         final operation = item[method] as Map<String, dynamic>?;
         if (operation == null) continue;
 
         final parameters = _parseParameters(
+          json,
           operation['parameters'] as List? ?? [],
           item['parameters'] as List? ?? [],
         );
 
         final requestBody = operation['requestBody'] as Map<String, dynamic>?;
-        final requestBodySchema = _extractSchema(requestBody);
+        final requestBodySchema = _extractSchema(json, requestBody);
 
         final responses = operation['responses'] as Map<String, dynamic>? ?? {};
         final responseSchemas = <String, OpenApiSchema>{};
         responses.forEach((code, response) {
           if (response is Map) {
-            final schema = _extractSchema(response as Map<String, dynamic>);
+            final schema = _extractSchema(json, response as Map<String, dynamic>);
             if (schema != null) {
               responseSchemas[code] = schema;
             }
@@ -93,23 +108,27 @@ class OpenApiParser {
   }
 
   static List<OpenApiParameter> _parseParameters(
+    Map<String, dynamic> root,
     List operationParams,
     List pathParams,
   ) {
     final allParams = [...pathParams, ...operationParams];
     return allParams.whereType<Map>().map((p) {
+      final schema = p['schema'] is Map
+          ? _parseSchema(root, p['schema'] as Map<String, dynamic>)
+          : null;
       return OpenApiParameter(
         name: p['name']?.toString() ?? '',
         location: p['in']?.toString() ?? 'query',
         description: p['description']?.toString(),
         required: p['required'] == true,
-        type: p['schema']?['type']?.toString(),
-        schemaType: p['schema']?['type']?.toString(),
+        type: schema?.type,
+        schemaType: schema?.type,
       );
     }).toList();
   }
 
-  static OpenApiSchema? _extractSchema(Map<String, dynamic>? container) {
+  static OpenApiSchema? _extractSchema(Map<String, dynamic> root, Map<String, dynamic>? container) {
     if (container == null) return null;
     final content = container['content'] as Map<String, dynamic>?;
     if (content == null) return null;
@@ -120,17 +139,25 @@ class OpenApiParser {
     final schema = jsonContent['schema'] as Map<String, dynamic>?;
     if (schema == null) return null;
 
-    return _parseSchema(schema);
+    return _parseSchema(root, schema);
   }
 
-  static OpenApiSchema _parseSchema(Map<String, dynamic> schema) {
+  static OpenApiSchema _parseSchema(Map<String, dynamic> root, Map<String, dynamic> schema) {
     final ref = schema['\$ref']?.toString();
-    final properties = <String, OpenApiSchema>{};
 
+    if (ref != null) {
+      final resolved = _resolveRef(root, ref);
+      if (resolved != null) {
+        return _parseSchema(root, resolved);
+      }
+      return OpenApiSchema(type: 'object', ref: ref);
+    }
+
+    final properties = <String, OpenApiSchema>{};
     if (schema['properties'] is Map) {
       (schema['properties'] as Map).forEach((key, value) {
         if (value is Map) {
-          properties[key.toString()] = _parseSchema(value as Map<String, dynamic>);
+          properties[key.toString()] = _parseSchema(root, value as Map<String, dynamic>);
         }
       });
     }
@@ -145,7 +172,7 @@ class OpenApiParser {
       properties: properties,
       requiredFields: requiredFields,
       items: schema['items'] is Map
-          ? _parseSchema(schema['items'] as Map<String, dynamic>)
+          ? _parseSchema(root, schema['items'] as Map<String, dynamic>)
           : null,
       enumValues: (schema['enum'] as List?)?.cast<String>() ?? [],
     );

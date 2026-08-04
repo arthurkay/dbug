@@ -1,18 +1,35 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/material.dart' show showDialog;
 import 'package:go_router/go_router.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
-import 'package:intl/intl.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/models/history_entry.dart';
-import '../../../core/models/request_model.dart';
+import '../../../shared/widgets/dbug_spinner.dart';
+import '../../../shared/utils/method_colors.dart';
 
-class HistoryScreen extends ConsumerWidget {
+class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends ConsumerState<HistoryScreen> {
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colorScheme = shad.Theme.of(context).colorScheme;
     final historyAsync = ref.watch(historyProvider);
 
@@ -35,49 +52,123 @@ class HistoryScreen extends ConsumerWidget {
               ),
               shad.Button.outline(
                 onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => shad.AlertDialog(
+                      title: const Text('Clear History'),
+                      content: const Text('Delete all history entries?'),
+                      actions: [
+                        shad.Button.ghost(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                        shad.Button.primary(onPressed: () => Navigator.pop(context, true), child: const Text('Clear')),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true) return;
                   await ref.read(historyRepositoryProvider).clearAll();
                   ref.invalidate(historyProvider);
                 },
-                leading: const Icon(Icons.delete_sweep_outlined, size: 16),
+                leading: const Icon(LucideIcons.trash2, size: 16),
                 child: const Text('Clear All'),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: shad.TextField(
+                  controller: _searchController,
+                  placeholder: const Text('Search by name, method, URL, or status...'),
+                  onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+                ),
+              ),
+              if (_searchQuery.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                shad.IconButton.ghost(
+                  icon: const Icon(LucideIcons.x, size: 16),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 12),
           Expanded(
             child: historyAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: DbugSpinner()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (entries) {
                 if (entries.isEmpty) {
                   return _buildEmptyState(colorScheme);
                 }
-                return shad.Card(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: entries.length,
-                    itemBuilder: (context, index) {
-                      final entry = entries[index];
-                      return _HistoryTile(
-                        entry: entry,
-                        onTap: () {
-                          final req = RequestModel(
-                            id: '',
-                            name: entry.url,
-                            method: entry.method,
-                            url: entry.url,
-                            createdAt: entry.sentAt,
-                            updatedAt: entry.sentAt,
-                          );
-                          context.go('/request', extra: req);
-                        },
-                        onDelete: () async {
-                          await ref.read(historyRepositoryProvider).deleteEntry(entry.id);
-                          ref.invalidate(historyProvider);
-                        },
-                      );
-                    },
-                  ),
+                final filtered = _searchQuery.isEmpty
+                    ? entries
+                    : entries.where((e) {
+                        final q = _searchQuery;
+                        return (e.requestName ?? '').toLowerCase().contains(q) ||
+                            e.method.toLowerCase().contains(q) ||
+                            e.url.toLowerCase().contains(q) ||
+                            (e.statusCode?.toString().contains(q) ?? false);
+                      }).toList();
+                if (filtered.isEmpty) {
+                  return _buildNoResults(colorScheme);
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_searchQuery.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          '${filtered.length} result${filtered.length == 1 ? '' : 's'}',
+                          style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground),
+                        ),
+                      ),
+                    Expanded(
+                      child: shad.Card(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            final entry = filtered[index];
+                            return _HistoryTile(
+                              entry: entry,
+                              onTap: () {
+                                final collHeaders = <String, String>{};
+                                try {
+                                  final decoded = jsonDecode(entry.collectionHeaders);
+                                  collHeaders.addAll(Map<String, String>.from(decoded));
+                                } catch (_) {}
+                                context.go('/request', extra: {
+                                  'historyEntry': entry,
+                                  'collectionId': entry.collectionId,
+                                  'collectionHeaders': collHeaders,
+                                });
+                              },
+                              onDelete: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => shad.AlertDialog(
+                                    title: const Text('Delete Entry'),
+                                    content: const Text('Remove this entry from history?'),
+                                    actions: [
+                                      shad.Button.ghost(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                                      shad.Button.primary(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true) return;
+                                await ref.read(historyRepositoryProvider).deleteEntry(entry.id);
+                                ref.invalidate(historyProvider);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -93,11 +184,28 @@ class HistoryScreen extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history, size: 48, color: colorScheme.mutedForeground),
+            Icon(LucideIcons.history, size: 48, color: colorScheme.mutedForeground),
             const SizedBox(height: 16),
             Text('No history yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
             const SizedBox(height: 8),
             Text('Send a request to see it here', style: TextStyle(color: colorScheme.mutedForeground)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoResults(shad.ColorScheme colorScheme) {
+    return shad.Card(
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(LucideIcons.searchX, size: 48, color: colorScheme.mutedForeground),
+            const SizedBox(height: 16),
+            Text('No results found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+            const SizedBox(height: 8),
+            Text('Try a different search term', style: TextStyle(color: colorScheme.mutedForeground)),
           ],
         ),
       ),
@@ -115,7 +223,7 @@ class _HistoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = shad.Theme.of(context).colorScheme;
-    final timeStr = DateFormat('MMM d, HH:mm').format(entry.sentAt);
+    final displayName = entry.requestName ?? entry.url;
 
     final statusColor = entry.statusCode == null
         ? colorScheme.mutedForeground
@@ -125,8 +233,9 @@ class _HistoryTile extends StatelessWidget {
                 ? const Color(0xFFEF4444)
                 : const Color(0xFFF59E0B);
 
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         child: Row(
@@ -135,18 +244,19 @@ class _HistoryTile extends StatelessWidget {
               width: 52,
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: _methodColor(entry.method).withValues(alpha: 0.12),
+                color: methodColor(entry.method).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Text(entry.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _methodColor(entry.method)), textAlign: TextAlign.center),
+              child: Text(entry.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: methodColor(entry.method)), textAlign: TextAlign.center),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(entry.url, style: TextStyle(fontSize: 12, color: colorScheme.foreground), overflow: TextOverflow.ellipsis, maxLines: 1),
-                  Text(timeStr, style: TextStyle(fontSize: 10, color: colorScheme.mutedForeground)),
+                  Text(displayName, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.foreground), overflow: TextOverflow.ellipsis, maxLines: 1),
+                  const SizedBox(height: 1),
+                  Text(entry.url, style: TextStyle(fontSize: 10, color: colorScheme.mutedForeground), overflow: TextOverflow.ellipsis, maxLines: 1),
                 ],
               ),
             ),
@@ -164,18 +274,10 @@ class _HistoryTile extends StatelessWidget {
               Text('${entry.responseTimeMs}ms', style: TextStyle(fontSize: 10, color: colorScheme.mutedForeground)),
             ],
             const SizedBox(width: 4),
-            shad.IconButton.ghost(icon: const Icon(Icons.close, size: 12), onPressed: onDelete),
+            shad.IconButton.ghost(icon: const Icon(LucideIcons.x, size: 12), onPressed: onDelete),
           ],
         ),
       ),
     );
-  }
-
-  Color _methodColor(String method) {
-    const colors = {
-      'GET': Color(0xFF22C55E), 'POST': Color(0xFF3B82F6), 'PUT': Color(0xFFF59E0B),
-      'PATCH': Color(0xFFF97316), 'DELETE': Color(0xFFEF4444),
-    };
-    return colors[method.toUpperCase()] ?? const Color(0xFF6B7280);
   }
 }

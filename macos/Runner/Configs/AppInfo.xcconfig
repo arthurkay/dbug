@@ -8,7 +8,7 @@
 PRODUCT_NAME = dbug
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.dbug.dbug
+PRODUCT_BUNDLE_IDENTIFIER = zm.co.cloud.dbug
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.dbug. All rights reserved.

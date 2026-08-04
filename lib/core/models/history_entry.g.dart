@@ -17,6 +17,15 @@ _$HistoryEntryImpl _$$HistoryEntryImplFromJson(Map<String, dynamic> json) =>
       responseSize: (json['responseSize'] as num?)?.toInt(),
       responseBody: json['responseBody'] as String?,
       sentAt: DateTime.parse(json['sentAt'] as String),
+      requestName: json['requestName'] as String?,
+      collectionId: json['collectionId'] as String?,
+      headers: json['headers'] as String? ?? '{}',
+      collectionHeaders: json['collectionHeaders'] as String? ?? '{}',
+      body: json['body'] as String?,
+      bodyType: json['bodyType'] as String?,
+      queryParams: json['queryParams'] as String? ?? '{}',
+      authType: json['authType'] as String? ?? 'none',
+      authData: json['authData'] as String? ?? '{}',
     );
 
 Map<String, dynamic> _$$HistoryEntryImplToJson(_$HistoryEntryImpl instance) =>
@@ -30,4 +39,13 @@ Map<String, dynamic> _$$HistoryEntryImplToJson(_$HistoryEntryImpl instance) =>
       'responseSize': instance.responseSize,
       'responseBody': instance.responseBody,
       'sentAt': instance.sentAt.toIso8601String(),
+      'requestName': instance.requestName,
+      'collectionId': instance.collectionId,
+      'headers': instance.headers,
+      'collectionHeaders': instance.collectionHeaders,
+      'body': instance.body,
+      'bodyType': instance.bodyType,
+      'queryParams': instance.queryParams,
+      'authType': instance.authType,
+      'authData': instance.authData,
     };

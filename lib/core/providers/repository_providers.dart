@@ -50,6 +50,10 @@ final environmentsProvider = FutureProvider((ref) {
   return ref.watch(environmentRepositoryProvider).getAllEnvironments();
 });
 
+final userEnvironmentsProvider = FutureProvider((ref) {
+  return ref.watch(environmentRepositoryProvider).getUserEnvironments();
+});
+
 final mockEndpointsProvider = FutureProvider((ref) {
   return ref.watch(mockEndpointRepositoryProvider).getAllEndpoints();
 });

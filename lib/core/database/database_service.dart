@@ -30,6 +30,9 @@ class DatabaseService {
       version: AppConstants.dbVersion,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
+      onOpen: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
     );
   }
 
@@ -41,6 +44,7 @@ class DatabaseService {
         description TEXT,
         source_type TEXT DEFAULT 'manual',
         source_spec_id TEXT,
+        global_headers TEXT DEFAULT '{}',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )
@@ -83,7 +87,8 @@ class DatabaseService {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         variables TEXT DEFAULT '{}',
-        is_active INTEGER DEFAULT 0
+        is_active INTEGER DEFAULT 0,
+        source_type TEXT DEFAULT 'user'
       )
     ''');
 
@@ -97,7 +102,16 @@ class DatabaseService {
         response_time_ms INTEGER,
         response_size INTEGER,
         response_body TEXT,
-        sent_at INTEGER NOT NULL
+        sent_at INTEGER NOT NULL,
+        request_name TEXT,
+        collection_id TEXT,
+        headers TEXT DEFAULT '{}',
+        collection_headers TEXT DEFAULT '{}',
+        body TEXT,
+        body_type TEXT,
+        query_params TEXT DEFAULT '{}',
+        auth_type TEXT DEFAULT 'none',
+        auth_data TEXT DEFAULT '{}'
       )
     ''');
 
@@ -124,6 +138,20 @@ class DatabaseService {
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute("ALTER TABLE collections ADD COLUMN global_headers TEXT DEFAULT '{}'");
+    }
+    if (oldVersion < 3) {
+      await db.execute("ALTER TABLE environments ADD COLUMN source_type TEXT DEFAULT 'user'");
+    }
+    if (oldVersion < 4) {
+      await db.execute("ALTER TABLE history ADD COLUMN request_name TEXT");
+      await db.execute("ALTER TABLE history ADD COLUMN collection_id TEXT");
+      await db.execute("ALTER TABLE history ADD COLUMN headers TEXT DEFAULT '{}'");
+      await db.execute("ALTER TABLE history ADD COLUMN collection_headers TEXT DEFAULT '{}'");
+      await db.execute("ALTER TABLE history ADD COLUMN body TEXT");
+      await db.execute("ALTER TABLE history ADD COLUMN body_type TEXT");
+      await db.execute("ALTER TABLE history ADD COLUMN query_params TEXT DEFAULT '{}'");
+      await db.execute("ALTER TABLE history ADD COLUMN auth_type TEXT DEFAULT 'none'");
+      await db.execute("ALTER TABLE history ADD COLUMN auth_data TEXT DEFAULT '{}'");
     }
   }
 

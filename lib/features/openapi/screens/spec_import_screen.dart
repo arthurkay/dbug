@@ -1,15 +1,19 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 
 import '../../../core/providers/repository_providers.dart';
+import '../../../core/providers/http_client_provider.dart';
 import '../../../core/models/openapi_spec.dart';
 import '../../../shared/widgets/file_explorer.dart';
 import '../../../shared/widgets/toast_helper.dart';
+import '../../../shared/widgets/dbug_spinner.dart';
 import '../data/openapi_parser.dart';
 
 class SpecImportScreen extends ConsumerStatefulWidget {
@@ -122,9 +126,9 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
                 ),
               ),
               if (_isImporting)
-                const Padding(padding: EdgeInsets.only(right: 12), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+                const Padding(padding: EdgeInsets.only(right: 12), child: SizedBox(width: 16, height: 16, child: DbugSpinner(strokeWidth: 2))),
               if (_showFileExplorer)
-                shad.Button.ghost(onPressed: () => setState(() => _showFileExplorer = false), leading: const Icon(Icons.close, size: 16), child: const Text('Close Explorer')),
+                shad.Button.ghost(onPressed: () => setState(() => _showFileExplorer = false), leading: const Icon(LucideIcons.x, size: 16), child: const Text('Close Explorer')),
             ],
           ),
           const SizedBox(height: 16),
@@ -184,11 +188,12 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
                   onPressed: _isImporting ? null : () async {
                     if (_urlController.text.isNotEmpty) {
                       try {
-                        final client = HttpClient();
-                        final request = await client.getUrl(Uri.parse(_urlController.text));
-                        final response = await request.close();
-                        final body = await response.transform(SystemEncoding().decoder).join();
-                        client.close(force: false);
+                        final dio = ref.read(httpClientProvider).dio;
+                        final response = await dio.get(
+                          _urlController.text,
+                          options: Options(responseType: ResponseType.plain),
+                        );
+                        final body = response.data?.toString() ?? '';
                         await _parseAndImport(body, sourceName: _urlController.text);
                       } catch (e) {
                         if (mounted) {
@@ -252,7 +257,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
                           decoration: BoxDecoration(color: colorScheme.muted, borderRadius: BorderRadius.circular(8)),
                           child: Row(
                             children: [
-                              Icon(Icons.description, size: 20, color: colorScheme.primary),
+                              Icon(LucideIcons.fileText, size: 20, color: colorScheme.primary),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
@@ -263,7 +268,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
                                   ],
                                 ),
                               ),
-                              shad.IconButton.ghost(icon: const Icon(Icons.close, size: 16), onPressed: () => setState(() { _selectedFileName = null; _selectedFilePath = null; })),
+                              shad.IconButton.ghost(icon: const Icon(LucideIcons.x, size: 16), onPressed: () => setState(() { _selectedFileName = null; _selectedFilePath = null; })),
                             ],
                           ),
                         ),
@@ -280,12 +285,12 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
                     )
                   : Container(
                       width: double.infinity,
-                      decoration: BoxDecoration(border: Border.all(color: colorScheme.border, width: 2), borderRadius: BorderRadius.circular(8)),
+                      decoration: BoxDecoration(border: Border.all(color: colorScheme.border.withValues(alpha: 0.5), width: 1), borderRadius: BorderRadius.circular(8)),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.upload_file, size: 48, color: colorScheme.mutedForeground),
+                          Icon(LucideIcons.upload, size: 48, color: colorScheme.mutedForeground),
                           const SizedBox(height: 16),
                           Text('Select a .json or .yaml file', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
                           const SizedBox(height: 4),
@@ -294,9 +299,9 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              shad.Button.primary(onPressed: _isImporting ? null : _pickFile, leading: const Icon(Icons.file_upload_outlined, size: 16), child: const Text('Browse Files')),
+                              shad.Button.primary(onPressed: _isImporting ? null : _pickFile, leading: const Icon(LucideIcons.upload, size: 16), child: const Text('Browse Files')),
                               const SizedBox(width: 8),
-                              shad.Button.outline(onPressed: () => setState(() => _showFileExplorer = true), leading: const Icon(Icons.folder_open, size: 16), child: const Text('File Explorer')),
+                              shad.Button.outline(onPressed: () => setState(() => _showFileExplorer = true), leading: const Icon(LucideIcons.folderOpen, size: 16), child: const Text('File Explorer')),
                             ],
                           ),
                         ],
@@ -324,10 +329,10 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
               ],
             ),
           ),
-          const Divider(height: 1),
+          Container(height: 1, color: colorScheme.border.withValues(alpha: 0.5)),
           Expanded(
             child: specsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: DbugSpinner()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (specs) {
                 if (specs.isEmpty) {
@@ -369,13 +374,14 @@ class _SpecTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = shad.Theme.of(context).colorScheme;
 
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            Icon(Icons.description, size: 16, color: colorScheme.primary),
+            Icon(LucideIcons.fileText, size: 16, color: colorScheme.primary),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -386,7 +392,7 @@ class _SpecTile extends StatelessWidget {
                 ],
               ),
             ),
-            shad.IconButton.ghost(icon: const Icon(Icons.delete_outline, size: 14), onPressed: onDelete),
+            shad.IconButton.ghost(icon: const Icon(LucideIcons.trash2, size: 14), onPressed: onDelete),
           ],
         ),
       ),

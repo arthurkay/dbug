@@ -7,7 +7,7 @@ project(runner LANGUAGES CXX)
 set(BINARY_NAME "dbug")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
-set(APPLICATION_ID "com.dbug.dbug")
+set(APPLICATION_ID "zm.co.cloud.dbug")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -126,3 +126,27 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
+
+# === Icon installation ===
+# Install icons at standard XDG icon theme sizes for the .desktop file.
+set(ICON_SIZES 16 32 48 64 128 256 512 1024)
+set(ICON_DIR "${CMAKE_CURRENT_SOURCE_DIR}/runner/icons")
+foreach(SIZE ${ICON_SIZES})
+  install(FILES "${ICON_DIR}/dbug_icon_${SIZE}.png"
+    DESTINATION "${INSTALL_BUNDLE_DATA_DIR}/icons/hicolor/${SIZE}x${SIZE}/apps"
+    COMPONENT Runtime)
+endforeach()
+
+# Symlink the 256x256 icon as the base "dbug.png" so gtk_window_set_icon_name
+# can find it via the XDG icon lookup path.
+install(CODE "
+  file(MAKE_DIRECTORY \"${INSTALL_BUNDLE_DATA_DIR}/icons/hicolor/256x256/apps\")
+  file(INSTALL \"${ICON_DIR}/dbug_icon_256.png\"
+    DESTINATION \"${INSTALL_BUNDLE_DATA_DIR}/icons/hicolor/256x256/apps\"
+    RENAME \"dbug.png\")
+" COMPONENT Runtime)
+
+# === Desktop file installation ===
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/zm.co.cloud.dbug.desktop"
+  DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
+  COMPONENT Runtime)

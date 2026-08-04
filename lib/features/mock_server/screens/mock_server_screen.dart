@@ -1,7 +1,9 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
@@ -9,6 +11,8 @@ import '../../../core/providers/repository_providers.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/models/mock_endpoint.dart';
 import '../../../shared/widgets/toast_helper.dart';
+import '../../../shared/widgets/dbug_spinner.dart';
+import '../../../shared/utils/method_colors.dart';
 
 class MockServerScreen extends ConsumerStatefulWidget {
   const MockServerScreen({super.key});
@@ -108,7 +112,7 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
               const SizedBox(width: 8),
               shad.Button.outline(
                 onPressed: _isRunning ? _stopServer : _startServer,
-                leading: Icon(_isRunning ? Icons.stop : Icons.play_arrow, size: 16),
+                leading: Icon(_isRunning ? LucideIcons.square : LucideIcons.play, size: 16),
                 child: Text(_isRunning ? 'Stop' : 'Start'),
               ),
               const SizedBox(width: 8),
@@ -125,7 +129,7 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
                 const SizedBox(width: 8),
                 shad.Button.primary(
                   onPressed: () => _showAddEndpointDialog(context),
-                  leading: const Icon(Icons.add, size: 16),
+                  leading: const Icon(LucideIcons.plus, size: 16),
                   child: const Text('Add Endpoint'),
                 ),
               ],
@@ -134,7 +138,7 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
           const SizedBox(height: 16),
           Expanded(
             child: endpointsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: DbugSpinner()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (endpoints) {
                 if (endpoints.isEmpty) return _buildEmptyState(colorScheme);
@@ -168,7 +172,7 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.dns, size: 48, color: colorScheme.mutedForeground),
+            Icon(LucideIcons.server, size: 48, color: colorScheme.mutedForeground),
             const SizedBox(height: 16),
             Text('No mock endpoints', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
             const SizedBox(height: 8),
@@ -176,8 +180,8 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
             const SizedBox(height: 16),
             shad.Button.primary(
               onPressed: () => _showAddEndpointDialog(context),
-              leading: const Icon(Icons.add, size: 16),
-              child: const Text('Add Endpoint'),
+                  leading: const Icon(LucideIcons.plus, size: 16),
+                  child: const Text('Add Endpoint'),
             ),
           ],
         ),
@@ -281,10 +285,10 @@ class _EndpointTile extends StatelessWidget {
             width: 60,
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: _methodColor(endpoint.method).withValues(alpha: 0.12),
+              color: methodColor(endpoint.method).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: Text(endpoint.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _methodColor(endpoint.method)), textAlign: TextAlign.center),
+            child: Text(endpoint.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: methodColor(endpoint.method)), textAlign: TextAlign.center),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -303,17 +307,10 @@ class _EndpointTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          shad.IconButton.ghost(icon: const Icon(Icons.delete_outline, size: 14), onPressed: onDelete),
+          shad.IconButton.ghost(icon: const Icon(LucideIcons.trash2, size: 14), onPressed: onDelete),
         ],
       ),
     );
   }
 
-  Color _methodColor(String method) {
-    const colors = {
-      'GET': Color(0xFF22C55E), 'POST': Color(0xFF3B82F6), 'PUT': Color(0xFFF59E0B),
-      'PATCH': Color(0xFFF97316), 'DELETE': Color(0xFFEF4444),
-    };
-    return colors[method.toUpperCase()] ?? const Color(0xFF6B7280);
-  }
 }

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 
 class DbugHttpClient {
@@ -11,11 +13,13 @@ class DbugHttpClient {
       sendTimeout: AppConstants.defaultTimeout,
     ));
 
-    _dio.interceptors.add(LogInterceptor(
-      requestBody: true,
-      responseBody: true,
-      error: true,
-    ));
+    if (kDebugMode) {
+      _dio.interceptors.add(LogInterceptor(
+        requestBody: true,
+        responseBody: true,
+        error: true,
+      ));
+    }
   }
 
   Dio get dio => _dio;
@@ -35,6 +39,7 @@ class DbugHttpClient {
         headers: headers.isNotEmpty ? headers : null,
         receiveTimeout: AppConstants.defaultTimeout,
         sendTimeout: AppConstants.defaultTimeout,
+        responseType: ResponseType.plain,
       );
 
       final response = await _dio.request(
@@ -51,12 +56,13 @@ class DbugHttpClient {
         responseHeaders[key] = values.join(', ');
       });
 
+      final bodyString = response.data?.toString() ?? '';
       return HttpResponse(
         statusCode: response.statusCode ?? 0,
         headers: responseHeaders,
-        body: response.data?.toString() ?? '',
+        body: bodyString,
         timeMs: stopwatch.elapsedMilliseconds,
-        sizeBytes: response.data?.toString().length ?? 0,
+        sizeBytes: utf8.encode(bodyString).length,
       );
     } on DioException catch (e) {
       stopwatch.stop();
@@ -68,12 +74,13 @@ class DbugHttpClient {
         });
       }
 
+      final bodyString = e.response?.data?.toString() ?? e.message ?? 'Unknown error';
       return HttpResponse(
         statusCode: e.response?.statusCode ?? 0,
         headers: responseHeaders,
-        body: e.response?.data?.toString() ?? e.message ?? 'Unknown error',
+        body: bodyString,
         timeMs: stopwatch.elapsedMilliseconds,
-        sizeBytes: e.response?.data?.toString().length ?? 0,
+        sizeBytes: utf8.encode(bodyString).length,
       );
     }
   }

@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 
 class KeyValueEntry {
   final TextEditingController keyController;
@@ -40,19 +41,15 @@ class KeyValueEditor extends StatefulWidget {
 
 class _KeyValueEditorState extends State<KeyValueEditor> {
   void _addEntry() {
-    setState(() {
-      widget.entries.add(KeyValueEntry());
-    });
     widget.onChanged?.call();
   }
 
   void _removeEntry(int index) {
-    setState(() {
-      widget.entries[index].dispose();
-      widget.entries.removeAt(index);
-    });
+    widget.entries.removeAt(index);
     widget.onChanged?.call();
   }
+
+  @override
 
   @override
   Widget build(BuildContext context) {
@@ -112,13 +109,13 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                shad.IconButton.ghost(icon: const Icon(Icons.close, size: 14), onPressed: () => _removeEntry(i)),
+                shad.IconButton.ghost(icon: const Icon(LucideIcons.x, size: 14), onPressed: () => _removeEntry(i)),
               ],
             ),
           );
         }),
         const SizedBox(height: 8),
-        shad.Button.outline(onPressed: _addEntry, leading: const Icon(Icons.add, size: 14), child: const Text('Add')),
+        shad.Button.outline(onPressed: _addEntry, leading: const Icon(LucideIcons.plus, size: 14), child: const Text('Add')),
       ],
     );
   }

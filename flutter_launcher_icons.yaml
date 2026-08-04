@@ -1,0 +1,12 @@
+flutter_launcher_icons:
+  image_path: "assets/icon/dbug_icon_1024.png"
+  android: true
+  ios: true
+  macos:
+    generate: true
+  windows:
+    generate: true
+  web:
+    generate: true
+  adaptive_icon_foreground: "assets/icon/dbug_icon_1024.png"
+  adaptive_icon_background: "#18181b"

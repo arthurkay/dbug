@@ -13,6 +13,15 @@ class HistoryRepository {
     int? responseTimeMs,
     int? responseSize,
     String? responseBody,
+    String? requestName,
+    String? collectionId,
+    String headers = '{}',
+    String collectionHeaders = '{}',
+    String? body,
+    String? bodyType,
+    String queryParams = '{}',
+    String authType = 'none',
+    String authData = '{}',
   }) async {
     final db = await DatabaseService.database;
     final id = _uuid.v4();
@@ -28,6 +37,15 @@ class HistoryRepository {
       'response_size': responseSize,
       'response_body': responseBody,
       'sent_at': now.millisecondsSinceEpoch,
+      'request_name': requestName,
+      'collection_id': collectionId,
+      'headers': headers,
+      'collection_headers': collectionHeaders,
+      'body': body,
+      'body_type': bodyType,
+      'query_params': queryParams,
+      'auth_type': authType,
+      'auth_data': authData,
     });
 
     return HistoryEntry(
@@ -40,6 +58,15 @@ class HistoryRepository {
       responseSize: responseSize,
       responseBody: responseBody,
       sentAt: now,
+      requestName: requestName,
+      collectionId: collectionId,
+      headers: headers,
+      collectionHeaders: collectionHeaders,
+      body: body,
+      bodyType: bodyType,
+      queryParams: queryParams,
+      authType: authType,
+      authData: authData,
     );
   }
 
@@ -57,6 +84,15 @@ class HistoryRepository {
       responseSize: row['response_size'] as int?,
       responseBody: row['response_body'] as String?,
       sentAt: DateTime.fromMillisecondsSinceEpoch(row['sent_at'] as int),
+      requestName: row['request_name'] as String?,
+      collectionId: row['collection_id'] as String?,
+      headers: (row['headers'] as String?) ?? '{}',
+      collectionHeaders: (row['collection_headers'] as String?) ?? '{}',
+      body: row['body'] as String?,
+      bodyType: row['body_type'] as String?,
+      queryParams: (row['query_params'] as String?) ?? '{}',
+      authType: (row['auth_type'] as String?) ?? 'none',
+      authData: (row['auth_data'] as String?) ?? '{}',
     )).toList();
   }
 

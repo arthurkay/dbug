@@ -1,22 +1,28 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 
 import '../../../core/http/http_client.dart';
 import '../../../core/models/request_model.dart';
+import '../../../core/models/history_entry.dart';
 import '../../../core/providers/http_client_provider.dart';
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/active_environment_provider.dart';
 import '../../../shared/widgets/key_value_editor.dart';
 import '../../../shared/widgets/response_view.dart';
 import '../../../shared/widgets/toast_helper.dart';
+import '../../../shared/widgets/dbug_spinner.dart';
+import '../../../shared/utils/method_colors.dart';
 
 class RequestScreen extends ConsumerStatefulWidget {
   final RequestModel? initialRequest;
   final Map<String, String> collectionHeaders;
+  final String? collectionId;
+  final HistoryEntry? historyEntry;
 
-  const RequestScreen({super.key, this.initialRequest, this.collectionHeaders = const {}});
+  const RequestScreen({super.key, this.initialRequest, this.collectionHeaders = const {}, this.collectionId, this.historyEntry});
 
   @override
   ConsumerState<RequestScreen> createState() => _RequestScreenState();
@@ -33,6 +39,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
   bool _isSending = false;
   HttpResponse? _lastResponse;
   String? _currentRequestId;
+  bool _showEndpointList = true;
+  String _endpointSearchQuery = '';
+  double _responseSplitRatio = 0.5;
 
   final _methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
   final _bodyTypes = ['None', 'JSON', 'Form Data', 'Raw'];
@@ -54,8 +63,76 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     super.initState();
     _params = [KeyValueEntry()];
     _headers = [KeyValueEntry()];
-    if (widget.initialRequest != null) {
+    if (widget.historyEntry != null) {
+      _loadFromHistoryEntry(widget.historyEntry!);
+    } else if (widget.initialRequest != null) {
       _loadFromRequest(widget.initialRequest!);
+    }
+  }
+
+  void _loadFromHistoryEntry(HistoryEntry entry) {
+    _selectedMethod = entry.method;
+    _urlController.text = entry.url;
+    _bodyController.text = entry.body ?? '';
+    _requestNameController.text = entry.requestName ?? '';
+
+    // Restore body type
+    if (entry.bodyType == 'json') {
+      _selectedBodyType = 1;
+    } else if (entry.bodyType == 'form') {
+      _selectedBodyType = 2;
+    } else if (entry.bodyType == 'raw') {
+      _selectedBodyType = 3;
+    } else {
+      _selectedBodyType = 0;
+    }
+
+    // Restore headers
+    try {
+      final headersMap = Map<String, String>.from(jsonDecode(entry.headers));
+      _headers..clear()..addAll(mapToEntries(headersMap));
+    } catch (_) {
+      _headers.clear();
+    }
+    if (_headers.isEmpty) _headers.add(KeyValueEntry());
+
+    // Restore query params
+    try {
+      final paramsMap = Map<String, String>.from(jsonDecode(entry.queryParams));
+      _params..clear()..addAll(mapToEntries(paramsMap));
+    } catch (_) {
+      _params.clear();
+    }
+    if (_params.isEmpty) _params.add(KeyValueEntry());
+
+    // Restore auth type
+    switch (entry.authType) {
+      case 'bearer':
+        _selectedAuthType = 1;
+        try {
+          final data = jsonDecode(entry.authData);
+          _bearerTokenController.text = data['token'] ?? '';
+        } catch (_) {}
+        break;
+      case 'basic':
+        _selectedAuthType = 2;
+        try {
+          final data = jsonDecode(entry.authData);
+          _basicUserController.text = data['username'] ?? '';
+          _basicPassController.text = data['password'] ?? '';
+        } catch (_) {}
+        break;
+      case 'apikey':
+        _selectedAuthType = 3;
+        try {
+          final data = jsonDecode(entry.authData);
+          _apiKeyNameController.text = data['name'] ?? '';
+          _apiKeyValueController.text = data['value'] ?? '';
+          _apiKeyLocation = data['location'] ?? 'header';
+        } catch (_) {}
+        break;
+      default:
+        _selectedAuthType = 0;
     }
   }
 
@@ -148,7 +225,10 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
 
   Future<void> _sendRequest() async {
     final url = _urlController.text.trim();
-    if (url.isEmpty) return;
+    if (url.isEmpty) {
+      if (mounted) showDbugToast(context, message: 'Enter a URL to send', type: ToastType.warning);
+      return;
+    }
 
     setState(() { _isSending = true; _lastResponse = null; });
 
@@ -180,6 +260,29 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
 
       setState(() => _lastResponse = response);
 
+      // Build auth data for history
+      String authType = 'none';
+      String authData = '{}';
+      if (_selectedAuthType == 1) {
+        authType = 'bearer';
+        authData = jsonEncode({'token': _bearerTokenController.text.trim()});
+      } else if (_selectedAuthType == 2) {
+        authType = 'basic';
+        authData = jsonEncode({'username': _basicUserController.text.trim(), 'password': _basicPassController.text});
+      } else if (_selectedAuthType == 3) {
+        authType = 'apikey';
+        authData = jsonEncode({'name': _apiKeyNameController.text.trim(), 'value': _apiKeyValueController.text.trim(), 'location': _apiKeyLocation});
+      }
+
+      String? bodyType;
+      if (_selectedBodyType == 1) {
+        bodyType = 'json';
+      } else if (_selectedBodyType == 2) {
+        bodyType = 'form';
+      } else if (_selectedBodyType == 3) {
+        bodyType = 'raw';
+      }
+
       // Save to history
       final historyRepo = ref.read(historyRepositoryProvider);
       await historyRepo.addEntry(
@@ -190,6 +293,17 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
         responseTimeMs: response.timeMs,
         responseSize: response.sizeBytes,
         responseBody: response.body,
+        requestName: _requestNameController.text.trim().isNotEmpty
+            ? _requestNameController.text.trim()
+            : '$_selectedMethod $resolvedUrl',
+        collectionId: widget.collectionId,
+        headers: jsonEncode(entriesToMap(_headers)),
+        collectionHeaders: jsonEncode(widget.collectionHeaders),
+        body: _selectedBodyType > 0 ? _bodyController.text : null,
+        bodyType: bodyType,
+        queryParams: jsonEncode(_buildQueryParams()),
+        authType: authType,
+        authData: authData,
       );
       ref.invalidate(historyProvider);
     } catch (e) {
@@ -262,80 +376,262 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
 
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
         children: [
-          if (widget.initialRequest != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.api, size: 14, color: colorScheme.primary),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      widget.initialRequest!.name,
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.foreground),
-                      overflow: TextOverflow.ellipsis,
+          if (_showEndpointList && widget.collectionId != null) ...[
+            _buildEndpointList(colorScheme),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.initialRequest != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        if (widget.collectionId != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: shad.IconButton.ghost(
+                              icon: Icon(_showEndpointList ? LucideIcons.panelLeftOpen : LucideIcons.panelLeftClose, size: 18, color: colorScheme.mutedForeground),
+                              onPressed: () => setState(() => _showEndpointList = !_showEndpointList),
+                            ),
+                          ),
+                        Icon(LucideIcons.globe, size: 14, color: colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            widget.initialRequest!.name,
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.foreground),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-          _buildMethodUrlBar(colorScheme),
-          const SizedBox(height: 12),
-          _buildTabs(colorScheme),
-          const SizedBox(height: 10),
-          Expanded(child: _lastResponse != null ? _buildResponseSplit(colorScheme) : _buildTabContent(colorScheme)),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: shad.Button.primary(
-                  onPressed: _isSending ? null : _sendRequest,
-                  leading: _isSending
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.send, size: 14),
-                  child: Text(_isSending ? 'Sending...' : 'Send'),
+                _buildMethodUrlBar(colorScheme),
+                const SizedBox(height: 12),
+                _buildTabs(colorScheme),
+                const SizedBox(height: 10),
+                Expanded(child: _lastResponse != null ? _buildResponseSplit(colorScheme) : _buildTabContent(colorScheme)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: shad.Button.primary(
+                        onPressed: _isSending ? null : _sendRequest,
+                        leading: _isSending
+                            ? const SizedBox(width: 14, height: 14, child: DbugSpinner(strokeWidth: 2, color: Color(0xFFFFFFFF)))
+                            : const Icon(LucideIcons.send, size: 14),
+                        child: Text(_isSending ? 'Sending...' : 'Send'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    shad.Button.outline(
+                      onPressed: _saveRequest,
+                      leading: const Icon(LucideIcons.save, size: 14),
+                      child: const Text('Save'),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              shad.Button.outline(
-                onPressed: _saveRequest,
-                leading: const Icon(Icons.save_outlined, size: 14),
-                child: const Text('Save'),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildEndpointList(shad.ColorScheme colorScheme) {
+    final requestsAsync = ref.watch(requestsByCollectionProvider(widget.collectionId!));
+
+    return Container(
+      width: 220,
+      decoration: BoxDecoration(
+        color: colorScheme.card,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colorScheme.border.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              children: [
+                Icon(LucideIcons.list, size: 14, color: colorScheme.primary),
+                const SizedBox(width: 6),
+                Text('Endpoints', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: shad.TextField(
+              placeholder: const Text('Search endpoints...'),
+              onChanged: (v) => setState(() => _endpointSearchQuery = v),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(height: 1, color: colorScheme.border.withValues(alpha: 0.5)),
+          Expanded(
+            child: requestsAsync.when(
+              loading: () => const Center(child: SizedBox(width: 16, height: 16, child: DbugSpinner(strokeWidth: 2))),
+              error: (e, _) => Center(child: Text('Error', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground))),
+              data: (requests) {
+                if (requests.isEmpty) {
+                  return Center(child: Text('No requests', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)));
+                }
+                final filtered = _endpointSearchQuery.isEmpty
+                    ? requests
+                    : requests.where((r) {
+                        final q = _endpointSearchQuery.toLowerCase();
+                        return r.name.toLowerCase().contains(q) ||
+                            r.method.toLowerCase().contains(q) ||
+                            r.url.toLowerCase().contains(q);
+                      }).toList();
+                if (filtered.isEmpty) {
+                  return Center(child: Text('No matching endpoints', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)));
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, i) {
+                    final req = filtered[i];
+                    final isActive = req.id == _currentRequestId;
+                    return GestureDetector(
+                      onTap: () => _switchToRequest(req),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        color: isActive ? colorScheme.primary.withValues(alpha: 0.08) : null,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: methodColor(req.method).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(req.method, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: methodColor(req.method)), textAlign: TextAlign.center),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                req.name,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                                  color: isActive ? colorScheme.primary : colorScheme.foreground,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _switchToRequest(RequestModel req) {
+    setState(() {
+      _currentRequestId = req.id;
+      _selectedMethod = req.method;
+      _urlController.text = req.url;
+      _bodyController.text = req.body ?? '';
+      _requestNameController.text = req.name;
+      _lastResponse = null;
+      if (req.bodyType == 'json') {
+        _selectedBodyType = 1;
+      } else if (req.bodyType == 'form') {
+        _selectedBodyType = 2;
+      } else if (req.bodyType == 'raw') {
+        _selectedBodyType = 3;
+      } else {
+        _selectedBodyType = 0;
+      }
+      _params
+        ..clear()
+        ..addAll(mapToEntries(req.queryParams));
+      if (_params.isEmpty) _params.add(KeyValueEntry());
+      _headers
+        ..clear()
+        ..addAll(mapToEntries(req.headers));
+      if (_headers.isEmpty) _headers.add(KeyValueEntry());
+    });
+  }
+
   Widget _buildResponseSplit(shad.ColorScheme colorScheme) {
-    return Column(
-      children: [
-        Expanded(
-          flex: 1,
-          child: _buildTabContent(colorScheme),
-        ),
-        const SizedBox(height: 8),
-        Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalHeight = constraints.maxHeight;
+        final dividerHeight = 8.0;
+        final topHeight = (totalHeight - dividerHeight) * _responseSplitRatio;
+
+        return Column(
           children: [
-            Text('Response', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
-            const Spacer(),
-            shad.IconButton.ghost(
-              icon: const Icon(Icons.close, size: 14),
-              onPressed: () => setState(() => _lastResponse = null),
+            SizedBox(
+              height: topHeight.clamp(80.0, totalHeight - 80 - dividerHeight),
+              child: _buildTabContent(colorScheme),
+            ),
+            GestureDetector(
+              onVerticalDragUpdate: (details) {
+                setState(() {
+                  _responseSplitRatio += details.delta.dy / totalHeight;
+                  _responseSplitRatio = _responseSplitRatio.clamp(0.2, 0.8);
+                });
+              },
+              child: MouseRegion(
+                cursor: SystemMouseCursors.resizeUpDown,
+                child: Container(
+                  height: dividerHeight,
+                  color: const Color(0x00000000),
+                  child: Center(
+                    child: Container(
+                      width: 40,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: colorScheme.border,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Text('Response', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+                      const Spacer(),
+                      shad.IconButton.ghost(
+                        icon: const Icon(LucideIcons.x, size: 14),
+                        onPressed: () => setState(() => _lastResponse = null),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Expanded(child: ResponseView(response: _lastResponse!)),
+                ],
+              ),
             ),
           ],
-        ),
-        const SizedBox(height: 4),
-        Expanded(
-          flex: 1,
-          child: ResponseView(response: _lastResponse!),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -345,12 +641,12 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
         shad.Select<String>(
           value: _selectedMethod,
           onChanged: (v) { if (v != null) setState(() => _selectedMethod = v); },
-          itemBuilder: (context, value) => Text(value, style: TextStyle(color: _methodColor(value), fontWeight: FontWeight.w600, fontSize: 12)),
+          itemBuilder: (context, value) => Text(value, style: TextStyle(color: methodColor(value), fontWeight: FontWeight.w600, fontSize: 12)),
           popup: (context) => Column(
             mainAxisSize: MainAxisSize.min,
             children: _methods.map((m) => shad.SelectItemButton<String>(
               value: m,
-              child: Text(m, style: TextStyle(color: _methodColor(m), fontWeight: FontWeight.w600, fontSize: 12)),
+              child: Text(m, style: TextStyle(color: methodColor(m), fontWeight: FontWeight.w600, fontSize: 12)),
             )).toList(),
           ),
         ),
@@ -420,7 +716,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.vpn_key_outlined, size: 12, color: colorScheme.primary),
+                        Icon(LucideIcons.key, size: 12, color: colorScheme.primary),
                         const SizedBox(width: 6),
                         Text('Collection Headers (inherited)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.primary, letterSpacing: 0.5)),
                       ],
@@ -570,12 +866,4 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     );
   }
 
-  Color _methodColor(String method) {
-    const colors = {
-      'GET': Color(0xFF22C55E), 'POST': Color(0xFF3B82F6), 'PUT': Color(0xFFF59E0B),
-      'PATCH': Color(0xFFF97316), 'DELETE': Color(0xFFEF4444), 'HEAD': Color(0xFF8B5CF6),
-      'OPTIONS': Color(0xFF6B7280),
-    };
-    return colors[method] ?? const Color(0xFF6B7280);
-  }
 }

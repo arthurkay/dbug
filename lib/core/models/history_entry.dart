@@ -15,6 +15,15 @@ class HistoryEntry with _$HistoryEntry {
     int? responseSize,
     String? responseBody,
     required DateTime sentAt,
+    String? requestName,
+    String? collectionId,
+    @Default('{}') String headers,
+    @Default('{}') String collectionHeaders,
+    String? body,
+    String? bodyType,
+    @Default('{}') String queryParams,
+    @Default('none') String authType,
+    @Default('{}') String authData,
   }) = _HistoryEntry;
 
   factory HistoryEntry.fromJson(Map<String, dynamic> json) =>

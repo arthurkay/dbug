@@ -1,7 +1,10 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
+
+import 'dbug_spinner.dart';
 
 class FileExplorer extends StatefulWidget {
   final List<String> allowedExtensions;
@@ -24,6 +27,7 @@ class _FileExplorerState extends State<FileExplorer> {
   List<FileSystemEntity> _entries = [];
   String? _selectedPath;
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -33,7 +37,7 @@ class _FileExplorerState extends State<FileExplorer> {
   }
 
   Future<void> _loadDirectory() async {
-    setState(() => _isLoading = true);
+    setState(() { _isLoading = true; _loadError = null; });
 
     try {
       final entries = await _currentDirectory.list().toList();
@@ -56,6 +60,7 @@ class _FileExplorerState extends State<FileExplorer> {
         setState(() {
           _entries = [];
           _isLoading = false;
+          _loadError = e.toString();
         });
       }
     }
@@ -90,10 +95,10 @@ class _FileExplorerState extends State<FileExplorer> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildBreadcrumbBar(context, colorScheme),
-          const Divider(height: 1),
+          Container(height: 1, color: colorScheme.border.withValues(alpha: 0.5)),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: DbugSpinner())
                 : _entries.isEmpty
                     ? _buildEmptyState(colorScheme)
                     : _buildFileList(context, colorScheme),
@@ -110,7 +115,7 @@ class _FileExplorerState extends State<FileExplorer> {
       child: Row(
         children: [
           shad.IconButton.ghost(
-            icon: const Icon(Icons.arrow_upward, size: 16),
+            icon: const Icon(LucideIcons.arrowUp, size: 16),
             onPressed: _currentDirectory.parent.path != _currentDirectory.path
                 ? _navigateUp
                 : null,
@@ -136,7 +141,7 @@ class _FileExplorerState extends State<FileExplorer> {
         breadcrumbs.add(
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Icon(Icons.chevron_right, size: 14, color: colorScheme.mutedForeground),
+            child: Icon(LucideIcons.chevronRight, size: 14, color: colorScheme.mutedForeground),
           ),
         );
       }
@@ -166,20 +171,29 @@ class _FileExplorerState extends State<FileExplorer> {
   }
 
   Widget _buildEmptyState(shad.ColorScheme colorScheme) {
+    final hasError = _loadError != null;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.folder_open, size: 48, color: colorScheme.mutedForeground),
+          Icon(hasError ? LucideIcons.circleAlert : LucideIcons.folderOpen, size: 48, color: hasError ? const Color(0xFFF59E0B) : colorScheme.mutedForeground),
           const SizedBox(height: 12),
           Text(
-            'Empty directory',
+            hasError ? 'Cannot access directory' : 'Empty directory',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
               color: colorScheme.mutedForeground,
             ),
           ),
+          if (hasError) ...[
+            const SizedBox(height: 4),
+            Text(
+              _loadError!,
+              style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ],
       ),
     );
@@ -235,7 +249,7 @@ class _FileTile extends StatelessWidget {
     final colorScheme = shad.Theme.of(context).colorScheme;
 
     final icon = isDirectory
-        ? Icons.folder
+        ? LucideIcons.folder
         : _getFileIcon(name);
     final iconColor = isDirectory
         ? const Color(0xFFF59E0B)
@@ -274,7 +288,7 @@ class _FileTile extends StatelessWidget {
                 ),
               ),
               if (isDirectory)
-                Icon(Icons.chevron_right, size: 16, color: colorScheme.mutedForeground),
+                Icon(LucideIcons.chevronRight, size: 16, color: colorScheme.mutedForeground),
             ],
           ),
         ),
@@ -286,12 +300,12 @@ class _FileTile extends StatelessWidget {
     final ext = p.extension(name).toLowerCase();
     switch (ext) {
       case '.json':
-        return Icons.code;
+        return LucideIcons.braces;
       case '.yaml':
       case '.yml':
-        return Icons.data_object;
+        return LucideIcons.fileText;
       default:
-        return Icons.insert_drive_file;
+        return LucideIcons.file;
     }
   }
 }

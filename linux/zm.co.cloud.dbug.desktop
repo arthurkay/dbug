@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=dbug
+Comment=A local API testing tool like Postman, built with Flutter.
+Exec=dbug
+Icon=dbug
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+Keywords=api;testing;http;debug;postman;
+StartupWMClass=zm.co.cloud.dbug

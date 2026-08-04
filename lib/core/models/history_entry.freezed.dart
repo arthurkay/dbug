@@ -30,6 +30,15 @@ mixin _$HistoryEntry {
   int? get responseSize => throw _privateConstructorUsedError;
   String? get responseBody => throw _privateConstructorUsedError;
   DateTime get sentAt => throw _privateConstructorUsedError;
+  String? get requestName => throw _privateConstructorUsedError;
+  String? get collectionId => throw _privateConstructorUsedError;
+  String get headers => throw _privateConstructorUsedError;
+  String get collectionHeaders => throw _privateConstructorUsedError;
+  String? get body => throw _privateConstructorUsedError;
+  String? get bodyType => throw _privateConstructorUsedError;
+  String get queryParams => throw _privateConstructorUsedError;
+  String get authType => throw _privateConstructorUsedError;
+  String get authData => throw _privateConstructorUsedError;
 
   /// Serializes this HistoryEntry to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -58,6 +67,15 @@ abstract class $HistoryEntryCopyWith<$Res> {
     int? responseSize,
     String? responseBody,
     DateTime sentAt,
+    String? requestName,
+    String? collectionId,
+    String headers,
+    String collectionHeaders,
+    String? body,
+    String? bodyType,
+    String queryParams,
+    String authType,
+    String authData,
   });
 }
 
@@ -85,6 +103,15 @@ class _$HistoryEntryCopyWithImpl<$Res, $Val extends HistoryEntry>
     Object? responseSize = freezed,
     Object? responseBody = freezed,
     Object? sentAt = null,
+    Object? requestName = freezed,
+    Object? collectionId = freezed,
+    Object? headers = null,
+    Object? collectionHeaders = null,
+    Object? body = freezed,
+    Object? bodyType = freezed,
+    Object? queryParams = null,
+    Object? authType = null,
+    Object? authData = null,
   }) {
     return _then(
       _value.copyWith(
@@ -124,6 +151,42 @@ class _$HistoryEntryCopyWithImpl<$Res, $Val extends HistoryEntry>
                 ? _value.sentAt
                 : sentAt // ignore: cast_nullable_to_non_nullable
                       as DateTime,
+            requestName: freezed == requestName
+                ? _value.requestName
+                : requestName // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            collectionId: freezed == collectionId
+                ? _value.collectionId
+                : collectionId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            headers: null == headers
+                ? _value.headers
+                : headers // ignore: cast_nullable_to_non_nullable
+                      as String,
+            collectionHeaders: null == collectionHeaders
+                ? _value.collectionHeaders
+                : collectionHeaders // ignore: cast_nullable_to_non_nullable
+                      as String,
+            body: freezed == body
+                ? _value.body
+                : body // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            bodyType: freezed == bodyType
+                ? _value.bodyType
+                : bodyType // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            queryParams: null == queryParams
+                ? _value.queryParams
+                : queryParams // ignore: cast_nullable_to_non_nullable
+                      as String,
+            authType: null == authType
+                ? _value.authType
+                : authType // ignore: cast_nullable_to_non_nullable
+                      as String,
+            authData: null == authData
+                ? _value.authData
+                : authData // ignore: cast_nullable_to_non_nullable
+                      as String,
           )
           as $Val,
     );
@@ -149,6 +212,15 @@ abstract class _$$HistoryEntryImplCopyWith<$Res>
     int? responseSize,
     String? responseBody,
     DateTime sentAt,
+    String? requestName,
+    String? collectionId,
+    String headers,
+    String collectionHeaders,
+    String? body,
+    String? bodyType,
+    String queryParams,
+    String authType,
+    String authData,
   });
 }
 
@@ -175,6 +247,15 @@ class __$$HistoryEntryImplCopyWithImpl<$Res>
     Object? responseSize = freezed,
     Object? responseBody = freezed,
     Object? sentAt = null,
+    Object? requestName = freezed,
+    Object? collectionId = freezed,
+    Object? headers = null,
+    Object? collectionHeaders = null,
+    Object? body = freezed,
+    Object? bodyType = freezed,
+    Object? queryParams = null,
+    Object? authType = null,
+    Object? authData = null,
   }) {
     return _then(
       _$HistoryEntryImpl(
@@ -214,6 +295,42 @@ class __$$HistoryEntryImplCopyWithImpl<$Res>
             ? _value.sentAt
             : sentAt // ignore: cast_nullable_to_non_nullable
                   as DateTime,
+        requestName: freezed == requestName
+            ? _value.requestName
+            : requestName // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        collectionId: freezed == collectionId
+            ? _value.collectionId
+            : collectionId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        headers: null == headers
+            ? _value.headers
+            : headers // ignore: cast_nullable_to_non_nullable
+                  as String,
+        collectionHeaders: null == collectionHeaders
+            ? _value.collectionHeaders
+            : collectionHeaders // ignore: cast_nullable_to_non_nullable
+                  as String,
+        body: freezed == body
+            ? _value.body
+            : body // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        bodyType: freezed == bodyType
+            ? _value.bodyType
+            : bodyType // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        queryParams: null == queryParams
+            ? _value.queryParams
+            : queryParams // ignore: cast_nullable_to_non_nullable
+                  as String,
+        authType: null == authType
+            ? _value.authType
+            : authType // ignore: cast_nullable_to_non_nullable
+                  as String,
+        authData: null == authData
+            ? _value.authData
+            : authData // ignore: cast_nullable_to_non_nullable
+                  as String,
       ),
     );
   }
@@ -232,6 +349,15 @@ class _$HistoryEntryImpl implements _HistoryEntry {
     this.responseSize,
     this.responseBody,
     required this.sentAt,
+    this.requestName,
+    this.collectionId,
+    this.headers = '{}',
+    this.collectionHeaders = '{}',
+    this.body,
+    this.bodyType,
+    this.queryParams = '{}',
+    this.authType = 'none',
+    this.authData = '{}',
   });
 
   factory _$HistoryEntryImpl.fromJson(Map<String, dynamic> json) =>
@@ -255,10 +381,33 @@ class _$HistoryEntryImpl implements _HistoryEntry {
   final String? responseBody;
   @override
   final DateTime sentAt;
+  @override
+  final String? requestName;
+  @override
+  final String? collectionId;
+  @override
+  @JsonKey()
+  final String headers;
+  @override
+  @JsonKey()
+  final String collectionHeaders;
+  @override
+  final String? body;
+  @override
+  final String? bodyType;
+  @override
+  @JsonKey()
+  final String queryParams;
+  @override
+  @JsonKey()
+  final String authType;
+  @override
+  @JsonKey()
+  final String authData;
 
   @override
   String toString() {
-    return 'HistoryEntry(id: $id, requestId: $requestId, method: $method, url: $url, statusCode: $statusCode, responseTimeMs: $responseTimeMs, responseSize: $responseSize, responseBody: $responseBody, sentAt: $sentAt)';
+    return 'HistoryEntry(id: $id, requestId: $requestId, method: $method, url: $url, statusCode: $statusCode, responseTimeMs: $responseTimeMs, responseSize: $responseSize, responseBody: $responseBody, sentAt: $sentAt, requestName: $requestName, collectionId: $collectionId, headers: $headers, collectionHeaders: $collectionHeaders, body: $body, bodyType: $bodyType, queryParams: $queryParams, authType: $authType, authData: $authData)';
   }
 
   @override
@@ -279,7 +428,23 @@ class _$HistoryEntryImpl implements _HistoryEntry {
                 other.responseSize == responseSize) &&
             (identical(other.responseBody, responseBody) ||
                 other.responseBody == responseBody) &&
-            (identical(other.sentAt, sentAt) || other.sentAt == sentAt));
+            (identical(other.sentAt, sentAt) || other.sentAt == sentAt) &&
+            (identical(other.requestName, requestName) ||
+                other.requestName == requestName) &&
+            (identical(other.collectionId, collectionId) ||
+                other.collectionId == collectionId) &&
+            (identical(other.headers, headers) || other.headers == headers) &&
+            (identical(other.collectionHeaders, collectionHeaders) ||
+                other.collectionHeaders == collectionHeaders) &&
+            (identical(other.body, body) || other.body == body) &&
+            (identical(other.bodyType, bodyType) ||
+                other.bodyType == bodyType) &&
+            (identical(other.queryParams, queryParams) ||
+                other.queryParams == queryParams) &&
+            (identical(other.authType, authType) ||
+                other.authType == authType) &&
+            (identical(other.authData, authData) ||
+                other.authData == authData));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -295,6 +460,15 @@ class _$HistoryEntryImpl implements _HistoryEntry {
     responseSize,
     responseBody,
     sentAt,
+    requestName,
+    collectionId,
+    headers,
+    collectionHeaders,
+    body,
+    bodyType,
+    queryParams,
+    authType,
+    authData,
   );
 
   /// Create a copy of HistoryEntry
@@ -322,6 +496,15 @@ abstract class _HistoryEntry implements HistoryEntry {
     final int? responseSize,
     final String? responseBody,
     required final DateTime sentAt,
+    final String? requestName,
+    final String? collectionId,
+    final String headers,
+    final String collectionHeaders,
+    final String? body,
+    final String? bodyType,
+    final String queryParams,
+    final String authType,
+    final String authData,
   }) = _$HistoryEntryImpl;
 
   factory _HistoryEntry.fromJson(Map<String, dynamic> json) =
@@ -345,6 +528,24 @@ abstract class _HistoryEntry implements HistoryEntry {
   String? get responseBody;
   @override
   DateTime get sentAt;
+  @override
+  String? get requestName;
+  @override
+  String? get collectionId;
+  @override
+  String get headers;
+  @override
+  String get collectionHeaders;
+  @override
+  String? get body;
+  @override
+  String? get bodyType;
+  @override
+  String get queryParams;
+  @override
+  String get authType;
+  @override
+  String get authData;
 
   /// Create a copy of HistoryEntry
   /// with the given fields replaced by the non-null parameter values.

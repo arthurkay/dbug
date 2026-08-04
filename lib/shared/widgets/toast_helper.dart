@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 
 enum ToastType { success, error, warning, info }
 
@@ -9,10 +10,10 @@ void showDbugToast(
   ToastType type = ToastType.info,
 }) {
   final (icon, destructive) = switch (type) {
-    ToastType.success => (Icons.check_circle_outline, false),
-    ToastType.error => (Icons.error_outline, true),
-    ToastType.warning => (Icons.warning_amber_outlined, false),
-    ToastType.info => (Icons.info_outline, false),
+    ToastType.success => (LucideIcons.circleCheck, false),
+    ToastType.error => (LucideIcons.circleX, true),
+    ToastType.warning => (LucideIcons.triangleAlert, false),
+    ToastType.info => (LucideIcons.circleAlert, false),
   };
 
   shad.showToast(
@@ -25,7 +26,7 @@ void showDbugToast(
           destructive: destructive,
           title: Text(message, style: const TextStyle(fontSize: 13)),
           trailing: shad.IconButton.ghost(
-            icon: const Icon(Icons.close, size: 14),
+            icon: const Icon(LucideIcons.x, size: 14),
             onPressed: overlay.close,
           ),
         ),

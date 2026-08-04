@@ -25,6 +25,7 @@ mixin _$Environment {
   String get name => throw _privateConstructorUsedError;
   Map<String, String> get variables => throw _privateConstructorUsedError;
   bool get isActive => throw _privateConstructorUsedError;
+  String get sourceType => throw _privateConstructorUsedError;
 
   /// Serializes this Environment to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -48,6 +49,7 @@ abstract class $EnvironmentCopyWith<$Res> {
     String name,
     Map<String, String> variables,
     bool isActive,
+    String sourceType,
   });
 }
 
@@ -70,6 +72,7 @@ class _$EnvironmentCopyWithImpl<$Res, $Val extends Environment>
     Object? name = null,
     Object? variables = null,
     Object? isActive = null,
+    Object? sourceType = null,
   }) {
     return _then(
       _value.copyWith(
@@ -89,6 +92,10 @@ class _$EnvironmentCopyWithImpl<$Res, $Val extends Environment>
                 ? _value.isActive
                 : isActive // ignore: cast_nullable_to_non_nullable
                       as bool,
+            sourceType: null == sourceType
+                ? _value.sourceType
+                : sourceType // ignore: cast_nullable_to_non_nullable
+                      as String,
           )
           as $Val,
     );
@@ -109,6 +116,7 @@ abstract class _$$EnvironmentImplCopyWith<$Res>
     String name,
     Map<String, String> variables,
     bool isActive,
+    String sourceType,
   });
 }
 
@@ -130,6 +138,7 @@ class __$$EnvironmentImplCopyWithImpl<$Res>
     Object? name = null,
     Object? variables = null,
     Object? isActive = null,
+    Object? sourceType = null,
   }) {
     return _then(
       _$EnvironmentImpl(
@@ -149,6 +158,10 @@ class __$$EnvironmentImplCopyWithImpl<$Res>
             ? _value.isActive
             : isActive // ignore: cast_nullable_to_non_nullable
                   as bool,
+        sourceType: null == sourceType
+            ? _value.sourceType
+            : sourceType // ignore: cast_nullable_to_non_nullable
+                  as String,
       ),
     );
   }
@@ -156,13 +169,15 @@ class __$$EnvironmentImplCopyWithImpl<$Res>
 
 /// @nodoc
 @JsonSerializable()
-class _$EnvironmentImpl implements _Environment {
+class _$EnvironmentImpl extends _Environment {
   const _$EnvironmentImpl({
     required this.id,
     required this.name,
     final Map<String, String> variables = const {},
     this.isActive = false,
-  }) : _variables = variables;
+    this.sourceType = 'user',
+  }) : _variables = variables,
+       super._();
 
   factory _$EnvironmentImpl.fromJson(Map<String, dynamic> json) =>
       _$$EnvironmentImplFromJson(json);
@@ -183,10 +198,13 @@ class _$EnvironmentImpl implements _Environment {
   @override
   @JsonKey()
   final bool isActive;
+  @override
+  @JsonKey()
+  final String sourceType;
 
   @override
   String toString() {
-    return 'Environment(id: $id, name: $name, variables: $variables, isActive: $isActive)';
+    return 'Environment(id: $id, name: $name, variables: $variables, isActive: $isActive, sourceType: $sourceType)';
   }
 
   @override
@@ -201,7 +219,9 @@ class _$EnvironmentImpl implements _Environment {
               _variables,
             ) &&
             (identical(other.isActive, isActive) ||
-                other.isActive == isActive));
+                other.isActive == isActive) &&
+            (identical(other.sourceType, sourceType) ||
+                other.sourceType == sourceType));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -212,6 +232,7 @@ class _$EnvironmentImpl implements _Environment {
     name,
     const DeepCollectionEquality().hash(_variables),
     isActive,
+    sourceType,
   );
 
   /// Create a copy of Environment
@@ -228,13 +249,15 @@ class _$EnvironmentImpl implements _Environment {
   }
 }
 
-abstract class _Environment implements Environment {
+abstract class _Environment extends Environment {
   const factory _Environment({
     required final String id,
     required final String name,
     final Map<String, String> variables,
     final bool isActive,
+    final String sourceType,
   }) = _$EnvironmentImpl;
+  const _Environment._() : super._();
 
   factory _Environment.fromJson(Map<String, dynamic> json) =
       _$EnvironmentImpl.fromJson;
@@ -247,6 +270,8 @@ abstract class _Environment implements Environment {
   Map<String, String> get variables;
   @override
   bool get isActive;
+  @override
+  String get sourceType;
 
   /// Create a copy of Environment
   /// with the given fields replaced by the non-null parameter values.

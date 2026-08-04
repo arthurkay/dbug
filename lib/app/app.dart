@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 import 'theme/shadcn_theme.dart';
@@ -14,6 +14,7 @@ class DbugApp extends ConsumerWidget {
 
     return shad.ShadcnApp.router(
       title: 'dbug',
+      debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       darkTheme: DbugTheme.dark,
       theme: DbugTheme.light,

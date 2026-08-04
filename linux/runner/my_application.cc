@@ -5,6 +5,8 @@
 #include <gdk/gdkx.h>
 #endif
 
+#include <gdk/gdk.h>
+#include <unistd.h>
 #include "flutter/generated_plugin_registrant.h"
 
 struct _MyApplication {
@@ -53,6 +55,71 @@ static void my_application_activate(GApplication* application) {
   }
 
   gtk_window_set_default_size(window, 1280, 720);
+
+  // Set the window icon. Try multiple paths to cover both system-installed
+  // and Flutter bundle layouts.
+  g_autoptr(GError) icon_error = nullptr;
+  gboolean icon_set = FALSE;
+
+  // 1. Try XDG system data directories (for system-wide install).
+  if (!icon_set) {
+    const gchar* const* data_dirs = g_get_system_data_dirs();
+    for (const gchar* const* dir = data_dirs; *dir != nullptr; ++dir) {
+      g_autofree gchar* icon_path =
+          g_build_filename(*dir, "icons", "hicolor", "256x256", "apps",
+                           "dbug.png", nullptr);
+      if (g_file_test(icon_path, G_FILE_TEST_EXISTS)) {
+        icon_set = gtk_window_set_icon_from_file(window, icon_path,
+                                                 &icon_error);
+        break;
+      }
+    }
+  }
+
+  // 2. Try relative to the executable (for Flutter bundle layout).
+  if (!icon_set) {
+    g_autofree gchar* exe_dir = nullptr;
+    gchar exe_path[4096];
+    ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (len != -1) {
+      exe_path[len] = '\0';
+      exe_dir = g_path_get_dirname(exe_path);
+    }
+    if (exe_dir != nullptr) {
+      g_autofree gchar* bundle_icon = g_build_filename(
+          exe_dir, "data", "icons", "hicolor", "256x256", "apps",
+          "dbug.png", nullptr);
+      if (g_file_test(bundle_icon, G_FILE_TEST_EXISTS)) {
+        icon_set = gtk_window_set_icon_from_file(window, bundle_icon,
+                                                 &icon_error);
+      }
+    }
+  }
+
+  // 3. Fallback: use the 1024px icon from Flutter assets.
+  if (!icon_set) {
+    g_autofree gchar* exe_dir = nullptr;
+    gchar exe_path[4096];
+    ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (len != -1) {
+      exe_path[len] = '\0';
+      exe_dir = g_path_get_dirname(exe_path);
+    }
+    if (exe_dir != nullptr) {
+      g_autofree gchar* asset_icon = g_build_filename(
+          exe_dir, "data", "flutter_assets", "assets", "icon",
+          "dbug_icon_1024.png", nullptr);
+      if (g_file_test(asset_icon, G_FILE_TEST_EXISTS)) {
+        icon_set = gtk_window_set_icon_from_file(window, asset_icon,
+                                                 &icon_error);
+      }
+    }
+  }
+
+  if (!icon_set) {
+    g_warning("Failed to set window icon: %s",
+              icon_error ? icon_error->message : "icon file not found");
+  }
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(

@@ -39,9 +39,18 @@ class OpenApiRepository {
     });
 
     final baseUrl = parsed.baseUrl ?? '';
+    final allPathParams = <String>{};
+
     for (final ep in parsed.endpoints) {
       final requestId = _uuid.v4();
-      final url = baseUrl.isNotEmpty ? '{{baseUrl}}${ep.path}' : ep.path;
+      final convertedPath = ep.path.replaceAllMapped(
+        RegExp(r'\{(\w+)\}'),
+        (m) {
+          allPathParams.add(m.group(1)!);
+          return '{{${m.group(1)}}}';
+        },
+      );
+      final url = baseUrl.isNotEmpty ? '{{baseUrl}}$convertedPath' : convertedPath;
 
       await db.insert('requests', {
         'id': requestId,
@@ -58,14 +67,20 @@ class OpenApiRepository {
       });
     }
 
-    if (baseUrl.isNotEmpty) {
+    if (baseUrl.isNotEmpty || allPathParams.isNotEmpty) {
       final envId = _uuid.v4();
       final envName = parsed.title != null ? '${parsed.title} API' : 'Imported API';
+      final variables = <String, String>{};
+      if (baseUrl.isNotEmpty) variables['baseUrl'] = baseUrl;
+      for (final param in allPathParams) {
+        variables[param] = '';
+      }
       await db.insert('environments', {
         'id': envId,
         'name': envName,
-        'variables': jsonEncode({'baseUrl': baseUrl}),
+        'variables': jsonEncode(variables),
         'is_active': 0,
+        'source_type': 'openapi',
       });
     }
 
@@ -110,11 +125,21 @@ class OpenApiRepository {
 
   Future<void> deleteSpec(String id) async {
     final db = await DatabaseService.database;
+
+    final specRows = await db.query('openapi_specs', where: 'id = ?', whereArgs: [id], columns: ['title']);
+    final specTitle = specRows.isNotEmpty ? specRows.first['title'] as String? : null;
+
     final collections = await db.query('collections', where: 'source_spec_id = ?', whereArgs: [id]);
     for (final c in collections) {
       await db.delete('requests', where: 'collection_id = ?', whereArgs: [c['id']]);
     }
     await db.delete('collections', where: 'source_spec_id = ?', whereArgs: [id]);
+
+    if (specTitle != null) {
+      await db.delete('environments', where: 'name = ? AND source_type = ?', whereArgs: ['$specTitle API', 'openapi']);
+    }
+    await db.delete('environments', where: 'name = ? AND source_type = ?', whereArgs: ['Imported API', 'openapi']);
+
     await db.delete('openapi_specs', where: 'id = ?', whereArgs: [id]);
   }
 

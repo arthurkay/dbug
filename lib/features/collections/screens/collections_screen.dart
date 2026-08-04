@@ -1,10 +1,14 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/material.dart' show showDialog;
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
+import '../../../shared/widgets/dbug_spinner.dart';
+import '../../../shared/utils/method_colors.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/active_environment_provider.dart';
@@ -25,6 +29,8 @@ class CollectionsScreen extends ConsumerStatefulWidget {
 class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
   bool _showFileExplorer = false;
   final Set<String> _expandedCollections = {};
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
 
   Future<void> _importFromFile() async {
     final result = await FilePicker.platform.pickFiles(
@@ -160,8 +166,14 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     });
   }
 
-  void _openRequest(RequestModel request, Map<String, String> collectionHeaders) {
-    context.go('/request', extra: {'request': request, 'collectionHeaders': collectionHeaders});
+  void _openRequest(RequestModel request, Map<String, String> collectionHeaders, {String? collectionId}) {
+    context.go('/request', extra: {'request': request, 'collectionHeaders': collectionHeaders, 'collectionId': collectionId});
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -187,19 +199,29 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                 ),
               ),
               if (_showFileExplorer)
-                shad.Button.ghost(onPressed: () => setState(() => _showFileExplorer = false), leading: const Icon(Icons.close, size: 16), child: const Text('Close Explorer'))
+                shad.Button.ghost(onPressed: () => setState(() => _showFileExplorer = false), leading: const Icon(LucideIcons.x, size: 16), child: const Text('Close Explorer'))
               else ...[
-                shad.Button.outline(onPressed: _importFromFile, leading: const Icon(Icons.file_upload_outlined, size: 16), child: const Text('Import')),
+                shad.Button.outline(onPressed: _importFromFile, leading: const Icon(LucideIcons.upload, size: 16), child: const Text('Import')),
                 const SizedBox(width: 8),
-                shad.Button.outline(onPressed: () => setState(() => _showFileExplorer = true), leading: const Icon(Icons.folder_open, size: 16), child: const Text('Browse')),
+                shad.Button.outline(onPressed: () => setState(() => _showFileExplorer = true), leading: const Icon(LucideIcons.folderOpen, size: 16), child: const Text('Browse')),
                 const SizedBox(width: 8),
-                shad.Button.primary(onPressed: () => _showCreateDialog(context), leading: const Icon(Icons.add, size: 16), child: const Text('New Collection')),
+                shad.Button.primary(onPressed: () => _showCreateDialog(context), leading: const Icon(LucideIcons.plus, size: 16), child: const Text('New Collection')),
               ],
             ],
           ),
           const SizedBox(height: 12),
           _buildEnvSection(colorScheme),
           const SizedBox(height: 12),
+          if (!_showFileExplorer)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: shad.TextField(
+                controller: _searchController,
+                placeholder: const Text('Search requests by name, method, or URL...'),
+                style: const TextStyle(fontSize: 13),
+                onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+              ),
+            ),
           Expanded(
             child: _showFileExplorer
                 ? FileExplorer(
@@ -210,7 +232,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                     },
                   )
                 : collectionsAsync.when(
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading: () => const Center(child: DbugSpinner()),
                     error: (e, _) => Center(child: Text('Error: $e')),
                     data: (collections) {
                       if (collections.isEmpty) return _buildEmptyState(colorScheme);
@@ -223,15 +245,28 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                             final isExpanded = _expandedCollections.contains(collection.id);
                             return _CollectionExpandable(
                               collection: collection,
-                              isExpanded: isExpanded,
+                              isExpanded: isExpanded || _searchQuery.isNotEmpty,
                               onToggle: () => _toggleExpand(collection.id),
                               onDelete: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => shad.AlertDialog(
+                                    title: const Text('Delete Collection'),
+                                    content: Text('Delete "${collection.name}" and all its requests?'),
+                                    actions: [
+                                      shad.Button.ghost(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                                      shad.Button.primary(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true) return;
                                 final requestRepo = ref.read(requestRepositoryProvider);
                                 await requestRepo.deleteByCollection(collection.id);
                                 await ref.read(collectionRepositoryProvider).deleteCollection(collection.id);
                                 ref.invalidate(collectionsProvider);
                               },
                               onRequestTap: _openRequest,
+                              searchQuery: _searchQuery,
                             );
                           },
                         ),
@@ -253,7 +288,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
-              Icon(Icons.warning_amber, size: 16, color: const Color(0xFFF59E0B)),
+              Icon(LucideIcons.triangleAlert, size: 16, color: const Color(0xFFF59E0B)),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -281,7 +316,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.code, size: 14, color: colorScheme.primary),
+                Icon(LucideIcons.braces, size: 14, color: colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   activeEnv.name,
@@ -295,7 +330,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                 const Spacer(),
                 shad.Button.ghost(
                   onPressed: () => _showQuickAddVarDialog(context),
-                  leading: const Icon(Icons.add, size: 14),
+                  leading: const Icon(LucideIcons.plus, size: 14),
                   child: const Text('Add Var', style: TextStyle(fontSize: 11)),
                 ),
                 shad.Button.ghost(
@@ -368,7 +403,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                   updated[nameController.text] = valueController.text;
                   final updatedEnv = env.copyWith(variables: updated);
                   await ref.read(environmentRepositoryProvider).updateEnvironment(updatedEnv);
-                  ref.read(activeEnvironmentProvider.notifier).state = updatedEnv;
+                  ref.read(activeEnvironmentProvider.notifier).setActive(updatedEnv);
                   ref.invalidate(environmentsProvider);
                 }
                 if (context.mounted) Navigator.pop(context);
@@ -387,7 +422,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.folder_open, size: 48, color: colorScheme.mutedForeground),
+            Icon(LucideIcons.folderOpen, size: 48, color: colorScheme.mutedForeground),
             const SizedBox(height: 16),
             Text('No collections yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
             const SizedBox(height: 8),
@@ -396,9 +431,9 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                shad.Button.primary(onPressed: () => _showCreateDialog(context), leading: const Icon(Icons.add, size: 16), child: const Text('New Collection')),
+                shad.Button.primary(onPressed: () => _showCreateDialog(context), leading: const Icon(LucideIcons.plus, size: 16), child: const Text('New Collection')),
                 const SizedBox(width: 8),
-                shad.Button.outline(onPressed: _importFromFile, leading: const Icon(Icons.file_upload_outlined, size: 16), child: const Text('Import File')),
+                shad.Button.outline(onPressed: _importFromFile, leading: const Icon(LucideIcons.upload, size: 16), child: const Text('Import File')),
               ],
             ),
           ],
@@ -449,7 +484,8 @@ class _CollectionExpandable extends ConsumerWidget {
   final bool isExpanded;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
-  final void Function(RequestModel request, Map<String, String> headers) onRequestTap;
+  final void Function(RequestModel request, Map<String, String> headers, {String? collectionId}) onRequestTap;
+  final String searchQuery;
 
   const _CollectionExpandable({
     required this.collection,
@@ -457,6 +493,7 @@ class _CollectionExpandable extends ConsumerWidget {
     required this.onToggle,
     required this.onDelete,
     required this.onRequestTap,
+    this.searchQuery = '',
   });
 
   @override
@@ -467,13 +504,14 @@ class _CollectionExpandable extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        InkWell(
+        GestureDetector(
           onTap: onToggle,
+          behavior: HitTestBehavior.opaque,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                Icon(isExpanded ? Icons.folder_open : Icons.folder, size: 16, color: const Color(0xFFF59E0B)),
+                Icon(isExpanded ? LucideIcons.folderOpen : LucideIcons.folder, size: 16, color: const Color(0xFFF59E0B)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -495,19 +533,19 @@ class _CollectionExpandable extends ConsumerWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.key, size: 10, color: colorScheme.primary),
+                        Icon(LucideIcons.key, size: 10, color: colorScheme.primary),
                         const SizedBox(width: 3),
                         Text('$headerCount', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: colorScheme.primary)),
                       ],
                     ),
                   ),
                 shad.IconButton.ghost(
-                  icon: Icon(Icons.vpn_key_outlined, size: 16, color: headerCount > 0 ? colorScheme.primary : colorScheme.mutedForeground),
+                  icon: Icon(LucideIcons.key, size: 16, color: headerCount > 0 ? colorScheme.primary : colorScheme.mutedForeground),
                   onPressed: () => _showHeadersDialog(context, ref),
                 ),
-                Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 18, color: colorScheme.mutedForeground),
+                Icon(isExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18, color: colorScheme.mutedForeground),
                 const SizedBox(width: 4),
-                shad.IconButton.ghost(icon: const Icon(Icons.delete_outline, size: 14), onPressed: onDelete),
+                shad.IconButton.ghost(icon: const Icon(LucideIcons.trash2, size: 14), onPressed: onDelete),
               ],
             ),
           ),
@@ -519,6 +557,7 @@ class _CollectionExpandable extends ConsumerWidget {
             collectionId: collection.id,
             onRequestTap: onRequestTap,
             collectionHeaders: collection.globalHeaders,
+            searchQuery: searchQuery,
           ),
         ],
       ],
@@ -538,7 +577,7 @@ class _CollectionExpandable extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.vpn_key_outlined, size: 12, color: colorScheme.primary),
+              Icon(LucideIcons.key, size: 12, color: colorScheme.primary),
               const SizedBox(width: 6),
               Text('Collection Headers', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.mutedForeground, letterSpacing: 0.5)),
             ],
@@ -573,7 +612,7 @@ class _CollectionExpandable extends ConsumerWidget {
         builder: (dialogContext, setDialogState) => shad.AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.vpn_key_outlined, size: 18, color: shad.Theme.of(dialogContext).colorScheme.primary),
+              Icon(LucideIcons.key, size: 18, color: shad.Theme.of(dialogContext).colorScheme.primary),
               const SizedBox(width: 8),
               Text('${collection.name} Headers'),
             ],
@@ -623,10 +662,11 @@ class _CollectionExpandable extends ConsumerWidget {
 
 class _RequestList extends ConsumerWidget {
   final String collectionId;
-  final void Function(RequestModel request, Map<String, String> headers) onRequestTap;
+  final void Function(RequestModel request, Map<String, String> headers, {String? collectionId}) onRequestTap;
   final Map<String, String> collectionHeaders;
+  final String searchQuery;
 
-  const _RequestList({required this.collectionId, required this.onRequestTap, this.collectionHeaders = const {}});
+  const _RequestList({required this.collectionId, required this.onRequestTap, this.collectionHeaders = const {}, this.searchQuery = ''});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -636,24 +676,30 @@ class _RequestList extends ConsumerWidget {
     return requestsAsync.when(
       loading: () => const Padding(
         padding: EdgeInsets.all(12),
-        child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+        child: Center(child: SizedBox(width: 16, height: 16, child: DbugSpinner(strokeWidth: 2))),
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(12),
         child: Text('Error: $e', style: TextStyle(color: colorScheme.mutedForeground)),
       ),
       data: (requests) {
-        if (requests.isEmpty) {
+        final filtered = searchQuery.isEmpty ? requests : requests.where((req) {
+          return req.name.toLowerCase().contains(searchQuery) ||
+              req.method.toLowerCase().contains(searchQuery) ||
+              req.url.toLowerCase().contains(searchQuery);
+        }).toList();
+        if (filtered.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text('No requests', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
+            child: Text(searchQuery.isEmpty ? 'No requests' : 'No matching requests', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
           );
         }
         return Padding(
           padding: const EdgeInsets.only(left: 16),
           child: Column(
-            children: requests.map((req) => InkWell(
-            onTap: () => onRequestTap(req, collectionHeaders),
+            children: filtered.map((req) => GestureDetector(
+            onTap: () => onRequestTap(req, collectionHeaders, collectionId: collectionId),
+              behavior: HitTestBehavior.opaque,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 child: Row(
@@ -662,10 +708,10 @@ class _RequestList extends ConsumerWidget {
                       width: 52,
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: _methodColor(req.method).withValues(alpha: 0.12),
+                        color: methodColor(req.method).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(req.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _methodColor(req.method)), textAlign: TextAlign.center),
+                      child: Text(req.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: methodColor(req.method)), textAlign: TextAlign.center),
                     ),
                     const SizedBox(width: 10),
                     Expanded(child: Text(req.name, style: TextStyle(fontSize: 12, color: colorScheme.foreground), overflow: TextOverflow.ellipsis)),
@@ -679,11 +725,4 @@ class _RequestList extends ConsumerWidget {
     );
   }
 
-  Color _methodColor(String method) {
-    const colors = {
-      'GET': Color(0xFF22C55E), 'POST': Color(0xFF3B82F6), 'PUT': Color(0xFFF59E0B),
-      'PATCH': Color(0xFFF97316), 'DELETE': Color(0xFFEF4444),
-    };
-    return colors[method.toUpperCase()] ?? const Color(0xFF6B7280);
-  }
 }

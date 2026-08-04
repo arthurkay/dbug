@@ -8,7 +8,33 @@ class DbugTheme {
       );
 
   static ThemeData get dark => ThemeData.dark(
-        colorScheme: ColorSchemes.darkSlate,
+        colorScheme: ColorScheme(
+          brightness: Brightness.dark,
+          background: Color(0xFF09090B),
+          foreground: Color(0xFFFAFAFA),
+          card: Color(0xFF09090B),
+          cardForeground: Color(0xFFFAFAFA),
+          popover: Color(0xFF09090B),
+          popoverForeground: Color(0xFFFAFAFA),
+          primary: Color(0xFFFAFAFA),
+          primaryForeground: Color(0xFF18181B),
+          secondary: Color(0xFF27272A),
+          secondaryForeground: Color(0xFFFAFAFA),
+          muted: Color(0xFF27272A),
+          mutedForeground: Color(0xFFA1A1AA),
+          accent: Color(0xFF27272A),
+          accentForeground: Color(0xFFFAFAFA),
+          destructive: Color(0xFF7F1D1D),
+          destructiveForeground: Color(0xFFFAFAFA),
+          border: Color(0xFF27272A),
+          input: Color(0xFF27272A),
+          ring: Color(0xFFD4D4D8),
+          chart1: Color(0xFF4ADE80),
+          chart2: Color(0xFF60A5FA),
+          chart3: Color(0xFFFBBF24),
+          chart4: Color(0xFFF87171),
+          chart5: Color(0xFFA78BFA),
+        ),
       );
 
   static final Map<String, Color> methodColors = {

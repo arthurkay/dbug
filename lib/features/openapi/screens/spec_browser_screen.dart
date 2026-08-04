@@ -1,12 +1,15 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/models/openapi_spec.dart';
 import '../../../core/models/request_model.dart';
 import '../../../shared/widgets/toast_helper.dart';
+import '../../../shared/widgets/dbug_spinner.dart';
+import '../../../shared/utils/method_colors.dart';
 
 class SpecBrowserScreen extends ConsumerWidget {
   final String specId;
@@ -19,7 +22,7 @@ class SpecBrowserScreen extends ConsumerWidget {
     final specAsync = ref.watch(allSpecsProvider);
 
     return specAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: DbugSpinner()),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (specs) {
         final spec = specs.where((s) => s.id == specId).firstOrNull;
@@ -45,6 +48,14 @@ class _SpecBrowserBodyState extends State<_SpecBrowserBody> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   OpenApiEndpoint? _selectedEndpoint;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() => _searchQuery = _searchController.text);
+    });
+  }
 
   @override
   void dispose() {
@@ -85,7 +96,7 @@ class _SpecBrowserBodyState extends State<_SpecBrowserBody> {
           Row(
             children: [
               shad.IconButton.ghost(
-                icon: const Icon(Icons.arrow_back, size: 18),
+                icon: const Icon(LucideIcons.arrowLeft, size: 18),
                 onPressed: () => context.go('/openapi'),
               ),
               const SizedBox(width: 8),
@@ -128,7 +139,9 @@ class _SpecBrowserBodyState extends State<_SpecBrowserBody> {
                                   isSelected: _selectedEndpoint == ep,
                                   onTap: () => setState(() => _selectedEndpoint = ep),
                                   onSend: (context) {
-                                    final url = '${widget.spec.baseUrl ?? ''}${ep.path}';
+                                    final base = widget.spec.baseUrl ?? '';
+                                    final path = ep.path.startsWith('/') ? ep.path : '/${ep.path}';
+                                    final url = base.endsWith('/') ? '$base$path'.substring(1) : '$base$path';
                                     final req = RequestModel(
                                       id: '', name: ep.summary ?? '${ep.method} ${ep.path}',
                                       method: ep.method, url: url,
@@ -173,8 +186,9 @@ class _EndpointTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = shad.Theme.of(context).colorScheme;
 
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         color: isSelected ? colorScheme.primary.withValues(alpha: 0.08) : null,
@@ -184,10 +198,10 @@ class _EndpointTile extends StatelessWidget {
               width: 52,
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: _methodColor(endpoint.method).withValues(alpha: 0.12),
+                color: methodColor(endpoint.method).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Text(endpoint.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _methodColor(endpoint.method)), textAlign: TextAlign.center),
+              child: Text(endpoint.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: methodColor(endpoint.method)), textAlign: TextAlign.center),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -204,14 +218,6 @@ class _EndpointTile extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Color _methodColor(String method) {
-    const colors = {
-      'GET': Color(0xFF22C55E), 'POST': Color(0xFF3B82F6), 'PUT': Color(0xFFF59E0B),
-      'PATCH': Color(0xFFF97316), 'DELETE': Color(0xFFEF4444),
-    };
-    return colors[method.toUpperCase()] ?? const Color(0xFF6B7280);
   }
 }
 
@@ -236,10 +242,10 @@ class _EndpointDetail extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: _methodColor(endpoint.method).withValues(alpha: 0.12),
+                    color: methodColor(endpoint.method).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text(endpoint.method, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _methodColor(endpoint.method))),
+                  child: Text(endpoint.method, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: methodColor(endpoint.method))),
                 ),
                 const SizedBox(width: 8),
                 Expanded(child: Text(endpoint.path, style: const TextStyle(fontSize: 13, fontFamily: 'monospace'))),
@@ -289,7 +295,8 @@ class _EndpointDetail extends ConsumerWidget {
                 Expanded(
                   child: shad.Button.primary(
                     onPressed: () {
-                      final url = '$baseUrl${endpoint.path}';
+                      final path = endpoint.path.startsWith('/') ? endpoint.path : '/${endpoint.path}';
+                      final url = baseUrl.endsWith('/') ? '$baseUrl$path'.substring(1) : '$baseUrl$path';
                       final req = RequestModel(
                         id: '', name: endpoint.summary ?? '${endpoint.method} ${endpoint.path}',
                         method: endpoint.method, url: url,
@@ -297,7 +304,7 @@ class _EndpointDetail extends ConsumerWidget {
                       );
                       context.go('/request', extra: req);
                     },
-                    leading: const Icon(Icons.send, size: 14),
+                    leading: const Icon(LucideIcons.send, size: 14),
                     child: const Text('Send'),
                   ),
                 ),
@@ -313,7 +320,7 @@ class _EndpointDetail extends ConsumerWidget {
                       collectionId: collection.id,
                       name: endpoint.summary ?? '${endpoint.method} ${endpoint.path}',
                       method: endpoint.method,
-                      url: '$baseUrl${endpoint.path}',
+                      url: baseUrl.endsWith('/') ? '$baseUrl${endpoint.path}'.substring(1) : '$baseUrl${endpoint.path}',
                     );
                     ref.invalidate(collectionsProvider);
                     if (context.mounted) {
@@ -328,13 +335,5 @@ class _EndpointDetail extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  Color _methodColor(String method) {
-    const colors = {
-      'GET': Color(0xFF22C55E), 'POST': Color(0xFF3B82F6), 'PUT': Color(0xFFF59E0B),
-      'PATCH': Color(0xFFF97316), 'DELETE': Color(0xFFEF4444),
-    };
-    return colors[method.toUpperCase()] ?? const Color(0xFF6B7280);
   }
 }

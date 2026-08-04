@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 
@@ -14,7 +14,7 @@ class SettingsScreen extends ConsumerWidget {
     final colorScheme = shad.Theme.of(context).colorScheme;
     final themeMode = ref.watch(themeModeProvider);
     final activeEnv = ref.watch(activeEnvironmentProvider);
-    final envsAsync = ref.watch(environmentsProvider);
+    final envsAsync = ref.watch(userEnvironmentsProvider);
 
     final isDark = themeMode == shad.ThemeMode.dark ||
         (themeMode == shad.ThemeMode.system && MediaQuery.platformBrightnessOf(context) == Brightness.dark);
@@ -51,8 +51,8 @@ class SettingsScreen extends ConsumerWidget {
                             shad.Switch(
                               value: isDark,
                               onChanged: (v) {
-                                ref.read(themeModeProvider.notifier).state =
-                                    v ? shad.ThemeMode.dark : shad.ThemeMode.light;
+                                ref.read(themeModeProvider.notifier).setMode(
+                                    v ? shad.ThemeMode.dark : shad.ThemeMode.light);
                               },
                             ),
                           ],
@@ -88,10 +88,9 @@ class SettingsScreen extends ConsumerWidget {
                                       state: activeEnv?.id == env.id ? shad.CheckboxState.checked : shad.CheckboxState.unchecked,
                                       onChanged: (v) {
                                         if (v == shad.CheckboxState.checked) {
-                                          ref.read(activeEnvironmentProvider.notifier).state = env;
-                                          ref.read(environmentRepositoryProvider).setActive(env.id);
+                                          ref.read(activeEnvironmentProvider.notifier).setActive(env);
                                         } else {
-                                          ref.read(activeEnvironmentProvider.notifier).state = null;
+                                          ref.read(activeEnvironmentProvider.notifier).setActive(null);
                                         }
                                       },
                                     ),
