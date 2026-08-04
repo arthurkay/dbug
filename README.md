@@ -14,9 +14,44 @@ A local API testing tool like Postman, built with Flutter.
 
 ## Installation
 
+### Quick Install (Linux & macOS)
+
+Run the install script to download and set up the latest release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/arthurkay/dbug/main/install.sh | bash
+```
+
+Or clone and run locally:
+
+```bash
+git clone https://github.com/arthurkay/dbug.git
+cd dbug
+./install.sh
+```
+
+The script will:
+- Detect your platform (Linux x64 / macOS) and download the correct binary
+- Install to `~/.local/share/dbug/` (Linux) or `/Applications/dbug.app` (macOS)
+- Create a symlink at `~/.local/bin/dbug` (Linux)
+- Install the desktop entry and icons for app menu integration (Linux)
+
+#### Script Options
+
+| Command | Description |
+|---------|-------------|
+| `./install.sh` | Install or update to the latest version |
+| `./install.sh --version 0.0.1` | Install a specific version |
+| `./install.sh --check` | Check if an update is available |
+| `./install.sh --force` | Reinstall even if already up-to-date |
+| `./install.sh --uninstall` | Remove dbug from the system |
+| `./install.sh --help` | Show all options |
+
+Running the script again when already up-to-date will skip the download. When a new version is released, run `./install.sh` again to upgrade — it will detect the new version and replace the existing installation.
+
 ### Download Pre-built Binaries
 
-Go to the [Releases](https://github.com/ZmCoCloud/dbug/releases) page and download the archive for your platform:
+Go to the [Releases](https://github.com/arthurkay/dbug/releases) page and download the archive for your platform:
 
 | Platform | Archive | Notes |
 |----------|---------|-------|
@@ -58,7 +93,7 @@ Requires [Flutter SDK](https://docs.flutter.dev/get-started/install) (3.24+).
 
 ```bash
 # Clone the repository
-git clone https://github.com/ZmCoCloud/dbug.git
+git clone https://github.com/arthurkay/dbug.git
 cd dbug
 
 # Install dependencies
