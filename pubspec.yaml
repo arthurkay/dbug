@@ -1,7 +1,7 @@
 name: dbug
 description: "A local API testing tool like Postman, built with Flutter."
 publish_to: 'none'
-version: 0.0.4
+version: 0.0.6
 
 environment:
   sdk: ^3.11.4
