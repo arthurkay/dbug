@@ -6,26 +6,47 @@
   <title>dbug — Local API Testing Tool</title>
   <meta name="description" content="A fast, local API testing tool built with Flutter. Like Postman, but lighter and fully offline.">
   <link rel="icon" href="assets/icon/dbug_icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
       --bg: #09090b;
       --surface: #18181b;
+      --surface-hover: #1f1f23;
       --surface2: #27272a;
-      --border: #3f3f46;
+      --border: rgba(255,255,255,0.06);
+      --border-strong: rgba(255,255,255,0.1);
       --text: #fafafa;
-      --text-muted: #a1a1aa;
+      --text-secondary: #a1a1aa;
+      --text-tertiary: #71717a;
       --accent: #3b82f6;
-      --accent-dim: rgba(59,130,246,0.12);
+      --accent-hover: #2563eb;
+      --accent-dim: rgba(59,130,246,0.1);
       --green: #22c55e;
-      --green-dim: rgba(34,197,94,0.12);
+      --green-dim: rgba(34,197,94,0.1);
       --orange: #f59e0b;
+      --orange-dim: rgba(245,158,11,0.1);
       --red: #ef4444;
+      --purple: #a855f7;
+      --purple-dim: rgba(168,85,247,0.1);
+      --pink: #ec4899;
+      --pink-dim: rgba(236,72,153,0.1);
+      --teal: #14b8a6;
+      --teal-dim: rgba(20,184,166,0.1);
+      --indigo: #6366f1;
+      --indigo-dim: rgba(99,102,241,0.1);
+      --lime: #84cc16;
+      --lime-dim: rgba(132,204,22,0.1);
       --radius: 12px;
-      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      --radius-sm: 8px;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
     }
+
+    html { scroll-behavior: smooth; }
 
     body {
       font-family: var(--font);
@@ -33,117 +54,227 @@
       color: var(--text);
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
     }
 
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-
-    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    a { color: inherit; text-decoration: none; }
 
     /* NAV */
     nav {
-      position: sticky; top: 0; z-index: 100;
-      background: rgba(9,9,11,0.85);
-      backdrop-filter: blur(12px);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(9,9,11,0.8);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
     }
     nav .container {
+      max-width: 1100px; margin: 0 auto; padding: 0 24px;
       display: flex; align-items: center; justify-content: space-between;
-      height: 56px;
+      height: 60px;
     }
-    nav .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+    nav .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 16px; letter-spacing: -0.3px;
+    }
     nav .logo img { width: 28px; height: 28px; }
-    nav .links { display: flex; gap: 24px; font-size: 14px; }
-    nav .links a { color: var(--text-muted); transition: color 0.15s; }
-    nav .links a:hover { color: var(--text); text-decoration: none; }
+    nav .nav-links { display: flex; align-items: center; gap: 8px; }
+    nav .nav-links a {
+      padding: 8px 14px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 500; color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+    nav .nav-links a:hover { color: var(--text); background: var(--surface); }
+    nav .nav-links .btn-nav {
+      background: var(--text);
+      color: var(--bg);
+      font-weight: 600;
+    }
+    nav .nav-links .btn-nav:hover { opacity: 0.9; }
+
+    .mobile-menu-btn {
+      display: none;
+      background: none; border: none; color: var(--text);
+      padding: 8px; cursor: pointer; border-radius: var(--radius-sm);
+    }
+    .mobile-menu-btn:hover { background: var(--surface); }
 
     /* HERO */
     .hero {
       text-align: center;
-      padding: 100px 0 80px;
+      padding: 160px 24px 100px;
+      position: relative;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 60px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px 6px 8px;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      font-size: 12px; font-weight: 500; color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+    .hero-badge .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(34,197,94,0.4);
     }
     .hero h1 {
-      font-size: clamp(40px, 6vw, 64px);
+      font-size: clamp(48px, 8vw, 80px);
       font-weight: 800;
-      letter-spacing: -1.5px;
-      line-height: 1.1;
+      letter-spacing: -2.5px;
+      line-height: 1.05;
+      max-width: 720px;
+      margin: 0 auto;
     }
-    .hero h1 span { color: var(--accent); }
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--accent) 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
     .hero p {
-      margin-top: 16px;
-      font-size: 18px;
-      color: var(--text-muted);
-      max-width: 560px;
+      margin-top: 20px;
+      font-size: 17px;
+      color: var(--text-secondary);
+      max-width: 520px;
       margin-left: auto;
       margin-right: auto;
+      line-height: 1.7;
     }
-    .hero .btns { margin-top: 32px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .hero-actions {
+      margin-top: 36px;
+      display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+    }
 
+    /* BUTTONS */
     .btn {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 12px 24px;
-      border-radius: 8px;
+      border-radius: var(--radius);
       font-size: 14px; font-weight: 600;
+      font-family: var(--font);
       border: none; cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
+      transition: all 0.15s ease;
+      text-decoration: none;
     }
-    .btn:hover { text-decoration: none; transform: translateY(-1px); }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: #2563eb; }
-    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
-    .btn-outline:hover { background: var(--surface); }
+    .btn:hover { text-decoration: none; }
+    .btn-primary {
+      background: var(--text);
+      color: var(--bg);
+    }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+    }
+    .btn-secondary:hover { background: var(--surface-hover); border-color: rgba(255,255,255,0.15); }
 
     .install-cmd {
-      margin-top: 24px;
-      display: inline-flex; align-items: center; gap: 10px;
+      margin-top: 32px;
+      display: inline-flex; align-items: center; gap: 12px;
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 16px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      padding: 12px 18px;
       font-family: var(--mono);
       font-size: 13px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
     }
-    .install-cmd code { color: var(--green); }
+    .install-cmd .prompt { color: var(--text-tertiary); }
+    .install-cmd code { color: var(--text); }
+    .install-cmd .copy-btn {
+      background: none; border: none; color: var(--text-tertiary);
+      cursor: pointer; padding: 4px; border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .install-cmd .copy-btn:hover { color: var(--text); }
 
     /* FEATURES */
-    .features { padding: 80px 0; }
-    .features h2 {
+    .features {
+      padding: 100px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .section-header {
       text-align: center;
-      font-size: 32px; font-weight: 700;
-      margin-bottom: 48px;
+      margin-bottom: 56px;
+    }
+    .section-header h2 {
+      font-size: 36px; font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 12px;
+    }
+    .section-header p {
+      font-size: 16px;
+      color: var(--text-secondary);
+      max-width: 480px;
+      margin: 0 auto;
     }
     .feature-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
     }
     .feature-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 24px;
-      transition: border-color 0.2s;
+      padding: 28px;
+      transition: all 0.2s ease;
     }
-    .feature-card:hover { border-color: var(--accent); }
-    .feature-card .icon {
+    .feature-card:hover {
+      border-color: var(--border-strong);
+      background: var(--surface-hover);
+    }
+    .feature-icon {
       width: 40px; height: 40px;
       display: flex; align-items: center; justify-content: center;
-      border-radius: 8px;
-      margin-bottom: 14px;
-      font-size: 20px;
+      border-radius: 10px;
+      margin-bottom: 16px;
     }
-    .feature-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
-    .feature-card p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+    .feature-card h3 {
+      font-size: 15px; font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: -0.2px;
+    }
+    .feature-card p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .feature-card code {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: rgba(255,255,255,0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text);
+    }
 
     /* TECH */
     .tech {
-      padding: 60px 0;
+      padding: 80px 24px;
       border-top: 1px solid var(--border);
     }
-    .tech h2 { text-align: center; font-size: 24px; font-weight: 700; margin-bottom: 32px; }
+    .tech .container { max-width: 1100px; margin: 0 auto; }
+    .tech h2 {
+      text-align: center; font-size: 20px; font-weight: 700;
+      letter-spacing: -0.5px; margin-bottom: 32px;
+      color: var(--text-secondary);
+    }
     .tech-grid {
-      display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+      max-width: 700px; margin: 0 auto;
     }
     .tech-badge {
       background: var(--surface);
@@ -151,8 +282,13 @@
       border-radius: 999px;
       padding: 8px 16px;
       font-size: 13px; font-weight: 500;
-      color: var(--text-muted);
-      display: flex; align-items: center; gap: 6px;
+      color: var(--text-secondary);
+      display: flex; align-items: center; gap: 8px;
+      transition: all 0.15s ease;
+    }
+    .tech-badge:hover {
+      border-color: var(--border-strong);
+      color: var(--text);
     }
     .tech-badge .dot {
       width: 8px; height: 8px;
@@ -162,17 +298,64 @@
     /* FOOTER */
     footer {
       border-top: 1px solid var(--border);
-      padding: 32px 0;
+      padding: 40px 24px;
       text-align: center;
-      font-size: 13px;
-      color: var(--text-muted);
     }
-    footer a { color: var(--text-muted); }
+    footer .container { max-width: 1100px; margin: 0 auto; }
+    footer p {
+      font-size: 13px;
+      color: var(--text-tertiary);
+    }
+    footer a { color: var(--text-secondary); transition: color 0.15s; }
     footer a:hover { color: var(--text); }
 
-    @media (max-width: 640px) {
-      .hero { padding: 60px 0 40px; }
-      .hero .btns { flex-direction: column; align-items: center; }
+    /* MOBILE */
+    @media (max-width: 768px) {
+      nav .nav-links { display: none; }
+      nav .nav-links.open {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 60px; left: 0; right: 0;
+        background: rgba(9,9,11,0.95);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border);
+        padding: 16px;
+        gap: 4px;
+      }
+      nav .nav-links.open a {
+        width: 100%;
+        padding: 12px 16px;
+        font-size: 14px;
+      }
+      .mobile-menu-btn { display: block; }
+      .hero { padding: 120px 20px 60px; }
+      .hero h1 { letter-spacing: -1.5px; }
+      .hero p { font-size: 15px; }
+      .hero-actions { flex-direction: column; align-items: center; }
+      .hero-actions .btn { width: 100%; max-width: 280px; justify-content: center; }
+      .install-cmd {
+        width: 100%;
+        max-width: 340px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .install-cmd code { white-space: nowrap; font-size: 11px; }
+      .features { padding: 60px 20px; }
+      .section-header h2 { font-size: 28px; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .feature-card { padding: 20px; }
+      .tech { padding: 60px 20px; }
+      .tech-badge { font-size: 12px; padding: 6px 12px; }
+    }
+
+    @media (max-width: 480px) {
+      .hero { padding: 100px 16px 48px; }
+      .hero h1 { font-size: 40px; letter-spacing: -1px; }
+      .hero p { font-size: 14px; }
+      .features { padding: 48px 16px; }
+      .section-header h2 { font-size: 24px; }
     }
   </style>
 </head>
@@ -180,105 +363,123 @@
 
 <nav>
   <div class="container">
-    <div class="logo">
+    <a href="#" class="logo">
       <img src="assets/icon/dbug_icon.svg" alt="dbug">
       dbug
-    </div>
-    <div class="links">
+    </a>
+    <div class="nav-links" id="navLinks">
       <a href="#features">Features</a>
       <a href="#tech">Tech</a>
       <a href="https://github.com/arthurkay/dbug" target="_blank">GitHub</a>
+      <a href="https://github.com/arthurkay/dbug/releases" target="_blank" class="btn-nav">Download</a>
     </div>
+    <button class="mobile-menu-btn" id="menuBtn" aria-label="Toggle menu">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
   </div>
 </nav>
 
 <section class="hero">
-  <div class="container">
-    <h1>API testing,<br><span>simplified.</span></h1>
-    <p>A fast, local API testing tool built with Flutter. Like Postman, but lighter, fully offline, and open source.</p>
-    <div class="btns">
-      <a href="https://github.com/arthurkay/dbug/releases" class="btn btn-primary" target="_blank">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0Zm3.28 5.22a.75.75 0 0 1 0 1.06l-2.72 2.72 2.72 2.72a.75.75 0 1 1-1.06 1.06L6.78 10.28a.75.75 0 0 1 0-1.06l3.44-3.44a.75.75 0 0 1 1.06 0Z"/></svg>
-        Download
-      </a>
-      <a href="https://github.com/arthurkay/dbug" class="btn btn-outline" target="_blank">View on GitHub</a>
-    </div>
-    <div class="install-cmd">
-      <span>$</span> <code>curl -fsSL https://raw.githubusercontent.com/arthurkay/dbug/main/install.sh | bash</code>
-    </div>
+  <div class="hero-badge">
+    <span class="dot"></span>
+    v0.0.4 — Now with Yaru theming
+  </div>
+  <h1>API testing,<br><span>simplified.</span></h1>
+  <p>A fast, local API testing tool built with Flutter. Like Postman, but lighter, fully offline, and open source.</p>
+  <div class="hero-actions">
+    <a href="https://github.com/arthurkay/dbug/releases" class="btn btn-primary" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0Zm3.28 5.22a.75.75 0 0 1 0 1.06l-2.72 2.72 2.72 2.72a.75.75 0 1 1-1.06 1.06L6.78 10.28a.75.75 0 0 1 0-1.06l3.44-3.44a.75.75 0 0 1 1.06 0Z"/></svg>
+      Download for Linux
+    </a>
+    <a href="https://github.com/arthurkay/dbug" class="btn btn-secondary" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      View Source
+    </a>
+  </div>
+  <div class="install-cmd">
+    <span class="prompt">$</span>
+    <code>curl -fsSL https://raw.githubusercontent.com/arthurkay/dbug/main/install.sh | bash</code>
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('curl -fsSL https://raw.githubusercontent.com/arthurkay/dbug/main/install.sh | bash')" aria-label="Copy">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    </button>
   </div>
 </section>
 
 <section class="features" id="features">
-  <div class="container">
+  <div class="section-header">
     <h2>Everything you need</h2>
-    <div class="feature-grid">
+    <p>All the tools to test, debug, and mock your APIs — completely offline.</p>
+  </div>
+  <div class="feature-grid">
 
-      <div class="feature-card">
-        <div class="icon" style="background:var(--accent-dim); color:var(--accent);">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
-        </div>
-        <h3>Request Builder</h3>
-        <p>Send HTTP requests with full control over headers, query params, body (JSON, form data, raw), and auth (Bearer, Basic, API Key).</p>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--accent-dim); color:var(--accent);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
       </div>
-
-      <div class="feature-card">
-        <div class="icon" style="background:var(--green-dim); color:var(--green);">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
-        </div>
-        <h3>Collections</h3>
-        <p>Organize requests into collections with global headers and auth. Import and export as JSON files.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="icon" style="background:rgba(168,85,247,0.12); color:#a855f7;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </div>
-        <h3>History</h3>
-        <p>Automatic logging of every request with response status, timing, and body. Search and revisit any past request.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="icon" style="background:rgba(245,158,11,0.12); color:var(--orange);">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        </div>
-        <h3>OpenAPI Specs</h3>
-        <p>Import OpenAPI 3.x specs from files or URLs. Browse endpoints with full parameter tables, request body schemas, and response structures.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="icon" style="background:rgba(236,72,153,0.12); color:#ec4899;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M8 8l4-5 4 5"/><rect x="4" y="14" width="16" height="7" rx="1"/></svg>
-        </div>
-        <h3>Environments</h3>
-        <p>Define variables per environment and switch between them. Use <code>{{variable}}</code> syntax in URLs, headers, and body.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="icon" style="background:rgba(20,184,166,0.12); color:#14b8a6;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-        </div>
-        <h3>Mock Server</h3>
-        <p>Built-in mock server on port 3001. Define endpoints with custom status codes, headers, response bodies, and delays.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="icon" style="background:rgba(99,102,241,0.12); color:#6366f1;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </div>
-        <h3>Collection Auth</h3>
-        <p>Set global auth (Bearer, Basic, API Key) at the collection level. Automatically inherited by all requests.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="icon" style="background:rgba(132,204,22,0.12); color:#84cc16;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        </div>
-        <h3>OS-Native Theme</h3>
-        <p>Fully adapts to your system accent color and dark/light mode. Built with Yaru for a native Linux feel.</p>
-      </div>
-
+      <h3>Request Builder</h3>
+      <p>Send HTTP requests with full control over headers, query params, body (JSON, form data, raw), and auth (Bearer, Basic, API Key).</p>
     </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--green-dim); color:var(--green);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+      </div>
+      <h3>Collections</h3>
+      <p>Organize requests into collections with global headers and auth. Import and export as JSON files.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--purple-dim); color:var(--purple);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <h3>History</h3>
+      <p>Automatic logging of every request with response status, timing, and body. Search and revisit any past request.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--orange-dim); color:var(--orange);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      </div>
+      <h3>OpenAPI Specs</h3>
+      <p>Import OpenAPI 3.x specs from files or URLs. Browse endpoints with full parameter tables, request body schemas, and response structures.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--pink-dim); color:var(--pink);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M8 8l4-5 4 5"/><rect x="4" y="14" width="16" height="7" rx="1"/></svg>
+      </div>
+      <h3>Environments</h3>
+      <p>Define variables per environment and switch between them. Use <code>{{variable}}</code> syntax in URLs, headers, and body.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--teal-dim); color:var(--teal);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+      </div>
+      <h3>Mock Server</h3>
+      <p>Built-in mock server on port 3001. Define endpoints with custom status codes, headers, response bodies, and delays.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--indigo-dim); color:var(--indigo);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <h3>Collection Auth</h3>
+      <p>Set global auth (Bearer, Basic, API Key) at the collection level. Automatically inherited by all requests.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--lime-dim); color:var(--lime);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      </div>
+      <h3>OS-Native Theme</h3>
+      <p>Fully adapts to your system accent color and dark/light mode. Built with Yaru for a native Linux feel.</p>
+    </div>
+
   </div>
 </section>
 
@@ -304,6 +505,12 @@
     <p>Built with Flutter &middot; <a href="https://github.com/arthurkay/dbug" target="_blank">Source on GitHub</a> &middot; MIT License</p>
   </div>
 </footer>
+
+<script>
+  document.getElementById('menuBtn').addEventListener('click', function() {
+    document.getElementById('navLinks').classList.toggle('open');
+  });
+</script>
 
 </body>
 </html>
