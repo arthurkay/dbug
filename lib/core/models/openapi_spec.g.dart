@@ -33,7 +33,7 @@ Map<String, dynamic> _$$OpenApiSpecImplToJson(_$OpenApiSpecImpl instance) =>
       'version': instance.version,
       'baseUrl': instance.baseUrl,
       'rawContent': instance.rawContent,
-      'endpoints': instance.endpoints,
+      'endpoints': instance.endpoints.map((e) => e.toJson()).toList(),
       'sourceType': instance.sourceType,
       'sourceUrl': instance.sourceUrl,
       'importedAt': instance.importedAt.toIso8601String(),
@@ -74,9 +74,9 @@ Map<String, dynamic> _$$OpenApiEndpointImplToJson(
   'summary': instance.summary,
   'description': instance.description,
   'operationId': instance.operationId,
-  'parameters': instance.parameters,
-  'requestBodySchema': instance.requestBodySchema,
-  'responseSchemas': instance.responseSchemas,
+  'parameters': instance.parameters.map((e) => e.toJson()).toList(),
+  'requestBodySchema': instance.requestBodySchema?.toJson(),
+  'responseSchemas': instance.responseSchemas?.map((k, e) => MapEntry(k, e.toJson())),
   'tags': instance.tags,
 };
 
@@ -135,8 +135,8 @@ Map<String, dynamic> _$$OpenApiSchemaImplToJson(_$OpenApiSchemaImpl instance) =>
       'format': instance.format,
       'ref': instance.ref,
       'description': instance.description,
-      'properties': instance.properties,
+      'properties': instance.properties.map((k, e) => MapEntry(k, e.toJson())),
       'requiredFields': instance.requiredFields,
-      'items': instance.items,
+      'items': instance.items?.toJson(),
       'enumValues': instance.enumValues,
     };

@@ -99,8 +99,8 @@ void main() {
       expect(AppConstants.appName, 'dbug');
     });
 
-    test('app version is 0.0.3', () {
-      expect(AppConstants.appVersion, '0.0.3');
+    test('app version is 0.0.9', () {
+      expect(AppConstants.appVersion, '0.0.9');
     });
 
     test('database name is dbug.db', () {

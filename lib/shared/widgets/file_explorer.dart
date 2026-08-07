@@ -191,7 +191,7 @@ class _FileExplorerState extends State<FileExplorer> {
             const SizedBox(height: 4),
             Text(
               _loadError!,
-              style: TextStyle(fontSize: 11, color: colorScheme.outline),
+              style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
           ],

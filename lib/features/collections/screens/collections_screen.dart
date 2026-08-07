@@ -34,7 +34,9 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
   @override
   void initState() {
     super.initState();
-    ref.read(windowTitleProvider.notifier).state = 'Collections';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(windowTitleProvider.notifier).state = 'Collections';
+    });
   }
 
   Future<void> _importFromFile() async {
@@ -532,13 +534,13 @@ class _CollectionExpandable extends ConsumerWidget {
                       if (headerCount > 0) ...[
                         Icon(LucideIcons.key, size: 10, color: colorScheme.onSurfaceVariant),
                         const SizedBox(width: 3),
-                        Text('$headerCount', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: colorScheme.onSurfaceVariant)),
+                        Text('$headerCount', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: colorScheme.onSurfaceVariant)),
                       ],
                       if (headerCount > 0 && hasAuth) const SizedBox(width: 6),
                       if (hasAuth) ...[
                         Icon(LucideIcons.shield, size: 10, color: colorScheme.onSurfaceVariant),
                         const SizedBox(width: 3),
-                        Text(collection.authType.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: colorScheme.onSurfaceVariant)),
+                        Text(collection.authType.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: colorScheme.onSurfaceVariant)),
                       ],
                     ],
                   ),
@@ -598,7 +600,7 @@ class _CollectionExpandable extends ConsumerWidget {
             children: [
               Icon(LucideIcons.key, size: 12, color: colorScheme.primary),
               const SizedBox(width: 6),
-              Text('Collection Headers', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant, letterSpacing: 0.5)),
+              Text('Collection Headers', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant, letterSpacing: 0.5)),
             ],
           ),
           const SizedBox(height: 6),
@@ -924,7 +926,7 @@ class _RequestList extends ConsumerWidget {
                   color: methodColor(req.method).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text(req.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: methodColor(req.method)), textAlign: TextAlign.center),
+                child: Text(req.method, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: methodColor(req.method)), textAlign: TextAlign.center),
               ),
               title: Text(req.name, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
               onTap: () => onRequestTap(req, collectionHeaders, collectionId: collectionId, collectionAuthType: collectionAuthType, collectionAuthData: collectionAuthData),

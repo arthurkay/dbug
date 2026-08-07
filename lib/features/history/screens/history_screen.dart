@@ -24,7 +24,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    ref.read(windowTitleProvider.notifier).state = 'History';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(windowTitleProvider.notifier).state = 'History';
+    });
   }
 
   @override
@@ -197,7 +199,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             const SizedBox(height: 16),
             Text('No history yet', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('Send a request to see it here', style: TextStyle(color: colorScheme.outline)),
+            Text('Send a request to see it here', style: TextStyle(color: colorScheme.onSurfaceVariant)),
           ],
         ),
       ),
@@ -214,7 +216,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             const SizedBox(height: 16),
             Text('No results found', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('Try a different search term', style: TextStyle(color: colorScheme.outline)),
+            Text('Try a different search term', style: TextStyle(color: colorScheme.onSurfaceVariant)),
           ],
         ),
       ),
@@ -252,10 +254,10 @@ class _HistoryTile extends StatelessWidget {
           color: methodColor(entry.method).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(4),
         ),
-        child: Text(entry.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: methodColor(entry.method)), textAlign: TextAlign.center),
+        child: Text(entry.method, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: methodColor(entry.method)), textAlign: TextAlign.center),
       ),
       title: Text(displayName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis, maxLines: 1),
-      subtitle: Text(entry.url, style: TextStyle(fontSize: 10, color: colorScheme.outline), overflow: TextOverflow.ellipsis, maxLines: 1),
+      subtitle: Text(entry.url, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis, maxLines: 1),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -270,7 +272,7 @@ class _HistoryTile extends StatelessWidget {
             ),
           if (entry.responseTimeMs != null) ...[
             const SizedBox(width: 8),
-            Text('${entry.responseTimeMs}ms', style: TextStyle(fontSize: 10, color: colorScheme.outline)),
+            Text('${entry.responseTimeMs}ms', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
           ],
           const SizedBox(width: 4),
           IconButton(

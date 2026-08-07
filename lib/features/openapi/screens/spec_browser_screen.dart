@@ -27,7 +27,7 @@ class SpecBrowserScreen extends ConsumerWidget {
       data: (specs) {
         final spec = specs.where((s) => s.id == specId).firstOrNull;
         if (spec == null) {
-          return Center(child: Text('Spec not found', style: TextStyle(color: colorScheme.outline)));
+          return Center(child: Text('Spec not found', style: TextStyle(color: colorScheme.onSurfaceVariant)));
         }
         return _SpecBrowserBody(spec: spec);
       },
@@ -109,7 +109,7 @@ class _SpecBrowserBodyState extends ConsumerState<_SpecBrowserBody> with SingleT
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(widget.spec.title ?? 'API Spec', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
-                    Text('${widget.spec.version ?? ''} \u2022 ${widget.spec.endpoints.length} endpoints \u2022 ${widget.spec.baseUrl ?? ''}', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                    Text('${widget.spec.version ?? ''} \u2022 ${widget.spec.endpoints.length} endpoints \u2022 ${widget.spec.baseUrl ?? ''}', style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -121,7 +121,7 @@ class _SpecBrowserBodyState extends ConsumerState<_SpecBrowserBody> with SingleT
                   children: [
                     Icon(LucideIcons.code, size: 14, color: !_docsMode ? colorScheme.primary : colorScheme.outline),
                     const SizedBox(width: 4),
-                    Text('API', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: !_docsMode ? colorScheme.primary : colorScheme.outline)),
+                    Text('API', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: !_docsMode ? colorScheme.primary : colorScheme.outline)),
                   ],
                 ),
               ),
@@ -132,7 +132,7 @@ class _SpecBrowserBodyState extends ConsumerState<_SpecBrowserBody> with SingleT
                   children: [
                     Icon(LucideIcons.bookOpen, size: 14, color: _docsMode ? colorScheme.primary : colorScheme.outline),
                     const SizedBox(width: 4),
-                    Text('Docs', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _docsMode ? colorScheme.primary : colorScheme.outline)),
+                    Text('Docs', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _docsMode ? colorScheme.primary : colorScheme.outline)),
                   ],
                 ),
               ),
@@ -142,7 +142,7 @@ class _SpecBrowserBodyState extends ConsumerState<_SpecBrowserBody> with SingleT
           TextField(
             controller: _searchController,
             decoration: const InputDecoration(hintText: 'Search endpoints by name, path, method, or description...', border: OutlineInputBorder(), isDense: true, prefixIcon: Icon(LucideIcons.search, size: 16)),
-            style: const TextStyle(fontSize: 13),
+            style: const TextStyle(fontSize: 14),
           ),
           const SizedBox(height: 12),
           Expanded(
@@ -152,14 +152,14 @@ class _SpecBrowserBodyState extends ConsumerState<_SpecBrowserBody> with SingleT
                   width: 280,
                   child: Card(
                     child: grouped.isEmpty
-                        ? Center(child: Text('No endpoints found', style: TextStyle(color: colorScheme.outline)))
+                        ? Center(child: Text('No endpoints found', style: TextStyle(color: colorScheme.onSurfaceVariant)))
                         : ListView(
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             children: grouped.entries.expand((entry) {
                               return [
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                                  child: Text(entry.key, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: colorScheme.outline, letterSpacing: 0.5)),
+                                  child: Text(entry.key, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: colorScheme.onSurfaceVariant, letterSpacing: 0.5)),
                                 ),
                                 ...entry.value.map((ep) => _EndpointTile(
                                   endpoint: ep,
@@ -196,7 +196,7 @@ class _SpecBrowserBodyState extends ConsumerState<_SpecBrowserBody> with SingleT
                               children: [
                                 Icon(LucideIcons.mousePointerClick, size: 32, color: colorScheme.outline),
                                 const SizedBox(height: 8),
-                                Text('Select an endpoint', style: TextStyle(color: colorScheme.outline)),
+                                Text('Select an endpoint', style: TextStyle(color: colorScheme.onSurfaceVariant)),
                               ],
                             ),
                           ),
@@ -224,56 +224,89 @@ class _EndpointTile extends StatelessWidget {
     final hasBody = endpoint.requestBodySchema != null;
     final responseCount = endpoint.responseSchemas?.length ?? 0;
 
+    final displayName = endpoint.operationId ?? endpoint.summary;
+    final showPathAsPrimary = displayName == null;
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         color: isSelected ? colorScheme.surfaceContainerHighest : null,
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(
-                color: methodColor(endpoint.method).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(endpoint.method, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: methodColor(endpoint.method)), textAlign: TextAlign.center),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(endpoint.path, style: const TextStyle(fontSize: 11, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis),
-                  if (endpoint.summary != null)
-                    Text(endpoint.summary!, style: TextStyle(fontSize: 10, color: colorScheme.outline), overflow: TextOverflow.ellipsis, maxLines: 1),
-                ],
-              ),
-            ),
             Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                if (paramCount > 0)
-                  _countBadge('$paramCount', LucideIcons.listFilter, colorScheme),
-                if (hasBody)
-                  _countBadge('body', LucideIcons.fileJson, colorScheme),
-                if (responseCount > 0)
-                  _countBadge('$responseCount', LucideIcons.arrowDownToLine, colorScheme),
+                Container(
+                  width: 52,
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: methodColor(endpoint.method).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(endpoint.method, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: methodColor(endpoint.method)), textAlign: TextAlign.center),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: showPathAsPrimary
+                      ? _tooltipWrap(
+                          child: Text(endpoint.path, style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.w500, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis, maxLines: 1),
+                          tooltip: endpoint.path,
+                        )
+                      : _tooltipWrap(
+                          child: Text(displayName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis, maxLines: 1),
+                          tooltip: displayName,
+                        ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (paramCount > 0)
+                      _countBadge('$paramCount', LucideIcons.listFilter, colorScheme),
+                    if (hasBody)
+                      _countBadge('body', LucideIcons.fileJson, colorScheme),
+                    if (responseCount > 0)
+                      _countBadge('$responseCount', LucideIcons.arrowDownToLine, colorScheme),
+                  ],
+                ),
               ],
             ),
+            if (!showPathAsPrimary) ...[
+              const SizedBox(height: 2),
+              Padding(
+                padding: const EdgeInsets.only(left: 58),
+                child: _tooltipWrap(
+                  child: Text(endpoint.path, style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis, maxLines: 1),
+                  tooltip: endpoint.path,
+                ),
+              ),
+            ],
+            if (showPathAsPrimary && endpoint.summary != null) ...[
+              const SizedBox(height: 2),
+              Padding(
+                padding: const EdgeInsets.only(left: 58),
+                child: _tooltipWrap(
+                  child: Text(endpoint.summary!, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis, maxLines: 1),
+                  tooltip: endpoint.summary!,
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
+  Widget _tooltipWrap({required Widget child, required String tooltip}) {
+    return Tooltip(message: tooltip, child: child);
+  }
+
   Widget _countBadge(String label, IconData icon, ColorScheme colorScheme) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(3),
@@ -281,9 +314,9 @@ class _EndpointTile extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 8, color: colorScheme.outline),
+            Icon(icon, size: 11, color: colorScheme.outline),
             const SizedBox(width: 2),
-            Text(label, style: TextStyle(fontSize: 8, color: colorScheme.outline)),
+            Text(label, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
           ],
         ),
       ),
@@ -315,10 +348,10 @@ class _EndpointApiDetail extends ConsumerWidget {
                     color: methodColor(endpoint.method).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text(endpoint.method, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: methodColor(endpoint.method))),
+                  child: SelectableText(endpoint.method, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: methodColor(endpoint.method))),
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: Text(endpoint.path, style: const TextStyle(fontSize: 14, fontFamily: 'monospace', fontWeight: FontWeight.w500))),
+                Expanded(child: SelectableText(endpoint.path, style: TextStyle(fontSize: 14, fontFamily: 'monospace', fontWeight: FontWeight.w500, color: colorScheme.onSurface))),
               ],
             ),
             if (fullUrl.isNotEmpty) ...[
@@ -329,16 +362,16 @@ class _EndpointApiDetail extends ConsumerWidget {
                   color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text(fullUrl, style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.outline), overflow: TextOverflow.ellipsis),
+                child: SelectableText(fullUrl, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant)),
               ),
             ],
             if (endpoint.summary != null || endpoint.description != null) ...[
               const SizedBox(height: 12),
               if (endpoint.summary != null)
-                Text(endpoint.summary!, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+                SelectableText(endpoint.summary!, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
               if (endpoint.description != null) ...[
                 const SizedBox(height: 4),
-                Text(endpoint.description!, style: TextStyle(fontSize: 12, color: colorScheme.outline)),
+                SelectableText(endpoint.description!, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
               ],
             ],
             const SizedBox(height: 16),
@@ -369,14 +402,14 @@ class _EndpointApiDetail extends ConsumerWidget {
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
-                        child: Text('No schema information available', style: TextStyle(color: colorScheme.outline)),
+                        child: Text('No schema information available', style: TextStyle(color: colorScheme.onSurfaceVariant)),
                       ),
                     ),
                 ],
               ),
             ),
-            const Divider(),
-            const SizedBox(height: 8),
+            const Divider(height: 1),
+            const SizedBox(height: 4),
             Row(
               children: [
                 Expanded(
@@ -505,7 +538,7 @@ class _EndpointApiDetail extends ConsumerWidget {
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: colorScheme.outline, letterSpacing: 0.5)),
+      child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: colorScheme.onSurfaceVariant, letterSpacing: 0.5)),
     );
   }
 }
@@ -534,20 +567,20 @@ class _ParameterRow extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(param.name, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+                    SelectableText(param.name, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                     if (param.required) ...[
                       const SizedBox(width: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                         decoration: BoxDecoration(color: colorScheme.error.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(3)),
-                        child: Text('required', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: colorScheme.error)),
+                        child: SelectableText('required', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.error)),
                       ),
                     ],
                   ],
                 ),
                 if (param.description != null) ...[
                   const SizedBox(height: 2),
-                  Text(param.description!, style: TextStyle(fontSize: 11, color: colorScheme.outline)),
+                  SelectableText(param.description!, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
                 ],
               ],
             ),
@@ -557,7 +590,7 @@ class _ParameterRow extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(3)),
-              child: Text(param.type ?? param.schemaType!, style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: colorScheme.outline)),
+              child: SelectableText(param.type ?? param.schemaType!, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant)),
             ),
         ],
       ),
@@ -584,7 +617,7 @@ class _SectionHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
             decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8)),
-            child: Text('$count', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.outline)),
+            child: Text('$count', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant)),
           ),
         ],
       ],
@@ -650,10 +683,10 @@ class _ResponseCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(3)),
-                  child: Text(statusCode, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: statusColor)),
+                  child: SelectableText(statusCode, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: statusColor)),
                 ),
                 const SizedBox(width: 8),
-                Text(_statusText(c), style: TextStyle(fontSize: 12, color: colorScheme.outline)),
+                SelectableText(_statusText(c), style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
               ],
             ),
           ),
@@ -705,10 +738,10 @@ class _EndpointDocDetail extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(color: methodColor(endpoint.method).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(4)),
-                  child: Text(endpoint.method, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: methodColor(endpoint.method))),
+                  child: SelectableText(endpoint.method, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: methodColor(endpoint.method))),
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: Text(endpoint.path, style: const TextStyle(fontSize: 14, fontFamily: 'monospace', fontWeight: FontWeight.w500))),
+                Expanded(child: SelectableText(endpoint.path, style: TextStyle(fontSize: 14, fontFamily: 'monospace', fontWeight: FontWeight.w500, color: colorScheme.onSurface))),
               ],
             ),
           ),
@@ -742,11 +775,11 @@ class _EndpointDocDetail extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (endpoint.summary != null) ...[
-            Text(endpoint.summary!, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+            SelectableText(endpoint.summary!, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
             const SizedBox(height: 4),
           ],
           if (endpoint.description != null) ...[
-            Text(endpoint.description!, style: TextStyle(fontSize: 13, color: colorScheme.outline)),
+            SelectableText(endpoint.description!, style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant)),
             const SizedBox(height: 16),
           ],
           if (endpoint.parameters.isNotEmpty) ...[
@@ -795,9 +828,9 @@ class _EndpointDocDetail extends StatelessWidget {
                 children: [
                   Icon(LucideIcons.fileText, size: 14, color: colorScheme.outline),
                   const SizedBox(width: 6),
-                  Text('Raw Spec Content', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+                  Text('Raw Spec Content', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                   const Spacer(),
-                  Text('${lines.length} lines', style: TextStyle(fontSize: 10, color: colorScheme.outline)),
+                  Text('${lines.length} lines', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
                 ],
               ),
             ),
@@ -808,11 +841,11 @@ class _EndpointDocDetail extends StatelessWidget {
                   for (var i = 0; i < lines.length; i++) ...[
                     TextSpan(
                       text: '${(i + 1).toString().padLeft(4)}  ',
-                      style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.outline.withValues(alpha: 0.5)),
+                      style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                     ),
                     TextSpan(
                       text: '${lines[i]}\n',
-                      style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.onSurface),
+                      style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurface),
                     ),
                   ],
                 ],
@@ -838,7 +871,7 @@ class _EndpointDocDetail extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
             decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(3)),
-            child: Text(p.location, style: TextStyle(fontSize: 9, color: colorScheme.outline)),
+            child: SelectableText(p.location, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -847,24 +880,24 @@ class _EndpointDocDetail extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(p.name, style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600)),
+                    SelectableText(p.name, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                     if (p.required) ...[
                       const SizedBox(width: 4),
-                      Text('*', style: TextStyle(fontSize: 12, color: colorScheme.error)),
+                      SelectableText('*', style: TextStyle(fontSize: 12, color: colorScheme.error)),
                     ],
                     if (p.type != null) ...[
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                         decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(3)),
-                        child: Text(p.type!, style: TextStyle(fontSize: 9, fontFamily: 'monospace', color: colorScheme.outline)),
+                        child: SelectableText(p.type!, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant)),
                       ),
                     ],
                   ],
                 ),
                 if (p.description != null) ...[
                   const SizedBox(height: 2),
-                  Text(p.description!, style: TextStyle(fontSize: 11, color: colorScheme.outline)),
+                  SelectableText(p.description!, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
                 ],
               ],
             ),
@@ -898,7 +931,7 @@ class _SchemaView extends StatelessWidget {
           _buildTypeBadge(schema, colorScheme),
           if (schema.description != null) ...[
             const SizedBox(height: 4),
-            Text(schema.description!, style: TextStyle(fontSize: 11, color: colorScheme.outline)),
+            SelectableText(schema.description!, style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant)),
           ],
           if (schema.requiredFields.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -906,11 +939,11 @@ class _SchemaView extends StatelessWidget {
               spacing: 4,
               runSpacing: 4,
               children: [
-                Text('required:', style: TextStyle(fontSize: 10, color: colorScheme.outline)),
+                Text('required:', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
                 ...schema.requiredFields.map((f) => Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   decoration: BoxDecoration(color: colorScheme.error.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(3)),
-                  child: Text(f, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.error)),
+                  child: SelectableText(f, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.error)),
                 )),
               ],
             ),
@@ -921,11 +954,11 @@ class _SchemaView extends StatelessWidget {
               spacing: 4,
               runSpacing: 4,
               children: [
-                Text('enum:', style: TextStyle(fontSize: 10, color: colorScheme.outline)),
+                Text('enum:', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
                 ...schema.enumValues.map((v) => Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(3)),
-                  child: Text(v, style: TextStyle(fontSize: 10, color: colorScheme.outline)),
+                  child: SelectableText(v, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
                 )),
               ],
             ),
@@ -936,7 +969,7 @@ class _SchemaView extends StatelessWidget {
           ],
           if (schema.items != null) ...[
             const SizedBox(height: 8),
-            Text('items:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.outline)),
+            Text('items:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant)),
             const SizedBox(height: 4),
             _SchemaView(schema: schema.items!, depth: depth + 1),
           ],
@@ -961,7 +994,7 @@ class _SchemaView extends StatelessWidget {
         color: isRef ? colorScheme.primary.withValues(alpha: 0.08) : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(3),
       ),
-      child: Text(label, style: TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: isRef ? colorScheme.primary : colorScheme.onSurface)),
+      child: SelectableText(label, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: isRef ? colorScheme.primary : colorScheme.onSurface)),
     );
   }
 
@@ -972,11 +1005,11 @@ class _SchemaView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(width: 4),
-          Text('\u2022 ', style: TextStyle(fontSize: 12, color: colorScheme.outline)),
-          Text(name, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
+          SelectableText('\u2022 ', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+          SelectableText(name, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
           if (isRequired) ...[
             const SizedBox(width: 4),
-            Text('*', style: TextStyle(fontSize: 12, color: colorScheme.error)),
+            SelectableText('*', style: TextStyle(fontSize: 12, color: colorScheme.error)),
           ],
           const SizedBox(width: 8),
           if (prop.type != null || prop.ref != null)

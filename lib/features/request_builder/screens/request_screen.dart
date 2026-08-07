@@ -46,7 +46,8 @@ class RequestScreen extends ConsumerStatefulWidget {
   ConsumerState<RequestScreen> createState() => _RequestScreenState();
 }
 
-class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProviderStateMixin {
+class _RequestScreenState extends ConsumerState<RequestScreen>
+    with TickerProviderStateMixin {
   String _selectedMethod = 'GET';
   final _urlController = TextEditingController();
   final _bodyController = TextEditingController();
@@ -82,7 +83,11 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
     _loadSplitRatio();
     _params = [KeyValueEntry()];
     _headers = [KeyValueEntry()];
-    ref.read(windowTitleProvider.notifier).state = 'Request Builder';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(windowTitleProvider.notifier).state = 'Request Builder';
+      }
+    });
     if (widget.prefillMethod != null) _selectedMethod = widget.prefillMethod!;
     if (widget.prefillUrl != null) _urlController.text = widget.prefillUrl!;
     if (widget.historyEntry != null) {
@@ -107,10 +112,17 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       authData = jsonEncode({'token': _bearerTokenController.text});
     } else if (_selectedAuthType == 2) {
       authType = 'basic';
-      authData = jsonEncode({'username': _basicUserController.text, 'password': _basicPassController.text});
+      authData = jsonEncode({
+        'username': _basicUserController.text,
+        'password': _basicPassController.text,
+      });
     } else if (_selectedAuthType == 3) {
       authType = 'apikey';
-      authData = jsonEncode({'name': _apiKeyNameController.text, 'value': _apiKeyValueController.text, 'location': _apiKeyLocation});
+      authData = jsonEncode({
+        'name': _apiKeyNameController.text,
+        'value': _apiKeyValueController.text,
+        'location': _apiKeyLocation,
+      });
     }
 
     final state = {
@@ -133,12 +145,14 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       'apiKeyName': _apiKeyNameController.text,
       'apiKeyValue': _apiKeyValueController.text,
       'apiKeyLocation': _apiKeyLocation,
-      'response': _lastResponse != null ? {
-        'statusCode': _lastResponse!.statusCode,
-        'body': _lastResponse!.body,
-        'timeMs': _lastResponse!.timeMs,
-        'sizeBytes': _lastResponse!.sizeBytes,
-      } : null,
+      'response': _lastResponse != null
+          ? {
+              'statusCode': _lastResponse!.statusCode,
+              'body': _lastResponse!.body,
+              'timeMs': _lastResponse!.timeMs,
+              'sizeBytes': _lastResponse!.sizeBytes,
+            }
+          : null,
     };
 
     final prefs = await SharedPreferences.getInstance();
@@ -165,10 +179,17 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       final savedAuthType = state['authType'];
       if (savedAuthType is String) {
         switch (savedAuthType) {
-          case 'bearer': _selectedAuthType = 1; break;
-          case 'basic': _selectedAuthType = 2; break;
-          case 'apikey': _selectedAuthType = 3; break;
-          default: _selectedAuthType = 0;
+          case 'bearer':
+            _selectedAuthType = 1;
+            break;
+          case 'basic':
+            _selectedAuthType = 2;
+            break;
+          case 'apikey':
+            _selectedAuthType = 3;
+            break;
+          default:
+            _selectedAuthType = 0;
         }
       } else {
         _selectedAuthType = savedAuthType ?? 0;
@@ -184,7 +205,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
           _apiKeyNameController.text = data['name'] ?? '';
           _apiKeyValueController.text = data['value'] ?? '';
           if (data['location'] != null) _apiKeyLocation = data['location'];
-        } catch (e) { debugPrint('Failed to parse auth data: $e'); }
+        } catch (e) {
+          debugPrint('Failed to parse auth data: $e');
+        }
       } else {
         _bearerTokenController.text = state['bearerToken'] ?? '';
         _basicUserController.text = state['basicUser'] ?? '';
@@ -194,8 +217,12 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       }
 
       try {
-        final headersMap = Map<String, String>.from(jsonDecode(state['headers'] ?? '{}'));
-        _headers..clear()..addAll(mapToEntries(headersMap));
+        final headersMap = Map<String, String>.from(
+          jsonDecode(state['headers'] ?? '{}'),
+        );
+        _headers
+          ..clear()
+          ..addAll(mapToEntries(headersMap));
       } catch (e) {
         debugPrint('Failed to parse headers: $e');
         _headers.clear();
@@ -203,8 +230,12 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       if (_headers.isEmpty) _headers.add(KeyValueEntry());
 
       try {
-        final paramsMap = Map<String, String>.from(jsonDecode(state['params'] ?? '{}'));
-        _params..clear()..addAll(mapToEntries(paramsMap));
+        final paramsMap = Map<String, String>.from(
+          jsonDecode(state['params'] ?? '{}'),
+        );
+        _params
+          ..clear()
+          ..addAll(mapToEntries(paramsMap));
       } catch (e) {
         debugPrint('Failed to parse params: $e');
         _params.clear();
@@ -223,7 +254,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       }
 
       if (mounted) setState(() {});
-    } catch (e) { debugPrint('Failed to load saved request state: $e'); }
+    } catch (e) {
+      debugPrint('Failed to load saved request state: $e');
+    }
   }
 
   Future<void> _loadSplitRatio() async {
@@ -235,8 +268,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
   }
 
   void _saveSplitRatio() {
-    SharedPreferences.getInstance().then((prefs) =>
-      prefs.setDouble('response_split_ratio', _responseSplitRatio));
+    SharedPreferences.getInstance().then(
+      (prefs) => prefs.setDouble('response_split_ratio', _responseSplitRatio),
+    );
   }
 
   void _loadFromHistoryEntry(HistoryEntry entry) {
@@ -244,7 +278,15 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
     _urlController.text = entry.url;
     _bodyController.text = entry.body ?? '';
     _requestNameController.text = entry.requestName ?? '';
-    ref.read(windowTitleProvider.notifier).state = entry.requestName?.isNotEmpty == true ? entry.requestName! : 'Request Builder';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref
+            .read(windowTitleProvider.notifier)
+            .state = entry.requestName?.isNotEmpty == true
+            ? entry.requestName!
+            : 'Request Builder';
+      }
+    });
 
     // Restore body type
     _selectedBodyType = bodyTypeStringToIndex(entry.bodyType);
@@ -252,7 +294,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
     // Restore headers
     try {
       final headersMap = Map<String, String>.from(jsonDecode(entry.headers));
-      _headers..clear()..addAll(mapToEntries(headersMap));
+      _headers
+        ..clear()
+        ..addAll(mapToEntries(headersMap));
     } catch (e) {
       debugPrint('Failed to parse history headers: $e');
       _headers.clear();
@@ -262,7 +306,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
     // Restore query params
     try {
       final paramsMap = Map<String, String>.from(jsonDecode(entry.queryParams));
-      _params..clear()..addAll(mapToEntries(paramsMap));
+      _params
+        ..clear()
+        ..addAll(mapToEntries(paramsMap));
     } catch (e) {
       debugPrint('Failed to parse history params: $e');
       _params.clear();
@@ -276,7 +322,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
         try {
           final data = jsonDecode(entry.authData);
           _bearerTokenController.text = data['token'] ?? '';
-        } catch (e) { debugPrint('Failed to parse bearer auth: $e'); }
+        } catch (e) {
+          debugPrint('Failed to parse bearer auth: $e');
+        }
         break;
       case 'basic':
         _selectedAuthType = 2;
@@ -284,7 +332,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
           final data = jsonDecode(entry.authData);
           _basicUserController.text = data['username'] ?? '';
           _basicPassController.text = data['password'] ?? '';
-        } catch (e) { debugPrint('Failed to parse basic auth: $e'); }
+        } catch (e) {
+          debugPrint('Failed to parse basic auth: $e');
+        }
         break;
       case 'apikey':
         _selectedAuthType = 3;
@@ -293,7 +343,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
           _apiKeyNameController.text = data['name'] ?? '';
           _apiKeyValueController.text = data['value'] ?? '';
           _apiKeyLocation = data['location'] ?? 'header';
-        } catch (e) { debugPrint('Failed to parse apikey auth: $e'); }
+        } catch (e) {
+          debugPrint('Failed to parse apikey auth: $e');
+        }
         break;
       default:
         _selectedAuthType = 0;
@@ -315,13 +367,21 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       ..clear()
       ..addAll(mapToEntries(req.headers));
     if (_headers.isEmpty) _headers.add(KeyValueEntry());
-    ref.read(windowTitleProvider.notifier).state = req.name.isNotEmpty ? req.name : 'Request Builder';
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(windowTitleProvider.notifier).state = req.name.isNotEmpty
+            ? req.name
+            : 'Request Builder';
+      }
+    });
   }
 
   @override
   void didUpdateWidget(covariant RequestScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialRequest != null && widget.initialRequest != oldWidget.initialRequest) {
+    if (widget.initialRequest != null &&
+        widget.initialRequest != oldWidget.initialRequest) {
       setState(() => _loadFromRequest(widget.initialRequest!));
     }
   }
@@ -374,9 +434,13 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
     }
 
     // Fall back to collection auth
-    if (widget.collectionAuthType == null || widget.collectionAuthType == 'none') return {};
+    if (widget.collectionAuthType == null ||
+        widget.collectionAuthType == 'none')
+      return {};
     try {
-      final data = Map<String, dynamic>.from(jsonDecode(widget.collectionAuthData ?? '{}'));
+      final data = Map<String, dynamic>.from(
+        jsonDecode(widget.collectionAuthData ?? '{}'),
+      );
       switch (widget.collectionAuthType) {
         case 'bearer':
           final token = (data['token'] as String?) ?? '';
@@ -416,11 +480,15 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
     // Collection-level API key query param (only if request doesn't override)
     if (_selectedAuthType == 0 && widget.collectionAuthType == 'apikey') {
       try {
-        final data = Map<String, dynamic>.from(jsonDecode(widget.collectionAuthData ?? '{}'));
+        final data = Map<String, dynamic>.from(
+          jsonDecode(widget.collectionAuthData ?? '{}'),
+        );
         if (data['location'] == 'query') {
           final name = (data['name'] as String?) ?? '';
           final value = (data['value'] as String?) ?? '';
-          if (name.isNotEmpty && value.isNotEmpty && !params.containsKey(name)) {
+          if (name.isNotEmpty &&
+              value.isNotEmpty &&
+              !params.containsKey(name)) {
             params[name] = value;
           }
         }
@@ -433,11 +501,20 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
   Future<void> _sendRequest() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
-      if (mounted) showDbugToast(context, message: 'Enter a URL to send', type: ToastType.warning);
+      if (mounted) {
+        showDbugToast(
+          context,
+          message: 'Enter a URL to send',
+          type: ToastType.warning,
+        );
+      }
       return;
     }
 
-    setState(() { _isSending = true; _lastResponse = null; });
+    setState(() {
+      _isSending = true;
+      _lastResponse = null;
+    });
 
     try {
       final variables = ref.read(activeVariablesProvider);
@@ -447,9 +524,13 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       headers.addAll(widget.collectionHeaders);
       headers.addAll(entriesToMap(_headers));
       headers.addAll(_buildAuthHeaders());
-      final resolvedHeaders = headers.map((k, v) => MapEntry(k, substituteVariables(v, variables)));
+      final resolvedHeaders = headers.map(
+        (k, v) => MapEntry(k, substituteVariables(v, variables)),
+      );
 
-      final queryParams = _buildQueryParams().map((k, v) => MapEntry(k, substituteVariables(v, variables)));
+      final queryParams = _buildQueryParams().map(
+        (k, v) => MapEntry(k, substituteVariables(v, variables)),
+      );
 
       String? body;
       if (_selectedBodyType > 0 && _bodyController.text.isNotEmpty) {
@@ -475,10 +556,17 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
         authData = jsonEncode({'token': _bearerTokenController.text.trim()});
       } else if (_selectedAuthType == 2) {
         authType = 'basic';
-        authData = jsonEncode({'username': _basicUserController.text.trim(), 'password': _basicPassController.text});
+        authData = jsonEncode({
+          'username': _basicUserController.text.trim(),
+          'password': _basicPassController.text,
+        });
       } else if (_selectedAuthType == 3) {
         authType = 'apikey';
-        authData = jsonEncode({'name': _apiKeyNameController.text.trim(), 'value': _apiKeyValueController.text.trim(), 'location': _apiKeyLocation});
+        authData = jsonEncode({
+          'name': _apiKeyNameController.text.trim(),
+          'value': _apiKeyValueController.text.trim(),
+          'location': _apiKeyLocation,
+        });
       }
 
       final bodyType = bodyTypeIndexToString(_selectedBodyType);
@@ -509,7 +597,11 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       _saveBuilderState();
     } catch (e) {
       if (mounted) {
-        showDbugToast(context, message: 'Request failed: $e', type: ToastType.error);
+        showDbugToast(
+          context,
+          message: 'Request failed: $e',
+          type: ToastType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -545,9 +637,16 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
         await requestRepo.updateRequest(updated);
       }
       ref.invalidate(collectionsProvider);
-      if (mounted) showDbugToast(context, message: 'Request saved', type: ToastType.success);
+      if (mounted)
+        showDbugToast(
+          context,
+          message: 'Request saved',
+          type: ToastType.success,
+        );
     } else {
-      final collections = await ref.read(collectionRepositoryProvider).getAllCollections();
+      final collections = await ref
+          .read(collectionRepositoryProvider)
+          .getAllCollections();
       if (!mounted) return;
 
       if (collections.isEmpty) {
@@ -562,7 +661,12 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
         );
         setState(() => _currentRequestId = req.id);
         ref.invalidate(collectionsProvider);
-        if (mounted) showDbugToast(context, message: 'Request saved', type: ToastType.success);
+        if (mounted)
+          showDbugToast(
+            context,
+            message: 'Request saved',
+            type: ToastType.success,
+          );
         return;
       }
 
@@ -577,16 +681,26 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Choose a collection for this request.', style: Theme.of(ctx).textTheme.bodySmall),
+                  Text(
+                    'Choose a collection for this request.',
+                    style: Theme.of(ctx).textTheme.bodySmall,
+                  ),
                   const SizedBox(height: 12),
-                  ...collections.map((c) => RadioListTile<String>(
-                    title: Text(c.name, style: const TextStyle(fontSize: 13)),
-                    subtitle: c.description != null ? Text(c.description!, style: const TextStyle(fontSize: 11)) : null,
-                    value: c.id,
-                    groupValue: selectedId,
-                    dense: true,
-                    onChanged: (v) => setDialogState(() => selectedId = v),
-                  )),
+                  ...collections.map(
+                    (c) => RadioListTile<String>(
+                      title: Text(c.name, style: const TextStyle(fontSize: 13)),
+                      subtitle: c.description != null
+                          ? Text(
+                              c.description!,
+                              style: const TextStyle(fontSize: 11),
+                            )
+                          : null,
+                      value: c.id,
+                      groupValue: selectedId,
+                      dense: true,
+                      onChanged: (v) => setDialogState(() => selectedId = v),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -616,7 +730,12 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       );
       setState(() => _currentRequestId = req.id);
       ref.invalidate(collectionsProvider);
-      if (mounted) showDbugToast(context, message: picked != null ? 'Saved to collection' : 'Request saved', type: ToastType.success);
+      if (mounted)
+        showDbugToast(
+          context,
+          message: picked != null ? 'Saved to collection' : 'Request saved',
+          type: ToastType.success,
+        );
     }
   }
 
@@ -645,18 +764,34 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                           Padding(
                             padding: const EdgeInsets.only(right: 6),
                             child: IconButton(
-                              icon: Icon(_showEndpointList ? LucideIcons.panelLeftOpen : LucideIcons.panelLeftClose, size: 18, color: colorScheme.onSurfaceVariant),
-                              onPressed: () => setState(() => _showEndpointList = !_showEndpointList),
+                              icon: Icon(
+                                _showEndpointList
+                                    ? LucideIcons.panelLeftOpen
+                                    : LucideIcons.panelLeftClose,
+                                size: 18,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              onPressed: () => setState(
+                                () => _showEndpointList = !_showEndpointList,
+                              ),
                             ),
                           ),
-                        Icon(LucideIcons.globe, size: 14, color: colorScheme.primary),
+                        Icon(
+                          LucideIcons.globe,
+                          size: 14,
+                          color: colorScheme.primary,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             _requestNameController.text.isNotEmpty
                                 ? _requestNameController.text
                                 : widget.initialRequest?.name ?? '',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurface,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -667,7 +802,11 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                 const SizedBox(height: 12),
                 _buildTabs(colorScheme),
                 const SizedBox(height: 10),
-                Expanded(child: _lastResponse != null ? _buildResponseSplit(colorScheme) : _buildTabContent(colorScheme)),
+                Expanded(
+                  child: _lastResponse != null
+                      ? _buildResponseSplit(colorScheme)
+                      : _buildTabContent(colorScheme),
+                ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -675,7 +814,14 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                       child: FilledButton.icon(
                         onPressed: _isSending ? null : _sendRequest,
                         icon: _isSending
-                            ? const SizedBox(width: 14, height: 14, child: DbugSpinner(strokeWidth: 2, color: Color(0xFFFFFFFF)))
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: DbugSpinner(
+                                  strokeWidth: 2,
+                                  color: Color(0xFFFFFFFF),
+                                ),
+                              )
                             : const Icon(LucideIcons.send, size: 14),
                         label: Text(_isSending ? 'Sending...' : 'Send'),
                       ),
@@ -697,14 +843,18 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
   }
 
   Widget _buildEndpointList(ColorScheme colorScheme) {
-    final requestsAsync = ref.watch(requestsByCollectionProvider(widget.collectionId!));
+    final requestsAsync = ref.watch(
+      requestsByCollectionProvider(widget.collectionId!),
+    );
 
     return Container(
       width: 220,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -715,26 +865,65 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
               children: [
                 Icon(LucideIcons.list, size: 14, color: colorScheme.primary),
                 const SizedBox(width: 6),
-                Text('Endpoints', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+                Text(
+                  'Endpoints',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: TextField(
-              decoration: const InputDecoration(hintText: 'Search endpoints...', isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6)),
+              decoration: const InputDecoration(
+                hintText: 'Search endpoints...',
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 6,
+                ),
+              ),
               onChanged: (v) => setState(() => _endpointSearchQuery = v),
             ),
           ),
           const SizedBox(height: 6),
-          Container(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          Container(
+            height: 1,
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
           Expanded(
             child: requestsAsync.when(
-              loading: () => const Center(child: SizedBox(width: 16, height: 16, child: DbugSpinner(strokeWidth: 2))),
-              error: (e, _) =>                         Center(child: Text('Error', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant))),
+              loading: () => const Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: DbugSpinner(strokeWidth: 2),
+                ),
+              ),
+              error: (e, _) => Center(
+                child: Text(
+                  'Error',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
               data: (requests) {
                 if (requests.isEmpty) {
-                  return                     Center(child: Text('No requests', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)));
+                  return Center(
+                    child: Text(
+                      'No requests',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  );
                 }
                 final filtered = _endpointSearchQuery.isEmpty
                     ? requests
@@ -745,7 +934,15 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                             r.url.toLowerCase().contains(q);
                       }).toList();
                 if (filtered.isEmpty) {
-                  return                     Center(child: Text('No matching endpoints', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)));
+                  return Center(
+                    child: Text(
+                      'No matching endpoints',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  );
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -757,18 +954,36 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                       onTap: () => _switchToRequest(req),
                       behavior: HitTestBehavior.opaque,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        color: isActive ? colorScheme.surfaceContainerHighest : null,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        color: isActive
+                            ? colorScheme.surfaceContainerHighest
+                            : null,
                         child: Row(
                           children: [
                             Container(
-                              width: 40,
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              width: 52,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
                               decoration: BoxDecoration(
-                                color: methodColor(req.method).withValues(alpha: 0.12),
+                                color: methodColor(
+                                  req.method,
+                                ).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(3),
                               ),
-                              child: Text(req.method, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: methodColor(req.method)), textAlign: TextAlign.center),
+                              child: Text(
+                                req.method,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: methodColor(req.method),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                             const SizedBox(width: 6),
                             Expanded(
@@ -776,8 +991,12 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                                 req.name,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                                  color: isActive ? colorScheme.primary : colorScheme.onSurface,
+                                  fontWeight: isActive
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                  color: isActive
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurface,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -814,7 +1033,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
         ..addAll(mapToEntries(req.headers));
       if (_headers.isEmpty) _headers.add(KeyValueEntry());
     });
-    ref.read(windowTitleProvider.notifier).state = req.name.isNotEmpty ? req.name : 'Request Builder';
+    ref.read(windowTitleProvider.notifier).state = req.name.isNotEmpty
+        ? req.name
+        : 'Request Builder';
     _saveBuilderState();
   }
 
@@ -863,7 +1084,14 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                 children: [
                   Row(
                     children: [
-                      Text('Response', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+                      Text(
+                        'Response',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
                       const Spacer(),
                       IconButton(
                         icon: const Icon(LucideIcons.x, size: 14),
@@ -889,11 +1117,24 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
           value: _selectedMethod,
           underline: const SizedBox.shrink(),
           isDense: true,
-          items: _methods.map((m) => DropdownMenuItem(
-            value: m,
-            child: Text(m, style: TextStyle(color: methodColor(m), fontWeight: FontWeight.w600, fontSize: 12)),
-          )).toList(),
-          onChanged: (v) { if (v != null) setState(() => _selectedMethod = v); },
+          items: _methods
+              .map(
+                (m) => DropdownMenuItem(
+                  value: m,
+                  child: Text(
+                    m,
+                    style: TextStyle(
+                      color: methodColor(m),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (v) {
+            if (v != null) setState(() => _selectedMethod = v);
+          },
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -901,7 +1142,10 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
             tooltipText: _buildResolvedUrlPreview,
             child: TextField(
               controller: _urlController,
-              decoration: const InputDecoration(hintText: 'Enter URL (supports {{variables}})', isDense: true),
+              decoration: const InputDecoration(
+                hintText: 'Enter URL (supports {{variables}})',
+                isDense: true,
+              ),
               style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
             ),
           ),
@@ -922,7 +1166,11 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
 
   Widget _buildTabs(ColorScheme colorScheme) {
     return TabBar(
-      controller: TabController(length: 4, vsync: this, initialIndex: _selectedTab),
+      controller: TabController(
+        length: 4,
+        vsync: this,
+        initialIndex: _selectedTab,
+      ),
       onTap: (i) => setState(() => _selectedTab = i),
       tabs: const [
         Tab(text: 'Params'),
@@ -938,11 +1186,16 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
 
   Widget _buildTabContent(ColorScheme colorScheme) {
     switch (_selectedTab) {
-      case 0: return _buildParamsTab(colorScheme);
-      case 1: return _buildHeadersTab(colorScheme);
-      case 2: return _buildBodyTab(colorScheme);
-      case 3: return _buildAuthTab(colorScheme);
-      default: return const SizedBox.shrink();
+      case 0:
+        return _buildParamsTab(colorScheme);
+      case 1:
+        return _buildHeadersTab(colorScheme);
+      case 2:
+        return _buildBodyTab(colorScheme);
+      case 3:
+        return _buildAuthTab(colorScheme);
+      default:
+        return const SizedBox.shrink();
     }
   }
 
@@ -951,7 +1204,12 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: SingleChildScrollView(
-          child: KeyValueEditor(entries: _params, keyHint: 'Parameter', valueHint: 'Value', onChanged: () => setState(() {})),
+          child: KeyValueEditor(
+            entries: _params,
+            keyHint: 'Parameter',
+            valueHint: 'Value',
+            onChanged: () => setState(() {}),
+          ),
         ),
       ),
     );
@@ -970,29 +1228,69 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
                       children: [
-                        Icon(LucideIcons.key, size: 12, color: colorScheme.onSurfaceVariant),
+                        Icon(
+                          LucideIcons.key,
+                          size: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                         const SizedBox(width: 6),
-                        Text('Collection Headers (inherited)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant, letterSpacing: 0.5)),
+                        Text(
+                          'Collection Headers (inherited)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurfaceVariant,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    ...widget.collectionHeaders.entries.map((e) => Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: Row(
-                        children: [
-                          Text(e.key, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurface, fontFamily: 'monospace')),
-                          Text(': ', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
-                          Expanded(child: Text(e.value, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis)),
-                        ],
+                    ...widget.collectionHeaders.entries.map(
+                      (e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Row(
+                          children: [
+                            Text(
+                              e.key,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                            Text(
+                              ': ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                e.value,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontFamily: 'monospace',
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    )),
+                    ),
                   ],
                 ),
               ),
@@ -1000,7 +1298,12 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
             ],
             Expanded(
               child: SingleChildScrollView(
-                child: KeyValueEditor(entries: _headers, keyHint: 'Header', valueHint: 'Value', onChanged: () => setState(() {})),
+                child: KeyValueEditor(
+                  entries: _headers,
+                  keyHint: 'Header',
+                  valueHint: 'Value',
+                  onChanged: () => setState(() {}),
+                ),
               ),
             ),
           ],
@@ -1022,12 +1325,20 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                   padding: const EdgeInsets.only(right: 4),
                   child: _selectedBodyType == i
                       ? FilledButton.tonal(
-                          onPressed: () => setState(() => _selectedBodyType = i),
-                          child: Text(_bodyTypes[i], style: const TextStyle(fontSize: 11)),
+                          onPressed: () =>
+                              setState(() => _selectedBodyType = i),
+                          child: Text(
+                            _bodyTypes[i],
+                            style: const TextStyle(fontSize: 11),
+                          ),
                         )
                       : OutlinedButton(
-                          onPressed: () => setState(() => _selectedBodyType = i),
-                          child: Text(_bodyTypes[i], style: const TextStyle(fontSize: 11)),
+                          onPressed: () =>
+                              setState(() => _selectedBodyType = i),
+                          child: Text(
+                            _bodyTypes[i],
+                            style: const TextStyle(fontSize: 11),
+                          ),
                         ),
                 );
               }),
@@ -1037,14 +1348,22 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
               Expanded(
                 child: TextField(
                   controller: _bodyController,
-                  decoration: InputDecoration(hintText: _selectedBodyType == 1 ? '{\n  "key": "value"\n}' : 'Request body...', border: const OutlineInputBorder()),
+                  decoration: InputDecoration(
+                    hintText: _selectedBodyType == 1
+                        ? '{\n  "key": "value"\n}'
+                        : 'Request body...',
+                    border: const OutlineInputBorder(),
+                  ),
                   style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
                 ),
               )
             else
               Expanded(
                 child: Center(
-                    child: Text('No body', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                  child: Text(
+                    'No body',
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ),
                 ),
               ),
           ],
@@ -1067,56 +1386,167 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                     padding: const EdgeInsets.only(right: 4),
                     child: _selectedAuthType == i
                         ? FilledButton.tonal(
-                            onPressed: () => setState(() => _selectedAuthType = i),
-                            child: Text(_authTypes[i], style: const TextStyle(fontSize: 11)),
+                            onPressed: () =>
+                                setState(() => _selectedAuthType = i),
+                            child: Text(
+                              _authTypes[i],
+                              style: const TextStyle(fontSize: 11),
+                            ),
                           )
                         : OutlinedButton(
-                            onPressed: () => setState(() => _selectedAuthType = i),
-                            child: Text(_authTypes[i], style: const TextStyle(fontSize: 11)),
+                            onPressed: () =>
+                                setState(() => _selectedAuthType = i),
+                            child: Text(
+                              _authTypes[i],
+                              style: const TextStyle(fontSize: 11),
+                            ),
                           ),
                   );
                 }),
               ),
               const SizedBox(height: 16),
               if (_selectedAuthType == 1) ...[
-                Text('Token', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
+                Text(
+                  'Token',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                TextField(controller: _bearerTokenController, decoration: const InputDecoration(hintText: 'Enter bearer token', border: OutlineInputBorder())),
+                TextField(
+                  controller: _bearerTokenController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter bearer token',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
               ] else if (_selectedAuthType == 2) ...[
-                Text('Username', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
+                Text(
+                  'Username',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                TextField(controller: _basicUserController, decoration: const InputDecoration(hintText: 'Username', border: OutlineInputBorder())),
+                TextField(
+                  controller: _basicUserController,
+                  decoration: const InputDecoration(
+                    hintText: 'Username',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 12),
-                Text('Password', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
+                Text(
+                  'Password',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                TextField(controller: _basicPassController, obscureText: true, decoration: const InputDecoration(hintText: 'Password', border: OutlineInputBorder())),
+                TextField(
+                  controller: _basicPassController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Password',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
               ] else if (_selectedAuthType == 3) ...[
-                Text('Key Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
+                Text(
+                  'Key Name',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                TextField(controller: _apiKeyNameController, decoration: const InputDecoration(hintText: 'X-API-Key', border: OutlineInputBorder())),
+                TextField(
+                  controller: _apiKeyNameController,
+                  decoration: const InputDecoration(
+                    hintText: 'X-API-Key',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 12),
-                Text('Key Value', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
+                Text(
+                  'Key Value',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                TextField(controller: _apiKeyValueController, decoration: const InputDecoration(hintText: 'Your API key', border: OutlineInputBorder())),
+                TextField(
+                  controller: _apiKeyValueController,
+                  decoration: const InputDecoration(
+                    hintText: 'Your API key',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Text('Add to:', style: TextStyle(fontSize: 12, color: colorScheme.onSurface)),
+                    Text(
+                      'Add to:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     _apiKeyLocation == 'header'
-                        ? FilledButton.tonal(onPressed: () => setState(() => _apiKeyLocation = 'header'), child: const Text('Header', style: TextStyle(fontSize: 11)))
-                        : OutlinedButton(onPressed: () => setState(() => _apiKeyLocation = 'header'), child: const Text('Header', style: TextStyle(fontSize: 11))),
+                        ? FilledButton.tonal(
+                            onPressed: () =>
+                                setState(() => _apiKeyLocation = 'header'),
+                            child: const Text(
+                              'Header',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          )
+                        : OutlinedButton(
+                            onPressed: () =>
+                                setState(() => _apiKeyLocation = 'header'),
+                            child: const Text(
+                              'Header',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
                     const SizedBox(width: 4),
                     _apiKeyLocation == 'query'
-                        ? FilledButton.tonal(onPressed: () => setState(() => _apiKeyLocation = 'query'), child: const Text('Query Param', style: TextStyle(fontSize: 11)))
-                        : OutlinedButton(onPressed: () => setState(() => _apiKeyLocation = 'query'), child: const Text('Query Param', style: TextStyle(fontSize: 11))),
+                        ? FilledButton.tonal(
+                            onPressed: () =>
+                                setState(() => _apiKeyLocation = 'query'),
+                            child: const Text(
+                              'Query Param',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          )
+                        : OutlinedButton(
+                            onPressed: () =>
+                                setState(() => _apiKeyLocation = 'query'),
+                            child: const Text(
+                              'Query Param',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
                   ],
                 ),
               ] else ...[
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text('No authentication', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                    child: Text(
+                      'No authentication',
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
+                    ),
                   ),
                 ),
               ],
@@ -1157,11 +1587,21 @@ class _UrlTooltipState extends State<_UrlTooltip> {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.inverseSurface,
               borderRadius: BorderRadius.circular(6),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2))],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Text(
               text,
-              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onInverseSurface, fontFamily: 'monospace'),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onInverseSurface,
+                fontFamily: 'monospace',
+              ),
             ),
           ),
         ),

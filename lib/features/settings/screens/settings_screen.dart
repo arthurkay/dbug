@@ -3,17 +3,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/providers/theme_provider.dart';
+import '../../../core/providers/syntax_theme_provider.dart';
 import '../../../core/providers/active_environment_provider.dart';
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/window_title_provider.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../shared/utils/syntax_highlighter.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    ref.read(windowTitleProvider.notifier).state = 'Settings';
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(windowTitleProvider.notifier).state = 'Settings';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
     final activeEnv = ref.watch(activeEnvironmentProvider);
     final envsAsync = ref.watch(userEnvironmentsProvider);
@@ -60,6 +74,52 @@ class SettingsScreen extends ConsumerWidget {
                           onSelectionChanged: (modes) {
                             ref.read(themeModeProvider.notifier).setMode(modes.first);
                           },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text('Response Viewer', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 12),
+                        Text('Syntax Theme', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 8),
+                        DropdownButton<String>(
+                          value: ref.watch(syntaxThemeNameProvider),
+                          isExpanded: true,
+                          underline: const SizedBox.shrink(),
+                          items: syntaxThemeNames.map((name) => DropdownMenuItem(
+                            value: name,
+                            child: Text(name, style: const TextStyle(fontSize: 13)),
+                          )).toList(),
+                          onChanged: (v) {
+                            if (v != null) ref.read(syntaxThemeNameProvider.notifier).setTheme(v);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Text('Preview', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                          ),
+                          child: Text.rich(TextSpan(
+                            children: SyntaxHighlighter.highlight(
+                              '{\n  "name": "dbug",\n  "version": 1,\n  "active": true,\n  "tags": null\n}',
+                              'application/json',
+                              Theme.of(context).brightness,
+                              themeName: ref.watch(syntaxThemeNameProvider),
+                            ),
+                          )),
                         ),
                       ],
                     ),

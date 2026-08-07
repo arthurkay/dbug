@@ -104,7 +104,7 @@ class AdaptiveShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final screenTitle = ref.watch(windowTitleProvider);
     windowManager.setTitle('dbug — $screenTitle');
-    final isWide = MediaQuery.of(context).size.width > 768;
+    final isWide = MediaQuery.of(context).size.width >= 900;
 
     if (isWide) {
       return _buildWideLayout(context);
@@ -246,7 +246,7 @@ class _Sidebar extends ConsumerWidget {
                               Icon(LucideIcons.circle, size: 14, color: env.isOpenApiDefined ? colorScheme.primary : colorScheme.outline),
                               const SizedBox(width: 8),
                               Expanded(child: Text(env.name, overflow: TextOverflow.ellipsis)),
-                              Text('${env.variables.length}', style: TextStyle(fontSize: 11, color: colorScheme.outline)),
+                              Text('${env.variables.length}', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
                             ],
                           ),
                         )),

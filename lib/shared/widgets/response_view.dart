@@ -1,20 +1,22 @@
 import 'dart:convert' as convert;
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/http/http_client.dart';
+import '../../core/providers/syntax_theme_provider.dart';
 import '../utils/syntax_highlighter.dart';
 
-class ResponseView extends StatefulWidget {
+class ResponseView extends ConsumerStatefulWidget {
   final HttpResponse response;
 
   const ResponseView({super.key, required this.response});
 
   @override
-  State<ResponseView> createState() => _ResponseViewState();
+  ConsumerState<ResponseView> createState() => _ResponseViewState();
 }
 
-class _ResponseViewState extends State<ResponseView> {
+class _ResponseViewState extends ConsumerState<ResponseView> {
   int _selectedTab = 0;
   bool _prettyView = true;
 
@@ -56,7 +58,7 @@ class _ResponseViewState extends State<ResponseView> {
                                   color: Colors.green.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(3),
                                 ),
-                                child: Text(contentType.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.green)),
+                                child: Text(contentType.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.green)),
                               ),
                             ],
                           ],
@@ -219,7 +221,8 @@ class _ResponseViewState extends State<ResponseView> {
   Widget _buildHighlightedView(ColorScheme colorScheme, String body, HttpResponse resp) {
     final lines = body.split('\n');
     final contentType = resp.headers['content-type'] ?? '';
-    final spans = SyntaxHighlighter.highlight(body, contentType, colorScheme.brightness);
+    final themeName = ref.watch(syntaxThemeNameProvider);
+    final spans = SyntaxHighlighter.highlight(body, contentType, colorScheme.brightness, themeName: themeName);
 
     return Container(
       width: double.infinity,

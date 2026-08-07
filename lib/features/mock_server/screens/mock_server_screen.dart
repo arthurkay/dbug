@@ -28,7 +28,9 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
   @override
   void initState() {
     super.initState();
-    ref.read(windowTitleProvider.notifier).state = 'Mock Server';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(windowTitleProvider.notifier).state = 'Mock Server';
+    });
   }
 
   Future<void> _startServer() async {
@@ -185,7 +187,7 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
             const SizedBox(height: 16),
             Text('No mock endpoints', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('Add endpoints to simulate API responses', style: TextStyle(color: colorScheme.outline)),
+            Text('Add endpoints to simulate API responses', style: TextStyle(color: colorScheme.onSurfaceVariant)),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () => _showAddEndpointDialog(context),
@@ -295,7 +297,7 @@ class _EndpointTile extends StatelessWidget {
           color: methodColor(endpoint.method).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(4),
         ),
-        child: Text(endpoint.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: methodColor(endpoint.method)), textAlign: TextAlign.center),
+        child: Text(endpoint.method, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: methodColor(endpoint.method)), textAlign: TextAlign.center),
       ),
       title: Text(endpoint.path, style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
       trailing: Row(

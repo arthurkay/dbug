@@ -23,7 +23,9 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
   @override
   void initState() {
     super.initState();
-    ref.read(windowTitleProvider.notifier).state = 'Environments';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(windowTitleProvider.notifier).state = 'Environments';
+    });
   }
 
   @override
@@ -187,7 +189,7 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
             const SizedBox(height: 16),
             Text('No environments yet', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('Create environments like dev, staging, prod', style: TextStyle(color: colorScheme.outline)),
+            Text('Create environments like dev, staging, prod', style: TextStyle(color: colorScheme.onSurfaceVariant)),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () => _showCreateDialog(context),
@@ -282,7 +284,7 @@ class _EnvironmentTile extends StatelessWidget {
                 color: Colors.blue.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(3),
               ),
-              child: const Text('Collection', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.blue)),
+              child: const Text('Collection', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.blue)),
             ),
           ],
         ],

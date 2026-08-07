@@ -35,7 +35,9 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
   @override
   void initState() {
     super.initState();
-    ref.read(windowTitleProvider.notifier).state = 'OpenAPI Specs';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(windowTitleProvider.notifier).state = 'OpenAPI Specs';
+    });
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) setState(() {});
@@ -132,7 +134,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
                   children: [
                     Text('OpenAPI Specs', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
                     const SizedBox(height: 4),
-                    Text('Import OpenAPI 3.x specifications to use as request collections', style: TextStyle(fontSize: 13, color: colorScheme.outline)),
+                    Text('Import OpenAPI 3.x specifications to use as request collections', style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -276,7 +278,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(_selectedFileName!, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis),
-                                    Text(_selectedFilePath!, style: TextStyle(fontSize: 11, color: colorScheme.outline), overflow: TextOverflow.ellipsis),
+                                    Text(_selectedFilePath!, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
                                   ],
                                 ),
                               ),
@@ -306,7 +308,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
                           const SizedBox(height: 16),
                           Text('Select a .json or .yaml file', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                           const SizedBox(height: 4),
-                          Text('OpenAPI 3.x specification file', style: TextStyle(fontSize: 12, color: colorScheme.outline)),
+                          Text('OpenAPI 3.x specification file', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
                           const SizedBox(height: 16),
                           Row(
                             mainAxisSize: MainAxisSize.min,
@@ -337,7 +339,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
               children: [
                 Text('Imported Specs', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                 const Spacer(),
-                specsAsync.whenData((specs) => Text('${specs.length}', style: TextStyle(fontSize: 12, color: colorScheme.outline))).when(skipLoadingOnRefresh: false, skipLoadingOnReload: false, data: (w) => w, error: (_, __) => const SizedBox.shrink(), loading: () => const SizedBox.shrink()),
+                specsAsync.whenData((specs) => Text('${specs.length}', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant))).when(skipLoadingOnRefresh: false, skipLoadingOnReload: false, data: (w) => w, error: (_, __) => const SizedBox.shrink(), loading: () => const SizedBox.shrink()),
               ],
             ),
           ),
@@ -348,7 +350,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (specs) {
                 if (specs.isEmpty) {
-                  return Center(child: Text('No specs imported yet', style: TextStyle(fontSize: 12, color: colorScheme.outline)));
+                  return Center(child: Text('No specs imported yet', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)));
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 4),

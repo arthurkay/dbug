@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-class _Colors {
+class SyntaxColors {
   final Color key;
   final Color string;
   final Color number;
@@ -13,7 +13,7 @@ class _Colors {
   final Color punctuation;
   final Color defaultText;
 
-  const _Colors({
+  const SyntaxColors({
     required this.key,
     required this.string,
     required this.number,
@@ -28,7 +28,9 @@ class _Colors {
   });
 }
 
-const _darkColors = _Colors(
+const syntaxThemeNames = ['Default', 'GitHub', 'Monokai', 'Dracula', 'OneDark', 'Solarized'];
+
+const _defaultDark = SyntaxColors(
   key: Color(0xFF7DD3FC),
   string: Color(0xFF86EFAC),
   number: Color(0xFF93C5FD),
@@ -42,7 +44,7 @@ const _darkColors = _Colors(
   defaultText: Color(0xFFFAFAFA),
 );
 
-const _lightColors = _Colors(
+const _defaultLight = SyntaxColors(
   key: Color(0xFF2563EB),
   string: Color(0xFF16A34A),
   number: Color(0xFF7C3AED),
@@ -56,15 +58,169 @@ const _lightColors = _Colors(
   defaultText: Color(0xFF09090B),
 );
 
+const _githubDark = SyntaxColors(
+  key: Color(0xFF79C0FF),
+  string: Color(0xFFA5D6FF),
+  number: Color(0xFF79C0FF),
+  boolValue: Color(0xFFFF7B72),
+  nullValue: Color(0xFFFF7B72),
+  tag: Color(0xFF7EE787),
+  attrName: Color(0xFF79C0FF),
+  attrValue: Color(0xFFA5D6FF),
+  comment: Color(0xFF8B949E),
+  punctuation: Color(0xFFC9D1D9),
+  defaultText: Color(0xFFC9D1D9),
+);
+
+const _githubLight = SyntaxColors(
+  key: Color(0xFF0550AE),
+  string: Color(0xFF0A3069),
+  number: Color(0xFF0550AE),
+  boolValue: Color(0xFFCF222E),
+  nullValue: Color(0xFFCF222E),
+  tag: Color(0xFF116329),
+  attrName: Color(0xFF0550AE),
+  attrValue: Color(0xFF0A3069),
+  comment: Color(0xFF6E7781),
+  punctuation: Color(0xFF24292F),
+  defaultText: Color(0xFF24292F),
+);
+
+const _monokaiDark = SyntaxColors(
+  key: Color(0xFFF92672),
+  string: Color(0xFFE6DB74),
+  number: Color(0xFFAE81FF),
+  boolValue: Color(0xFFA6E22E),
+  nullValue: Color(0xFFA6E22E),
+  tag: Color(0xFFF92672),
+  attrName: Color(0xFFA6E22E),
+  attrValue: Color(0xFFE6DB74),
+  comment: Color(0xFF75715E),
+  punctuation: Color(0xFFF8F8F2),
+  defaultText: Color(0xFFF8F8F2),
+);
+
+const _monokaiLight = SyntaxColors(
+  key: Color(0xFFC41A16),
+  string: Color(0xFF1B8937),
+  number: Color(0xFF6C36A7),
+  boolValue: Color(0xFFC41A16),
+  nullValue: Color(0xFFC41A16),
+  tag: Color(0xFFC41A16),
+  attrName: Color(0xFF1B8937),
+  attrValue: Color(0xFF1B8937),
+  comment: Color(0xFF8C8C8C),
+  punctuation: Color(0xFF333333),
+  defaultText: Color(0xFF333333),
+);
+
+const _draculaDark = SyntaxColors(
+  key: Color(0xFFFF79C6),
+  string: Color(0xFFF1FA8C),
+  number: Color(0xFFBD93F9),
+  boolValue: Color(0xFF50FA7B),
+  nullValue: Color(0xFF50FA7B),
+  tag: Color(0xFFFF79C6),
+  attrName: Color(0xFF50FA7B),
+  attrValue: Color(0xFFF1FA8C),
+  comment: Color(0xFF6272A4),
+  punctuation: Color(0xFFF8F8F2),
+  defaultText: Color(0xFFF8F8F2),
+);
+
+const _draculaLight = SyntaxColors(
+  key: Color(0xFFA626A4),
+  string: Color(0xFF50A14F),
+  number: Color(0xFFA626A4),
+  boolValue: Color(0xFFE45649),
+  nullValue: Color(0xFFE45649),
+  tag: Color(0xFFA626A4),
+  attrName: Color(0xFF50A14F),
+  attrValue: Color(0xFF50A14F),
+  comment: Color(0xFFA0A1A7),
+  punctuation: Color(0xFF383A42),
+  defaultText: Color(0xFF383A42),
+);
+
+const _oneDarkDark = SyntaxColors(
+  key: Color(0xFFE06C75),
+  string: Color(0xFF98C379),
+  number: Color(0xFFD19A66),
+  boolValue: Color(0xFF56B6C2),
+  nullValue: Color(0xFF56B6C2),
+  tag: Color(0xFFE06C75),
+  attrName: Color(0xFFD19A66),
+  attrValue: Color(0xFF98C379),
+  comment: Color(0xFF5C6370),
+  punctuation: Color(0xFFABB2BF),
+  defaultText: Color(0xFFABB2BF),
+);
+
+const _oneDarkLight = SyntaxColors(
+  key: Color(0xFFE45649),
+  string: Color(0xFF50A14F),
+  number: Color(0xFF986801),
+  boolValue: Color(0xFF0184BC),
+  nullValue: Color(0xFF0184BC),
+  tag: Color(0xFFE45649),
+  attrName: Color(0xFF986801),
+  attrValue: Color(0xFF50A14F),
+  comment: Color(0xFFA0A1A7),
+  punctuation: Color(0xFF383A42),
+  defaultText: Color(0xFF383A42),
+);
+
+const _solarizedDark = SyntaxColors(
+  key: Color(0xFF268BD2),
+  string: Color(0xFF2AA198),
+  number: Color(0xFFD33682),
+  boolValue: Color(0xFF859900),
+  nullValue: Color(0xFF859900),
+  tag: Color(0xFF268BD2),
+  attrName: Color(0xFF859900),
+  attrValue: Color(0xFF2AA198),
+  comment: Color(0xFF586E75),
+  punctuation: Color(0xFF93A1A1),
+  defaultText: Color(0xFF839496),
+);
+
+const _solarizedLight = SyntaxColors(
+  key: Color(0xFF268BD2),
+  string: Color(0xFF2AA198),
+  number: Color(0xFFD33682),
+  boolValue: Color(0xFF859900),
+  nullValue: Color(0xFF859900),
+  tag: Color(0xFF268BD2),
+  attrName: Color(0xFF859900),
+  attrValue: Color(0xFF2AA198),
+  comment: Color(0xFF93A1A1),
+  punctuation: Color(0xFF586E75),
+  defaultText: Color(0xFF657B83),
+);
+
 class SyntaxHighlighter {
   SyntaxHighlighter._();
 
-  static _Colors _getColors(Brightness brightness) {
-    return brightness == Brightness.dark ? _darkColors : _lightColors;
+  static SyntaxColors getColors(String themeName, Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    switch (themeName) {
+      case 'GitHub':
+        return isDark ? _githubDark : _githubLight;
+      case 'Monokai':
+        return isDark ? _monokaiDark : _monokaiLight;
+      case 'Dracula':
+        return isDark ? _draculaDark : _draculaLight;
+      case 'OneDark':
+        return isDark ? _oneDarkDark : _oneDarkLight;
+      case 'Solarized':
+        return isDark ? _solarizedDark : _solarizedLight;
+      default:
+        return isDark ? _defaultDark : _defaultLight;
+    }
   }
 
-  static List<TextSpan> highlight(String body, String contentType, Brightness brightness) {
-    final c = _getColors(brightness);
+  static List<TextSpan> highlight(String body, String contentType, Brightness brightness, {String themeName = 'Default'}) {
+    final c = getColors(themeName, brightness);
     if (contentType.contains('json') || _looksLikeJson(body)) {
       return _highlightJson(body, c);
     } else if (contentType.contains('xml') || _looksLikeXml(body)) {
@@ -90,16 +246,16 @@ class SyntaxHighlighter {
     return trimmed.contains(': ') && !trimmed.startsWith('{') && !trimmed.startsWith('<');
   }
 
-  static List<TextSpan> _highlightJson(String body, _Colors c) {
+  static List<TextSpan> _highlightJson(String body, SyntaxColors c) {
     final spans = <TextSpan>[];
     final regex = RegExp(
-      r'"([^"\\]|\\.)*"'   // strings (including keys)
-      r'|[-+]?\d*\.?\d+([eE][-+]?\d+)?'  // numbers
-      r'|true|false'        // bools
-      r'|null'              // null
-      r'|[{}\[\]:,]'       // punctuation
-      r'|[ \t]+'            // whitespace
-      r'|\n'                // newlines
+      r'"([^"\\]|\\.)*"'
+      r'|[-+]?\d*\.?\d+([eE][-+]?\d+)?'
+      r'|true|false'
+      r'|null'
+      r'|[{}\[\]:,]'
+      r'|[ \t]+'
+      r'|\n'
     );
 
     int lastEnd = 0;
@@ -157,17 +313,17 @@ class SyntaxHighlighter {
     return spans;
   }
 
-  static List<TextSpan> _highlightXml(String body, _Colors c) {
+  static List<TextSpan> _highlightXml(String body, SyntaxColors c) {
     final spans = <TextSpan>[];
     final regex = RegExp(
-      r'<!--[\s\S]*?-->'           // comments
-      r'|<\?[\s\S]*?\?>'           // processing instructions
-      r'|</?[a-zA-Z][\w.-]*'      // opening/closing tags
-      r'|/>|>'                     // tag end
-      r'|\s+[a-zA-Z][\w.-]*='     // attribute names
-      r'|"[^"]*"'                  // double-quoted attribute values
-      r"|'[^']*'"                  // single-quoted attribute values
-      r'|[^<]+'                    // text content
+      r'<!--[\s\S]*?-->'
+      r'|<\?[\s\S]*?\?>'
+      r'|</?[a-zA-Z][\w.-]*'
+      r'|/>|>'
+      r'|\s+[a-zA-Z][\w.-]*='
+      r'|"[^"]*"'
+      r"|'[^']*'"
+      r'|[^<]+'
     );
 
     int lastEnd = 0;
@@ -209,7 +365,7 @@ class SyntaxHighlighter {
     return spans;
   }
 
-  static List<TextSpan> _highlightYaml(String body, _Colors c) {
+  static List<TextSpan> _highlightYaml(String body, SyntaxColors c) {
     final spans = <TextSpan>[];
     final lines = body.split('\n');
 
