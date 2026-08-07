@@ -728,12 +728,12 @@
 <section class="hero">
   <div class="hero-badge">
     <span class="dot"></span>
-    v0.0.8 — Legibility fixes, theme-aware syntax, cursor tooltip
+    v0.0.9 — Add endpoints to collections, collection picker
   </div>
   <h1>API testing,<br>simplified.</h1>
   <p>A fast, local API testing tool built with Flutter. Like Postman, but lighter, fully offline, and open source.</p>
   <div class="hero-actions">
-    <a href="#" class="btn btn-primary" id="heroDownload">
+    <a href="#install" class="btn btn-primary">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Download
     </a>
@@ -1095,12 +1095,6 @@
   const versionMatch = heroBadge.textContent.match(/v[\d.]+/);
   const appVersion = versionMatch ? versionMatch[0] : 'v0.0.8';
   const baseUrl = 'https://github.com/arthurkay/dbug/releases/download';
-
-  // Wire up hero download button
-  const heroDownload = document.getElementById('heroDownload');
-  if (heroDownload) {
-    heroDownload.href = baseUrl + '/' + appVersion + '/dbug-linux-x64.tar.gz';
-  }
 
   // Wire up install section download buttons
   document.querySelectorAll('.install-download-btn').forEach(function(btn) {
