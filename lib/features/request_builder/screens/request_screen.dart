@@ -544,8 +544,68 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
         );
         await requestRepo.updateRequest(updated);
       }
+      ref.invalidate(collectionsProvider);
+      if (mounted) showDbugToast(context, message: 'Request saved', type: ToastType.success);
     } else {
+      final collections = await ref.read(collectionRepositoryProvider).getAllCollections();
+      if (!mounted) return;
+
+      if (collections.isEmpty) {
+        final req = await requestRepo.createRequest(
+          name: name,
+          method: _selectedMethod,
+          url: url,
+          headers: headers,
+          bodyType: bodyType,
+          body: _selectedBodyType > 0 ? _bodyController.text : null,
+          queryParams: queryParams,
+        );
+        setState(() => _currentRequestId = req.id);
+        ref.invalidate(collectionsProvider);
+        if (mounted) showDbugToast(context, message: 'Request saved', type: ToastType.success);
+        return;
+      }
+
+      String? selectedId = widget.collectionId ?? collections.first.id;
+      final picked = await showDialog<String>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            title: const Text('Save to Collection'),
+            content: SizedBox(
+              width: 360,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Choose a collection for this request.', style: Theme.of(ctx).textTheme.bodySmall),
+                  const SizedBox(height: 12),
+                  ...collections.map((c) => RadioListTile<String>(
+                    title: Text(c.name, style: const TextStyle(fontSize: 13)),
+                    subtitle: c.description != null ? Text(c.description!, style: const TextStyle(fontSize: 11)) : null,
+                    value: c.id,
+                    groupValue: selectedId,
+                    dense: true,
+                    onChanged: (v) => setDialogState(() => selectedId = v),
+                  )),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Skip'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, selectedId),
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        ),
+      );
+
       final req = await requestRepo.createRequest(
+        collectionId: picked,
         name: name,
         method: _selectedMethod,
         url: url,
@@ -555,12 +615,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
         queryParams: queryParams,
       );
       setState(() => _currentRequestId = req.id);
-    }
-
-    ref.invalidate(collectionsProvider);
-
-    if (mounted) {
-      showDbugToast(context, message: 'Request saved', type: ToastType.success);
+      ref.invalidate(collectionsProvider);
+      if (mounted) showDbugToast(context, message: picked != null ? 'Saved to collection' : 'Request saved', type: ToastType.success);
     }
   }
 

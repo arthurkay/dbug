@@ -566,6 +566,18 @@ class _CollectionExpandable extends ConsumerWidget {
             collectionAuthData: collection.authType != 'none' ? collection.authData : null,
             searchQuery: searchQuery,
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: OutlinedButton.icon(
+              onPressed: () => _showAddRequestDialog(context, ref),
+              icon: const Icon(LucideIcons.plus, size: 14),
+              label: const Text('New Request', style: TextStyle(fontSize: 12)),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ),
         ],
       ],
     );
@@ -787,6 +799,74 @@ class _CollectionExpandable extends ConsumerWidget {
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
               },
               child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddRequestDialog(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController();
+    final urlController = TextEditingController();
+    String method = 'GET';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('New Request'),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(controller: nameController, decoration: const InputDecoration(hintText: 'Request name')),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    DropdownButton<String>(
+                      value: method,
+                      isDense: true,
+                      items: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+                          .map((m) => DropdownMenuItem(value: m, child: Text(m, style: TextStyle(fontSize: 12, color: methodColor(m)))))
+                          .toList(),
+                      onChanged: (v) { if (v != null) setDialogState(() => method = v); },
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: urlController,
+                        decoration: const InputDecoration(hintText: 'URL (e.g. /api/users)'),
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                final name = nameController.text.trim().isNotEmpty
+                    ? nameController.text.trim()
+                    : '$method ${urlController.text.trim()}';
+                final url = urlController.text.trim();
+                if (url.isEmpty) return;
+                await ref.read(requestRepositoryProvider).createRequest(
+                  collectionId: collection.id,
+                  name: name,
+                  method: method,
+                  url: url,
+                );
+                ref.invalidate(collectionsProvider);
+                ref.invalidate(requestsByCollectionProvider(collection.id));
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              },
+              child: const Text('Create'),
             ),
           ],
         ),

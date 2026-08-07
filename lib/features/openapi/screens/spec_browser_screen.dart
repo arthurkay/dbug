@@ -397,10 +397,45 @@ class _EndpointApiDetail extends ConsumerWidget {
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: () async {
-                    final requestRepo = ref.read(requestRepositoryProvider);
                     final collections = await ref.read(collectionRepositoryProvider).getAllCollections();
-                    final collection = collections.isNotEmpty ? collections.first : null;
-                    if (collection == null) return;
+                    if (!context.mounted || collections.isEmpty) return;
+                    String? selectedId = collections.first.id;
+                    final picked = await showDialog<String>(
+                      context: context,
+                      builder: (ctx) => StatefulBuilder(
+                        builder: (ctx, setDialogState) => AlertDialog(
+                          title: const Text('Save to Collection'),
+                          content: SizedBox(
+                            width: 360,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('Choose a collection for this endpoint.', style: Theme.of(ctx).textTheme.bodySmall),
+                                const SizedBox(height: 12),
+                                ...collections.map((c) => RadioListTile<String>(
+                                  title: Text(c.name, style: const TextStyle(fontSize: 13)),
+                                  subtitle: c.description != null ? Text(c.description!, style: const TextStyle(fontSize: 11)) : null,
+                                  value: c.id,
+                                  groupValue: selectedId,
+                                  dense: true,
+                                  onChanged: (v) => setDialogState(() => selectedId = v),
+                                )),
+                              ],
+                            ),
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(ctx, selectedId),
+                              child: const Text('Save'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                    if (picked == null || !context.mounted) return;
+                    final collection = collections.firstWhere((c) => c.id == picked);
+                    final requestRepo = ref.read(requestRepositoryProvider);
                     await requestRepo.createRequest(
                       collectionId: collection.id,
                       name: endpoint.summary ?? '${endpoint.method} ${endpoint.path}',
