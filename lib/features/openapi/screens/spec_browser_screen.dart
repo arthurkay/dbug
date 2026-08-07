@@ -109,7 +109,7 @@ class _SpecBrowserBodyState extends ConsumerState<_SpecBrowserBody> with SingleT
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(widget.spec.title ?? 'API Spec', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
-                    Text('${widget.spec.version ?? ''} \u2022 ${widget.spec.endpoints.length} endpoints \u2022 ${widget.spec.baseUrl ?? ''}', style: TextStyle(fontSize: 12, color: colorScheme.outline)),
+                    Text('${widget.spec.version ?? ''} \u2022 ${widget.spec.endpoints.length} endpoints \u2022 ${widget.spec.baseUrl ?? ''}', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
