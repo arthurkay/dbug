@@ -1,8 +1,6 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/material.dart' show showDialog;
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
-import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/active_environment_provider.dart';
@@ -23,7 +21,7 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final envsAsync = ref.watch(environmentsProvider);
     final activeEnv = ref.watch(activeEnvironmentProvider);
 
@@ -38,9 +36,9 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Environments', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.foreground)),
+                    Text('Environments', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
-                    Text('Manage variables for different environments', style: TextStyle(fontSize: 13, color: colorScheme.mutedForeground)),
+                    Text('Manage variables for different environments', style: Theme.of(context).textTheme.bodyMedium),
                   ],
                 ),
               ),
@@ -50,16 +48,16 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.12),
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text('Active: ${activeEnv.name}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.primary)),
+                    child: Text('Active: ${activeEnv.name}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                   ),
                 ),
-              shad.Button.primary(
+              FilledButton.icon(
                 onPressed: () => _showCreateDialog(context),
-                leading: const Icon(LucideIcons.plus, size: 16),
-                child: const Text('New Environment'),
+                icon: const Icon(LucideIcons.plus, size: 16),
+                label: const Text('New Environment'),
               ),
             ],
           ),
@@ -74,7 +72,7 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
                   final editingEnv = envs.where((e) => e.id == _editingEnvId).firstOrNull;
                   if (editingEnv != null) return _buildEditor(colorScheme, editingEnv);
                 }
-                return shad.Card(
+                return Card(
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     itemCount: envs.length,
@@ -91,12 +89,12 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
                         onDelete: env.isOpenApiDefined ? null : () async {
                           final confirmed = await showDialog<bool>(
                             context: context,
-                            builder: (context) => shad.AlertDialog(
+                            builder: (context) => AlertDialog(
                               title: const Text('Delete Environment'),
                               content: Text('Delete "${env.name}"?'),
                               actions: [
-                                shad.Button.ghost(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                                shad.Button.primary(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+                                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                                FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
                               ],
                             ),
                           );
@@ -119,11 +117,11 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
     );
   }
 
-  Widget _buildEditor(shad.ColorScheme colorScheme, Environment env) {
+  Widget _buildEditor(ColorScheme colorScheme, Environment env) {
     final entries = mapToEntries(env.variables);
     if (entries.isEmpty) entries.add(KeyValueEntry());
 
-    return shad.Card(
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -132,25 +130,25 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
             Row(
               children: [
                 Expanded(
-                  child: Text(env.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+                  child: Text(env.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                 ),
-                shad.Button.ghost(
+                TextButton(
                   onPressed: () => setState(() => _editingEnvId = null),
                   child: const Text('Back'),
                 ),
               ],
             ),
             const SizedBox(height: 4),
-            Text('${env.variables.length} variables', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
+            Text('${env.variables.length} variables', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 16),
-            Container(height: 1, color: colorScheme.border.withValues(alpha: 0.5)),
+            const Divider(),
             Expanded(
               child: SingleChildScrollView(
                 child: KeyValueEditor(entries: entries, keyHint: 'Variable name', valueHint: 'Value'),
               ),
             ),
             const SizedBox(height: 12),
-            shad.Button.primary(
+            FilledButton(
               onPressed: () async {
                 final vars = entriesToMap(entries);
                 final updated = env.copyWith(variables: vars);
@@ -172,22 +170,22 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
     );
   }
 
-  Widget _buildEmptyState(shad.ColorScheme colorScheme) {
-    return shad.Card(
+  Widget _buildEmptyState(ColorScheme colorScheme) {
+    return Card(
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(LucideIcons.code, size: 48, color: colorScheme.mutedForeground),
+            Icon(LucideIcons.code, size: 48, color: colorScheme.outline),
             const SizedBox(height: 16),
-            Text('No environments yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+            Text('No environments yet', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('Create environments like dev, staging, prod', style: TextStyle(color: colorScheme.mutedForeground)),
+            Text('Create environments like dev, staging, prod', style: TextStyle(color: colorScheme.outline)),
             const SizedBox(height: 16),
-            shad.Button.primary(
+            FilledButton.icon(
               onPressed: () => _showCreateDialog(context),
-              leading: const Icon(LucideIcons.plus, size: 16),
-              child: const Text('New Environment'),
+              icon: const Icon(LucideIcons.plus, size: 16),
+              label: const Text('New Environment'),
             ),
           ],
         ),
@@ -201,17 +199,20 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => shad.AlertDialog(
+        builder: (context, setDialogState) => AlertDialog(
           title: const Text('New Environment'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              shad.TextField(controller: nameController, placeholder: const Text('Environment name (e.g. dev, staging)')),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(hintText: 'Environment name (e.g. dev, staging)'),
+              ),
             ],
           ),
           actions: [
-            shad.Button.ghost(onPressed: () { nameController.dispose(); Navigator.pop(context); }, child: const Text('Cancel')),
-            shad.Button.primary(
+            TextButton(onPressed: () { nameController.dispose(); Navigator.pop(context); }, child: const Text('Cancel')),
+            FilledButton(
               onPressed: () async {
                 if (nameController.text.isNotEmpty) {
                   await ref.read(environmentRepositoryProvider).createEnvironment(name: nameController.text);
@@ -249,49 +250,50 @@ class _EnvironmentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Row(
+    return ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      leading: isActive
+          ? Icon(LucideIcons.circleCheck, size: 16, color: colorScheme.primary)
+          : canActivate
+              ? IconButton(
+                  icon: Icon(LucideIcons.circle, size: 16, color: colorScheme.outline),
+                  onPressed: onActivate,
+                  visualDensity: VisualDensity.compact,
+                )
+              : Icon(LucideIcons.link, size: 16, color: colorScheme.outline),
+      title: Row(
         children: [
-          if (isActive)
-            Icon(LucideIcons.circleCheck, size: 16, color: colorScheme.primary)
-          else if (canActivate)
-            shad.IconButton.ghost(
-              icon: Icon(LucideIcons.circle, size: 16, color: colorScheme.mutedForeground),
-              onPressed: onActivate,
-            )
-          else
-            Icon(LucideIcons.link, size: 16, color: colorScheme.mutedForeground),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(env.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: colorScheme.foreground)),
-                    if (env.isOpenApiDefined) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: const Text('Collection', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF3B82F6))),
-                      ),
-                    ],
-                  ],
-                ),
-                Text('${env.variables.length} variables', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
-              ],
+          Text(env.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          if (env.isOpenApiDefined) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: const Text('Collection', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.blue)),
             ),
+          ],
+        ],
+      ),
+      subtitle: Text('${env.variables.length} variables', style: Theme.of(context).textTheme.bodySmall),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextButton(
+            onPressed: onEdit,
+            child: const Text('Edit', style: TextStyle(fontSize: 12)),
           ),
-          shad.Button.ghost(onPressed: onEdit, child: const Text('Edit', style: TextStyle(fontSize: 12))),
           if (onDelete != null)
-            shad.IconButton.ghost(icon: const Icon(LucideIcons.trash2, size: 14), onPressed: onDelete),
+            IconButton(
+              icon: const Icon(LucideIcons.trash2, size: 14),
+              onPressed: onDelete,
+              visualDensity: VisualDensity.compact,
+            ),
         ],
       ),
     );

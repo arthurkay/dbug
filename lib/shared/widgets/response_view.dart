@@ -1,8 +1,7 @@
 import 'dart:convert' as convert;
 import 'package:flutter/widgets.dart';
-import 'package:flutter/material.dart' show SelectableText, SelectionArea;
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
-import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
+import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/http/http_client.dart';
 
 class ResponseView extends StatefulWidget {
@@ -20,11 +19,11 @@ class _ResponseViewState extends State<ResponseView> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final resp = widget.response;
     final isJson = _isJsonBody(resp);
 
-    return shad.Card(
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -35,36 +34,41 @@ class _ResponseViewState extends State<ResponseView> {
             Row(
               children: [
                 Expanded(
-                  child: shad.Tabs(
-                    index: _selectedTab,
-                    onChanged: (i) => setState(() => _selectedTab = i),
-                    children: [
-                      shad.TabItem(child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('Body'),
-                          if (isJson) ...[
-                            const SizedBox(width: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF22C55E).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(3),
+                  child: DefaultTabController(
+                    length: 2,
+                    initialIndex: _selectedTab,
+                    child: TabBar(
+                      onTap: (i) => setState(() => _selectedTab = i),
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      tabs: [
+                        Tab(child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('Body'),
+                            if (isJson) ...[
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: const Text('JSON', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.green)),
                               ),
-                              child: const Text('JSON', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF22C55E))),
-                            ),
+                            ],
                           ],
-                        ],
-                      )),
-                      const shad.TabItem(child: Text('Headers')),
-                    ],
+                        )),
+                        const Tab(text: 'Headers'),
+                      ],
+                    ),
                   ),
                 ),
                 if (_selectedTab == 0 && isJson) ...[
                   const SizedBox(width: 8),
                   Container(
                     decoration: BoxDecoration(
-                      color: colorScheme.muted,
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
@@ -90,14 +94,14 @@ class _ResponseViewState extends State<ResponseView> {
     );
   }
 
-  Widget _viewToggle(shad.ColorScheme colorScheme, String label, bool isPretty) {
+  Widget _viewToggle(ColorScheme colorScheme, String label, bool isPretty) {
     final isActive = _prettyView == isPretty;
     return GestureDetector(
       onTap: () => setState(() => _prettyView = isPretty),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: isActive ? colorScheme.background : const Color(0x00000000),
+          color: isActive ? colorScheme.surface : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
@@ -105,7 +109,7 @@ class _ResponseViewState extends State<ResponseView> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-            color: isActive ? colorScheme.foreground : colorScheme.mutedForeground,
+            color: isActive ? colorScheme.onSurface : colorScheme.outline,
           ),
         ),
       ),
@@ -119,14 +123,14 @@ class _ResponseViewState extends State<ResponseView> {
     return body.startsWith('{') || body.startsWith('[');
   }
 
-  Widget _buildStatusBar(shad.ColorScheme colorScheme, HttpResponse resp) {
+  Widget _buildStatusBar(ColorScheme colorScheme, HttpResponse resp) {
     final statusColor = resp.isSuccess
-        ? const Color(0xFF22C55E)
+        ? Colors.green
         : resp.statusCode >= 400
-            ? const Color(0xFFEF4444)
+            ? Colors.red
             : resp.statusCode >= 300
-                ? const Color(0xFFF59E0B)
-                : colorScheme.mutedForeground;
+                ? Colors.orange
+                : colorScheme.outline;
 
     return Row(
       children: [
@@ -142,7 +146,7 @@ class _ResponseViewState extends State<ResponseView> {
           ),
         ),
         const SizedBox(width: 8),
-        Text(resp.statusCodeLabel, style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
+        Text(resp.statusCodeLabel, style: TextStyle(fontSize: 12, color: colorScheme.outline)),
         const Spacer(),
         _buildMetaChip(LucideIcons.timer, '${resp.timeMs}ms', colorScheme),
         const SizedBox(width: 12),
@@ -151,26 +155,26 @@ class _ResponseViewState extends State<ResponseView> {
     );
   }
 
-  Widget _buildMetaChip(IconData icon, String label, shad.ColorScheme colorScheme) {
+  Widget _buildMetaChip(IconData icon, String label, ColorScheme colorScheme) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 13, color: colorScheme.mutedForeground),
+        Icon(icon, size: 13, color: colorScheme.outline),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground, fontWeight: FontWeight.w500)),
+        Text(label, style: TextStyle(fontSize: 11, color: colorScheme.outline, fontWeight: FontWeight.w500)),
       ],
     );
   }
 
-  Widget _buildBody(shad.ColorScheme colorScheme, HttpResponse resp, bool isJson) {
+  Widget _buildBody(ColorScheme colorScheme, HttpResponse resp, bool isJson) {
     if (resp.body.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(LucideIcons.inbox, size: 32, color: colorScheme.mutedForeground),
+            Icon(LucideIcons.inbox, size: 32, color: colorScheme.outline),
             const SizedBox(height: 8),
-            Text('Empty response body', style: TextStyle(color: colorScheme.mutedForeground, fontSize: 13)),
+            Text('Empty response body', style: TextStyle(color: colorScheme.outline, fontSize: 13)),
           ],
         ),
       );
@@ -181,7 +185,7 @@ class _ResponseViewState extends State<ResponseView> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: colorScheme.muted,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: const BorderRadius.all(Radius.circular(8)),
       ),
       child: _buildLineView(colorScheme, displayBody),
@@ -198,44 +202,65 @@ class _ResponseViewState extends State<ResponseView> {
     }
   }
 
-  Widget _buildLineView(shad.ColorScheme colorScheme, String body) {
+  Widget _buildLineView(ColorScheme colorScheme, String body) {
     final lines = body.split('\n');
-    final numberedBody = List.generate(lines.length, (i) {
-      final lineNum = '${(i + 1).toString().padLeft(4)}  ';
-      return '$lineNum${lines[i]}';
-    }).join('\n');
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: colorScheme.muted,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: const BorderRadius.all(Radius.circular(8)),
       ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(14),
-        child: SelectableText(
-          numberedBody,
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 12,
-            color: colorScheme.foreground,
-            height: 1.5,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              border: Border(right: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4))),
+            ),
+            child: Column(
+              children: List.generate(lines.length, (i) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 0),
+                child: Text(
+                  '${i + 1}',
+                  style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.outline, height: 1.5),
+                  textAlign: TextAlign.right,
+                ),
+              )),
+            ),
           ),
-        ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(14),
+              child: SelectableText(
+                body,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  color: colorScheme.onSurface,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildHeaders(shad.ColorScheme colorScheme, HttpResponse resp) {
+  Widget _buildHeaders(ColorScheme colorScheme, HttpResponse resp) {
     if (resp.headers.isEmpty) {
       return Center(
-        child: Text('No response headers', style: TextStyle(color: colorScheme.mutedForeground)),
+        child: Text('No response headers', style: TextStyle(color: colorScheme.outline)),
       );
     }
 
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.muted,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: const BorderRadius.all(Radius.circular(8)),
       ),
       child: SelectionArea(
@@ -248,7 +273,7 @@ class _ResponseViewState extends State<ResponseView> {
             final value = resp.headers[key]!;
             final isEven = i.isEven;
             return Container(
-              color: isEven ? colorScheme.muted : colorScheme.muted.withValues(alpha: 0.5),
+              color: isEven ? colorScheme.surfaceContainerHighest : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,7 +283,7 @@ class _ResponseViewState extends State<ResponseView> {
                     child: SelectableText(key, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.primary, fontFamily: 'monospace')),
                   ),
                   Expanded(
-                    child: SelectableText(value, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.mutedForeground)),
+                    child: SelectableText(value, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.outline)),
                   ),
                 ],
               ),

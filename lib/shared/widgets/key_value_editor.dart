@@ -1,6 +1,5 @@
-import 'package:flutter/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
-import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
+import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class KeyValueEntry {
   final TextEditingController keyController;
@@ -56,7 +55,7 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -69,12 +68,12 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
                 const SizedBox(width: 32),
                 Expanded(
                   flex: 2,
-                  child: Text(widget.keyHint, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground, fontWeight: FontWeight.w500)),
+                  child: Text(widget.keyHint, style: TextStyle(fontSize: 11, color: colorScheme.outline, fontWeight: FontWeight.w500)),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   flex: 3,
-                  child: Text(widget.valueHint, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground, fontWeight: FontWeight.w500)),
+                  child: Text(widget.valueHint, style: TextStyle(fontSize: 11, color: colorScheme.outline, fontWeight: FontWeight.w500)),
                 ),
                 const SizedBox(width: 32),
               ],
@@ -86,39 +85,59 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
             padding: const EdgeInsets.only(bottom: 4),
             child: Row(
               children: [
-                shad.Checkbox(
-                  state: entry.enabled ? shad.CheckboxState.checked : shad.CheckboxState.unchecked,
+                Checkbox(
+                  value: entry.enabled,
                   onChanged: (v) {
-                    setState(() => entry.enabled = v == shad.CheckboxState.checked);
+                    setState(() => entry.enabled = v ?? true);
                     widget.onChanged?.call();
                   },
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
                 ),
                 const SizedBox(width: 4),
                 Expanded(
                   flex: 2,
-                  child: shad.TextField(
+                  child: TextField(
                     controller: entry.keyController,
-                    placeholder: Text(widget.keyHint),
-                    style: TextStyle(fontSize: 12, color: entry.enabled ? null : colorScheme.mutedForeground),
+                    decoration: InputDecoration(
+                      hintText: widget.keyHint,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: const OutlineInputBorder(),
+                    ),
+                    style: TextStyle(fontSize: 12, color: entry.enabled ? null : colorScheme.outline),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   flex: 3,
-                  child: shad.TextField(
+                  child: TextField(
                     controller: entry.valueController,
-                    placeholder: Text(widget.valueHint),
-                    style: TextStyle(fontSize: 12, color: entry.enabled ? null : colorScheme.mutedForeground),
+                    decoration: InputDecoration(
+                      hintText: widget.valueHint,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: const OutlineInputBorder(),
+                    ),
+                    style: TextStyle(fontSize: 12, color: entry.enabled ? null : colorScheme.outline),
                   ),
                 ),
                 const SizedBox(width: 4),
-                shad.IconButton.ghost(icon: const Icon(LucideIcons.x, size: 14), onPressed: () => _removeEntry(i)),
+                IconButton(
+                  icon: const Icon(LucideIcons.x, size: 14),
+                  onPressed: () => _removeEntry(i),
+                  visualDensity: VisualDensity.compact,
+                ),
               ],
             ),
           );
         }),
         const SizedBox(height: 8),
-        shad.Button.outline(onPressed: _addEntry, leading: const Icon(LucideIcons.plus, size: 14), child: const Text('Add')),
+        OutlinedButton.icon(
+          onPressed: _addEntry,
+          icon: const Icon(LucideIcons.plus, size: 14),
+          label: const Text('Add'),
+        ),
       ],
     );
   }

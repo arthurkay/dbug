@@ -1,6 +1,6 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/active_environment_provider.dart';
@@ -12,83 +12,84 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
     final themeMode = ref.watch(themeModeProvider);
     final activeEnv = ref.watch(activeEnvironmentProvider);
     final envsAsync = ref.watch(userEnvironmentsProvider);
-
-    final isDark = themeMode == shad.ThemeMode.dark ||
-        (themeMode == shad.ThemeMode.system && MediaQuery.platformBrightnessOf(context) == Brightness.dark);
 
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Settings', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.foreground)),
+          Text('Settings', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 16),
           Expanded(
             child: ListView(
               children: [
-                shad.Card(
+                Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text('Appearance', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+                        Text('Appearance', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Dark Mode', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: colorScheme.foreground)),
-                                  Text('Use dark theme', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
-                                ],
-                              ),
+                        Text('Theme', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 8),
+                        SegmentedButton<ThemeMode>(
+                          segments: const [
+                            ButtonSegment(
+                              value: ThemeMode.system,
+                              icon: Icon(LucideIcons.monitor, size: 16),
+                              label: Text('System'),
                             ),
-                            shad.Switch(
-                              value: isDark,
-                              onChanged: (v) {
-                                ref.read(themeModeProvider.notifier).setMode(
-                                    v ? shad.ThemeMode.dark : shad.ThemeMode.light);
-                              },
+                            ButtonSegment(
+                              value: ThemeMode.light,
+                              icon: Icon(LucideIcons.sun, size: 16),
+                              label: Text('Light'),
+                            ),
+                            ButtonSegment(
+                              value: ThemeMode.dark,
+                              icon: Icon(LucideIcons.moon, size: 16),
+                              label: Text('Dark'),
                             ),
                           ],
+                          selected: {themeMode},
+                          onSelectionChanged: (modes) {
+                            ref.read(themeModeProvider.notifier).setMode(modes.first);
+                          },
                         ),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                shad.Card(
+                Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text('Active Environment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+                        Text('Active Environment', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 4),
-                        Text('Variables from the active environment are available as {{var}} in requests', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
+                        Text('Variables from the active environment are available as {{var}} in requests', style: Theme.of(context).textTheme.bodySmall),
                         const SizedBox(height: 12),
                         envsAsync.when(
                           loading: () => const SizedBox.shrink(),
                           error: (_, __) => const SizedBox.shrink(),
                           data: (envs) {
                             if (envs.isEmpty) {
-                              return Text('No environments created yet', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground));
+                              return Text('No environments created yet', style: Theme.of(context).textTheme.bodySmall);
                             }
                             return Column(
                               children: envs.map((env) => Padding(
                                 padding: const EdgeInsets.only(bottom: 4),
                                 child: Row(
                                   children: [
-                                    shad.Checkbox(
-                                      state: activeEnv?.id == env.id ? shad.CheckboxState.checked : shad.CheckboxState.unchecked,
+                                    Checkbox(
+                                      value: activeEnv?.id == env.id,
                                       onChanged: (v) {
-                                        if (v == shad.CheckboxState.checked) {
+                                        if (v == true) {
                                           ref.read(activeEnvironmentProvider.notifier).setActive(env);
                                         } else {
                                           ref.read(activeEnvironmentProvider.notifier).setActive(null);
@@ -97,7 +98,7 @@ class SettingsScreen extends ConsumerWidget {
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(child: Text(env.name, style: const TextStyle(fontSize: 13))),
-                                    Text('${env.variables.length} vars', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
+                                    Text('${env.variables.length} vars', style: Theme.of(context).textTheme.bodySmall),
                                   ],
                                 ),
                               )).toList(),
@@ -109,17 +110,17 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                shad.Card(
+                Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text('About', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+                        Text('About', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 12),
-                        Text('dbug v${AppConstants.appVersion}', style: TextStyle(fontSize: 13, color: colorScheme.foreground)),
+                        Text('dbug v${AppConstants.appVersion}', style: Theme.of(context).textTheme.bodyMedium),
                         const SizedBox(height: 4),
-                        Text('A local API testing tool built with Flutter', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
+                        Text('A local API testing tool built with Flutter', style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
                   ),

@@ -18,6 +18,8 @@ _$CollectionImpl _$$CollectionImplFromJson(Map<String, dynamic> json) =>
             (k, e) => MapEntry(k, e as String),
           ) ??
           const {},
+      authType: json['authType'] as String? ?? 'none',
+      authData: json['authData'] as String? ?? '{}',
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
@@ -30,6 +32,8 @@ Map<String, dynamic> _$$CollectionImplToJson(_$CollectionImpl instance) =>
       'sourceType': instance.sourceType,
       'sourceSpecId': instance.sourceSpecId,
       'globalHeaders': instance.globalHeaders,
+      'authType': instance.authType,
+      'authData': instance.authData,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
     };

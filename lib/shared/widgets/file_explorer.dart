@@ -1,8 +1,7 @@
 import 'dart:io';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
-import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'dbug_spinner.dart';
 
@@ -88,14 +87,15 @@ class _FileExplorerState extends State<FileExplorer> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return shad.Card(
+    return Card(
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildBreadcrumbBar(context, colorScheme),
-          Container(height: 1, color: colorScheme.border.withValues(alpha: 0.5)),
+          const Divider(height: 1),
           Expanded(
             child: _isLoading
                 ? const Center(child: DbugSpinner())
@@ -108,17 +108,18 @@ class _FileExplorerState extends State<FileExplorer> {
     );
   }
 
-  Widget _buildBreadcrumbBar(BuildContext context, shad.ColorScheme colorScheme) {
+  Widget _buildBreadcrumbBar(BuildContext context, ColorScheme colorScheme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      color: colorScheme.card,
+      color: colorScheme.surface,
       child: Row(
         children: [
-          shad.IconButton.ghost(
+          IconButton(
             icon: const Icon(LucideIcons.arrowUp, size: 16),
             onPressed: _currentDirectory.parent.path != _currentDirectory.path
                 ? _navigateUp
                 : null,
+            visualDensity: VisualDensity.compact,
           ),
           const SizedBox(width: 4),
           Expanded(
@@ -132,7 +133,7 @@ class _FileExplorerState extends State<FileExplorer> {
     );
   }
 
-  Widget _buildBreadcrumbs(shad.ColorScheme colorScheme) {
+  Widget _buildBreadcrumbs(ColorScheme colorScheme) {
     final pathParts = p.split(_currentDirectory.path);
     final breadcrumbs = <Widget>[];
 
@@ -141,7 +142,7 @@ class _FileExplorerState extends State<FileExplorer> {
         breadcrumbs.add(
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Icon(LucideIcons.chevronRight, size: 14, color: colorScheme.mutedForeground),
+            child: Icon(LucideIcons.chevronRight, size: 14, color: colorScheme.outline),
           ),
         );
       }
@@ -160,7 +161,7 @@ class _FileExplorerState extends State<FileExplorer> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isLast ? FontWeight.w600 : FontWeight.w400,
-              color: isLast ? colorScheme.foreground : colorScheme.mutedForeground,
+              color: isLast ? colorScheme.onSurface : colorScheme.outline,
             ),
           ),
         ),
@@ -170,27 +171,27 @@ class _FileExplorerState extends State<FileExplorer> {
     return Row(children: breadcrumbs);
   }
 
-  Widget _buildEmptyState(shad.ColorScheme colorScheme) {
+  Widget _buildEmptyState(ColorScheme colorScheme) {
     final hasError = _loadError != null;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(hasError ? LucideIcons.circleAlert : LucideIcons.folderOpen, size: 48, color: hasError ? const Color(0xFFF59E0B) : colorScheme.mutedForeground),
+          Icon(hasError ? LucideIcons.circleAlert : LucideIcons.folderOpen, size: 48, color: hasError ? Colors.orange : colorScheme.outline),
           const SizedBox(height: 12),
           Text(
             hasError ? 'Cannot access directory' : 'Empty directory',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: colorScheme.mutedForeground,
+              color: colorScheme.outline,
             ),
           ),
           if (hasError) ...[
             const SizedBox(height: 4),
             Text(
               _loadError!,
-              style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground),
+              style: TextStyle(fontSize: 11, color: colorScheme.outline),
               textAlign: TextAlign.center,
             ),
           ],
@@ -199,7 +200,7 @@ class _FileExplorerState extends State<FileExplorer> {
     );
   }
 
-  Widget _buildFileList(BuildContext context, shad.ColorScheme colorScheme) {
+  Widget _buildFileList(BuildContext context, ColorScheme colorScheme) {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: _entries.length,
@@ -246,53 +247,38 @@ class _FileTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     final icon = isDirectory
         ? LucideIcons.folder
         : _getFileIcon(name);
     final iconColor = isDirectory
-        ? const Color(0xFFF59E0B)
+        ? Colors.orange
         : isAllowed
             ? colorScheme.primary
-            : colorScheme.mutedForeground;
+            : colorScheme.outline;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-      child: shad.Button.ghost(
-        onPressed: onTap,
-        alignment: Alignment.centerLeft,
-        enabled: isDirectory || isAllowed,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: isSelected
-              ? BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
-                )
-              : null,
-          child: Row(
-            children: [
-              Icon(icon, size: 16, color: iconColor),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: (isDirectory || isAllowed)
-                        ? colorScheme.foreground
-                        : colorScheme.mutedForeground,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (isDirectory)
-                Icon(LucideIcons.chevronRight, size: 16, color: colorScheme.mutedForeground),
-            ],
-          ),
+    return ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      enabled: isDirectory || isAllowed,
+      selected: isSelected,
+      selectedTileColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      leading: Icon(icon, size: 16, color: iconColor),
+      title: Text(
+        name,
+        style: TextStyle(
+          fontSize: 13,
+          color: (isDirectory || isAllowed)
+              ? colorScheme.onSurface
+              : colorScheme.outline,
         ),
+        overflow: TextOverflow.ellipsis,
       ),
+      trailing: isDirectory
+          ? Icon(LucideIcons.chevronRight, size: 16, color: colorScheme.outline)
+          : null,
+      onTap: onTap,
     );
   }
 

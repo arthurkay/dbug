@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/material.dart' show showDialog;
 import 'package:go_router/go_router.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
-import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/models/history_entry.dart';
@@ -30,7 +28,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final historyAsync = ref.watch(historyProvider);
 
     return Padding(
@@ -44,22 +42,22 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('History', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.foreground)),
+                    Text('History', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
-                    Text('Recent requests and responses', style: TextStyle(fontSize: 13, color: colorScheme.mutedForeground)),
+                    Text('Recent requests and responses', style: Theme.of(context).textTheme.bodyMedium),
                   ],
                 ),
               ),
-              shad.Button.outline(
+              OutlinedButton.icon(
                 onPressed: () async {
                   final confirmed = await showDialog<bool>(
                     context: context,
-                    builder: (context) => shad.AlertDialog(
+                    builder: (context) => AlertDialog(
                       title: const Text('Clear History'),
                       content: const Text('Delete all history entries?'),
                       actions: [
-                        shad.Button.ghost(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                        shad.Button.primary(onPressed: () => Navigator.pop(context, true), child: const Text('Clear')),
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Clear')),
                       ],
                     ),
                   );
@@ -67,8 +65,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   await ref.read(historyRepositoryProvider).clearAll();
                   ref.invalidate(historyProvider);
                 },
-                leading: const Icon(LucideIcons.trash2, size: 16),
-                child: const Text('Clear All'),
+                icon: const Icon(LucideIcons.trash2, size: 16),
+                label: const Text('Clear All'),
               ),
             ],
           ),
@@ -76,15 +74,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           Row(
             children: [
               Expanded(
-                child: shad.TextField(
+                child: TextField(
                   controller: _searchController,
-                  placeholder: const Text('Search by name, method, URL, or status...'),
+                  decoration: const InputDecoration(
+                    hintText: 'Search by name, method, URL, or status...',
+                    isDense: true,
+                    prefixIcon: Icon(LucideIcons.search, size: 16),
+                  ),
                   onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
                 ),
               ),
               if (_searchQuery.isNotEmpty) ...[
                 const SizedBox(width: 8),
-                shad.IconButton.ghost(
+                IconButton(
                   icon: const Icon(LucideIcons.x, size: 16),
                   onPressed: () {
                     _searchController.clear();
@@ -123,11 +125,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Text(
                           '${filtered.length} result${filtered.length == 1 ? '' : 's'}',
-                          style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground),
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),
                     Expanded(
-                      child: shad.Card(
+                      child: Card(
                         child: ListView.builder(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           itemCount: filtered.length,
@@ -150,12 +152,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               onDelete: () async {
                                 final confirmed = await showDialog<bool>(
                                   context: context,
-                                  builder: (context) => shad.AlertDialog(
+                                  builder: (context) => AlertDialog(
                                     title: const Text('Delete Entry'),
                                     content: const Text('Remove this entry from history?'),
                                     actions: [
-                                      shad.Button.ghost(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                                      shad.Button.primary(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+                                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                                      FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
                                     ],
                                   ),
                                 );
@@ -178,34 +180,34 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     );
   }
 
-  Widget _buildEmptyState(shad.ColorScheme colorScheme) {
-    return shad.Card(
+  Widget _buildEmptyState(ColorScheme colorScheme) {
+    return Card(
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(LucideIcons.history, size: 48, color: colorScheme.mutedForeground),
+            Icon(LucideIcons.history, size: 48, color: colorScheme.outline),
             const SizedBox(height: 16),
-            Text('No history yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+            Text('No history yet', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('Send a request to see it here', style: TextStyle(color: colorScheme.mutedForeground)),
+            Text('Send a request to see it here', style: TextStyle(color: colorScheme.outline)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNoResults(shad.ColorScheme colorScheme) {
-    return shad.Card(
+  Widget _buildNoResults(ColorScheme colorScheme) {
+    return Card(
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(LucideIcons.searchX, size: 48, color: colorScheme.mutedForeground),
+            Icon(LucideIcons.searchX, size: 48, color: colorScheme.outline),
             const SizedBox(height: 16),
-            Text('No results found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+            Text('No results found', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('Try a different search term', style: TextStyle(color: colorScheme.mutedForeground)),
+            Text('Try a different search term', style: TextStyle(color: colorScheme.outline)),
           ],
         ),
       ),
@@ -222,62 +224,56 @@ class _HistoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final displayName = entry.requestName ?? entry.url;
 
     final statusColor = entry.statusCode == null
-        ? colorScheme.mutedForeground
+        ? colorScheme.outline
         : entry.statusCode! >= 200 && entry.statusCode! < 300
-            ? const Color(0xFF22C55E)
+            ? Colors.green
             : entry.statusCode! >= 400
-                ? const Color(0xFFEF4444)
-                : const Color(0xFFF59E0B);
+                ? Colors.red
+                : Colors.orange;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Row(
-          children: [
+    return ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      leading: Container(
+        width: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: methodColor(entry.method).withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(entry.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: methodColor(entry.method)), textAlign: TextAlign.center),
+      ),
+      title: Text(displayName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis, maxLines: 1),
+      subtitle: Text(entry.url, style: TextStyle(fontSize: 10, color: colorScheme.outline), overflow: TextOverflow.ellipsis, maxLines: 1),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (entry.statusCode != null)
             Container(
-              width: 52,
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: methodColor(entry.method).withValues(alpha: 0.12),
+                color: statusColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Text(entry.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: methodColor(entry.method)), textAlign: TextAlign.center),
+              child: Text('${entry.statusCode}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(displayName, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.foreground), overflow: TextOverflow.ellipsis, maxLines: 1),
-                  const SizedBox(height: 1),
-                  Text(entry.url, style: TextStyle(fontSize: 10, color: colorScheme.mutedForeground), overflow: TextOverflow.ellipsis, maxLines: 1),
-                ],
-              ),
-            ),
-            if (entry.statusCode != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text('${entry.statusCode}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
-              ),
-            if (entry.responseTimeMs != null) ...[
-              const SizedBox(width: 8),
-              Text('${entry.responseTimeMs}ms', style: TextStyle(fontSize: 10, color: colorScheme.mutedForeground)),
-            ],
-            const SizedBox(width: 4),
-            shad.IconButton.ghost(icon: const Icon(LucideIcons.x, size: 12), onPressed: onDelete),
+          if (entry.responseTimeMs != null) ...[
+            const SizedBox(width: 8),
+            Text('${entry.responseTimeMs}ms', style: TextStyle(fontSize: 10, color: colorScheme.outline)),
           ],
-        ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: const Icon(LucideIcons.x, size: 12),
+            onPressed: onDelete,
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
       ),
+      onTap: onTap,
     );
   }
 }

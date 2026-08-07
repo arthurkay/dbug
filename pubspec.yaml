@@ -11,7 +11,9 @@ dependencies:
     sdk: flutter
 
   # UI
-  shadcn_flutter: ^0.0.53
+  yaru: ^10.2.0
+  lucide_icons_flutter: ^3.1.15
+  dynamic_color: ^1.7.0
 
   # State Management
   flutter_riverpod: ^2.6.0

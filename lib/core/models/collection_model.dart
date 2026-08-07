@@ -12,6 +12,8 @@ class Collection with _$Collection {
     @Default('manual') String sourceType,
     String? sourceSpecId,
     @Default({}) Map<String, String> globalHeaders,
+    @Default('none') String authType,
+    @Default('{}') String authData,
     required DateTime createdAt,
     required DateTime updatedAt,
   }) = _Collection;

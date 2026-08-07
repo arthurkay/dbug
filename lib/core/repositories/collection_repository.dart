@@ -13,6 +13,8 @@ class CollectionRepository {
     String sourceType = 'manual',
     String? sourceSpecId,
     Map<String, String> globalHeaders = const {},
+    String authType = 'none',
+    String authData = '{}',
   }) async {
     final db = await DatabaseService.database;
     final id = _uuid.v4();
@@ -25,6 +27,8 @@ class CollectionRepository {
       'source_type': sourceType,
       'source_spec_id': sourceSpecId,
       'global_headers': jsonEncode(globalHeaders),
+      'auth_type': authType,
+      'auth_data': authData,
       'created_at': now.millisecondsSinceEpoch,
       'updated_at': now.millisecondsSinceEpoch,
     });
@@ -36,6 +40,8 @@ class CollectionRepository {
       sourceType: sourceType,
       sourceSpecId: sourceSpecId,
       globalHeaders: globalHeaders,
+      authType: authType,
+      authData: authData,
       createdAt: now,
       updatedAt: now,
     );
@@ -58,6 +64,8 @@ class CollectionRepository {
         'source_type': collection.sourceType,
         'source_spec_id': collection.sourceSpecId,
         'global_headers': jsonEncode(collection.globalHeaders),
+        'auth_type': collection.authType,
+        'auth_data': collection.authData,
         'updated_at': DateTime.now().millisecondsSinceEpoch,
       },
       where: 'id = ?',
@@ -91,6 +99,8 @@ class CollectionRepository {
       sourceType: row['source_type'] as String,
       sourceSpecId: row['source_spec_id'] as String?,
       globalHeaders: globalHeaders,
+      authType: row['auth_type'] as String? ?? 'none',
+      authData: row['auth_data'] as String? ?? '{}',
       createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at'] as int),
     );

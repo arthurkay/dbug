@@ -1,9 +1,8 @@
 import 'dart:convert';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
-import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 
 import '../../../core/http/http_client.dart';
 import '../../../core/models/request_model.dart';
@@ -22,15 +21,31 @@ class RequestScreen extends ConsumerStatefulWidget {
   final RequestModel? initialRequest;
   final Map<String, String> collectionHeaders;
   final String? collectionId;
+  final String? collectionAuthType;
+  final String? collectionAuthData;
   final HistoryEntry? historyEntry;
+  final String? prefillMethod;
+  final String? prefillUrl;
+  final String? prefillSpecId;
 
-  const RequestScreen({super.key, this.initialRequest, this.collectionHeaders = const {}, this.collectionId, this.historyEntry});
+  const RequestScreen({
+    super.key,
+    this.initialRequest,
+    this.collectionHeaders = const {},
+    this.collectionId,
+    this.collectionAuthType,
+    this.collectionAuthData,
+    this.historyEntry,
+    this.prefillMethod,
+    this.prefillUrl,
+    this.prefillSpecId,
+  });
 
   @override
   ConsumerState<RequestScreen> createState() => _RequestScreenState();
 }
 
-class _RequestScreenState extends ConsumerState<RequestScreen> {
+class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProviderStateMixin {
   String _selectedMethod = 'GET';
   final _urlController = TextEditingController();
   final _bodyController = TextEditingController();
@@ -66,6 +81,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     _loadSplitRatio();
     _params = [KeyValueEntry()];
     _headers = [KeyValueEntry()];
+    if (widget.prefillMethod != null) _selectedMethod = widget.prefillMethod!;
+    if (widget.prefillUrl != null) _urlController.text = widget.prefillUrl!;
     if (widget.historyEntry != null) {
       _loadFromHistoryEntry(widget.historyEntry!);
     } else if (widget.initialRequest != null) {
@@ -326,37 +343,86 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
   }
 
   Map<String, String> _buildAuthHeaders() {
-    switch (_selectedAuthType) {
-      case 1: // Bearer
-        final token = _bearerTokenController.text.trim();
-        if (token.isNotEmpty) return {'Authorization': 'Bearer $token'};
-        break;
-      case 2: // Basic
-        final user = _basicUserController.text.trim();
-        final pass = _basicPassController.text;
-        if (user.isNotEmpty) {
-          final encoded = base64Encode(utf8.encode('$user:$pass'));
-          return {'Authorization': 'Basic $encoded'};
-        }
-        break;
-      case 3: // API Key (header mode)
-        if (_apiKeyLocation == 'header') {
-          final name = _apiKeyNameController.text.trim();
-          final value = _apiKeyValueController.text.trim();
-          if (name.isNotEmpty && value.isNotEmpty) return {name: value};
-        }
-        break;
+    // Request-level auth takes precedence
+    if (_selectedAuthType != 0) {
+      switch (_selectedAuthType) {
+        case 1:
+          final token = _bearerTokenController.text.trim();
+          if (token.isNotEmpty) return {'Authorization': 'Bearer $token'};
+          break;
+        case 2:
+          final user = _basicUserController.text.trim();
+          final pass = _basicPassController.text;
+          if (user.isNotEmpty) {
+            final encoded = base64Encode(utf8.encode('$user:$pass'));
+            return {'Authorization': 'Basic $encoded'};
+          }
+          break;
+        case 3:
+          if (_apiKeyLocation == 'header') {
+            final name = _apiKeyNameController.text.trim();
+            final value = _apiKeyValueController.text.trim();
+            if (name.isNotEmpty && value.isNotEmpty) return {name: value};
+          }
+          break;
+      }
+      return {};
     }
+
+    // Fall back to collection auth
+    if (widget.collectionAuthType == null || widget.collectionAuthType == 'none') return {};
+    try {
+      final data = Map<String, dynamic>.from(jsonDecode(widget.collectionAuthData ?? '{}'));
+      switch (widget.collectionAuthType) {
+        case 'bearer':
+          final token = (data['token'] as String?) ?? '';
+          if (token.isNotEmpty) return {'Authorization': 'Bearer $token'};
+          break;
+        case 'basic':
+          final user = (data['username'] as String?) ?? '';
+          final pass = (data['password'] as String?) ?? '';
+          if (user.isNotEmpty) {
+            final encoded = base64Encode(utf8.encode('$user:$pass'));
+            return {'Authorization': 'Basic $encoded'};
+          }
+          break;
+        case 'apikey':
+          final location = data['location'] ?? 'header';
+          if (location == 'header') {
+            final name = (data['name'] as String?) ?? '';
+            final value = (data['value'] as String?) ?? '';
+            if (name.isNotEmpty && value.isNotEmpty) return {name: value};
+          }
+          break;
+      }
+    } catch (_) {}
     return {};
   }
 
   Map<String, String> _buildQueryParams() {
     final params = entriesToMap(_params);
+
+    // Request-level API key query param
     if (_selectedAuthType == 3 && _apiKeyLocation == 'query') {
       final name = _apiKeyNameController.text.trim();
       final value = _apiKeyValueController.text.trim();
       if (name.isNotEmpty && value.isNotEmpty) params[name] = value;
     }
+
+    // Collection-level API key query param (only if request doesn't override)
+    if (_selectedAuthType == 0 && widget.collectionAuthType == 'apikey') {
+      try {
+        final data = Map<String, dynamic>.from(jsonDecode(widget.collectionAuthData ?? '{}'));
+        if (data['location'] == 'query') {
+          final name = (data['name'] as String?) ?? '';
+          final value = (data['value'] as String?) ?? '';
+          if (name.isNotEmpty && value.isNotEmpty && !params.containsKey(name)) {
+            params[name] = value;
+          }
+        }
+      } catch (_) {}
+    }
+
     return params;
   }
 
@@ -496,7 +562,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -518,8 +584,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                         if (widget.collectionId != null)
                           Padding(
                             padding: const EdgeInsets.only(right: 6),
-                            child: shad.IconButton.ghost(
-                              icon: Icon(_showEndpointList ? LucideIcons.panelLeftOpen : LucideIcons.panelLeftClose, size: 18, color: colorScheme.mutedForeground),
+                            child: IconButton(
+                              icon: Icon(_showEndpointList ? LucideIcons.panelLeftOpen : LucideIcons.panelLeftClose, size: 18, color: colorScheme.outline),
                               onPressed: () => setState(() => _showEndpointList = !_showEndpointList),
                             ),
                           ),
@@ -528,7 +594,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                         Expanded(
                           child: Text(
                             widget.initialRequest!.name,
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.foreground),
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -544,19 +610,19 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: shad.Button.primary(
+                      child: FilledButton.icon(
                         onPressed: _isSending ? null : _sendRequest,
-                        leading: _isSending
+                        icon: _isSending
                             ? const SizedBox(width: 14, height: 14, child: DbugSpinner(strokeWidth: 2, color: Color(0xFFFFFFFF)))
                             : const Icon(LucideIcons.send, size: 14),
-                        child: Text(_isSending ? 'Sending...' : 'Send'),
+                        label: Text(_isSending ? 'Sending...' : 'Send'),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    shad.Button.outline(
+                    OutlinedButton.icon(
                       onPressed: _saveRequest,
-                      leading: const Icon(LucideIcons.save, size: 14),
-                      child: const Text('Save'),
+                      icon: const Icon(LucideIcons.save, size: 14),
+                      label: const Text('Save'),
                     ),
                   ],
                 ),
@@ -568,15 +634,15 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     );
   }
 
-  Widget _buildEndpointList(shad.ColorScheme colorScheme) {
+  Widget _buildEndpointList(ColorScheme colorScheme) {
     final requestsAsync = ref.watch(requestsByCollectionProvider(widget.collectionId!));
 
     return Container(
       width: 220,
       decoration: BoxDecoration(
-        color: colorScheme.card,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.border.withValues(alpha: 0.5)),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -587,26 +653,26 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
               children: [
                 Icon(LucideIcons.list, size: 14, color: colorScheme.primary),
                 const SizedBox(width: 6),
-                Text('Endpoints', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+                Text('Endpoints', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: shad.TextField(
-              placeholder: const Text('Search endpoints...'),
+            child: TextField(
+              decoration: const InputDecoration(hintText: 'Search endpoints...', isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6)),
               onChanged: (v) => setState(() => _endpointSearchQuery = v),
             ),
           ),
           const SizedBox(height: 6),
-          Container(height: 1, color: colorScheme.border.withValues(alpha: 0.5)),
+          Container(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
           Expanded(
             child: requestsAsync.when(
               loading: () => const Center(child: SizedBox(width: 16, height: 16, child: DbugSpinner(strokeWidth: 2))),
-              error: (e, _) => Center(child: Text('Error', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground))),
+              error: (e, _) => Center(child: Text('Error', style: TextStyle(fontSize: 11, color: colorScheme.outline))),
               data: (requests) {
                 if (requests.isEmpty) {
-                  return Center(child: Text('No requests', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)));
+                  return Center(child: Text('No requests', style: TextStyle(fontSize: 11, color: colorScheme.outline)));
                 }
                 final filtered = _endpointSearchQuery.isEmpty
                     ? requests
@@ -617,7 +683,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                             r.url.toLowerCase().contains(q);
                       }).toList();
                 if (filtered.isEmpty) {
-                  return Center(child: Text('No matching endpoints', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)));
+                  return Center(child: Text('No matching endpoints', style: TextStyle(fontSize: 11, color: colorScheme.outline)));
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -630,7 +696,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                       behavior: HitTestBehavior.opaque,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        color: isActive ? colorScheme.primary.withValues(alpha: 0.08) : null,
+                        color: isActive ? colorScheme.surfaceContainerHighest : null,
                         child: Row(
                           children: [
                             Container(
@@ -649,7 +715,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                                  color: isActive ? colorScheme.primary : colorScheme.foreground,
+                                  color: isActive ? colorScheme.primary : colorScheme.onSurface,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -689,7 +755,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     _saveBuilderState();
   }
 
-  Widget _buildResponseSplit(shad.ColorScheme colorScheme) {
+  Widget _buildResponseSplit(ColorScheme colorScheme) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalHeight = constraints.maxHeight;
@@ -720,7 +786,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                       width: 40,
                       height: 3,
                       decoration: BoxDecoration(
-                        color: colorScheme.border,
+                        color: colorScheme.outlineVariant,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -734,9 +800,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                 children: [
                   Row(
                     children: [
-                      Text('Response', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+                      Text('Response', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                       const Spacer(),
-                      shad.IconButton.ghost(
+                      IconButton(
                         icon: const Icon(LucideIcons.x, size: 14),
                         onPressed: () => setState(() => _lastResponse = null),
                       ),
@@ -753,48 +819,61 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     );
   }
 
-  Widget _buildMethodUrlBar(shad.ColorScheme colorScheme) {
+  Widget _buildMethodUrlBar(ColorScheme colorScheme) {
     return Row(
       children: [
-        shad.Select<String>(
+        DropdownButton<String>(
           value: _selectedMethod,
+          underline: const SizedBox.shrink(),
+          isDense: true,
+          items: _methods.map((m) => DropdownMenuItem(
+            value: m,
+            child: Text(m, style: TextStyle(color: methodColor(m), fontWeight: FontWeight.w600, fontSize: 12)),
+          )).toList(),
           onChanged: (v) { if (v != null) setState(() => _selectedMethod = v); },
-          itemBuilder: (context, value) => Text(value, style: TextStyle(color: methodColor(value), fontWeight: FontWeight.w600, fontSize: 12)),
-          popup: (context) => shad.SelectPopup<String>(
-            items: shad.SelectItemList(
-              children: _methods.map((m) => shad.SelectItemButton<String>(
-                value: m,
-                child: Text(m, style: TextStyle(color: methodColor(m), fontWeight: FontWeight.w600, fontSize: 12)),
-              )).toList(),
-            ),
-          ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: shad.TextField(
-            controller: _urlController,
-            placeholder: const Text('Enter URL (supports {{variables}})'),
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+          child: Tooltip(
+            message: _buildResolvedUrlPreview(),
+            child: TextField(
+              controller: _urlController,
+              decoration: const InputDecoration(hintText: 'Enter URL (supports {{variables}})', isDense: true),
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildTabs(shad.ColorScheme colorScheme) {
-    return shad.Tabs(
-      index: _selectedTab,
-      onChanged: (i) => setState(() => _selectedTab = i),
-      children: const [
-        shad.TabItem(child: Text('Params')),
-        shad.TabItem(child: Text('Headers')),
-        shad.TabItem(child: Text('Body')),
-        shad.TabItem(child: Text('Auth')),
+  String _buildResolvedUrlPreview() {
+    final raw = _urlController.text;
+    if (raw.isEmpty) return 'Enter URL (supports {{variables}})';
+    final variables = ref.read(activeVariablesProvider);
+    if (variables.isEmpty) return raw;
+    final resolved = substituteVariables(raw, variables);
+    if (resolved == raw) return raw;
+    return '$raw\n→ $resolved';
+  }
+
+  Widget _buildTabs(ColorScheme colorScheme) {
+    return TabBar(
+      controller: TabController(length: 4, vsync: this, initialIndex: _selectedTab),
+      onTap: (i) => setState(() => _selectedTab = i),
+      tabs: const [
+        Tab(text: 'Params'),
+        Tab(text: 'Headers'),
+        Tab(text: 'Body'),
+        Tab(text: 'Auth'),
       ],
+      isScrollable: true,
+      tabAlignment: TabAlignment.start,
+      labelPadding: const EdgeInsets.symmetric(horizontal: 16),
     );
   }
 
-  Widget _buildTabContent(shad.ColorScheme colorScheme) {
+  Widget _buildTabContent(ColorScheme colorScheme) {
     switch (_selectedTab) {
       case 0: return _buildParamsTab(colorScheme);
       case 1: return _buildHeadersTab(colorScheme);
@@ -804,8 +883,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     }
   }
 
-  Widget _buildParamsTab(shad.ColorScheme colorScheme) {
-    return shad.Card(
+  Widget _buildParamsTab(ColorScheme colorScheme) {
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: SingleChildScrollView(
@@ -815,8 +894,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     );
   }
 
-  Widget _buildHeadersTab(shad.ColorScheme colorScheme) {
-    return shad.Card(
+  Widget _buildHeadersTab(ColorScheme colorScheme) {
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -826,18 +905,18 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.08),
+                  color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
                       children: [
-                        Icon(LucideIcons.key, size: 12, color: colorScheme.primary),
+                        Icon(LucideIcons.key, size: 12, color: colorScheme.outline),
                         const SizedBox(width: 6),
-                        Text('Collection Headers (inherited)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.primary, letterSpacing: 0.5)),
+                        Text('Collection Headers (inherited)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.outline, letterSpacing: 0.5)),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -845,9 +924,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                       padding: const EdgeInsets.only(bottom: 2),
                       child: Row(
                         children: [
-                          Text(e.key, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.foreground, fontFamily: 'monospace')),
-                          Text(': ', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
-                          Expanded(child: Text(e.value, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis)),
+                          Text(e.key, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurface, fontFamily: 'monospace')),
+                          Text(': ', style: TextStyle(fontSize: 11, color: colorScheme.outline)),
+                          Expanded(child: Text(e.value, style: TextStyle(fontSize: 11, color: colorScheme.outline, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis)),
                         ],
                       ),
                     )),
@@ -867,8 +946,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     );
   }
 
-  Widget _buildBodyTab(shad.ColorScheme colorScheme) {
-    return shad.Card(
+  Widget _buildBodyTab(ColorScheme colorScheme) {
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -879,11 +958,11 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: _selectedBodyType == i
-                      ? shad.Button.primary(
+                      ? FilledButton.tonal(
                           onPressed: () => setState(() => _selectedBodyType = i),
                           child: Text(_bodyTypes[i], style: const TextStyle(fontSize: 11)),
                         )
-                      : shad.Button.outline(
+                      : OutlinedButton(
                           onPressed: () => setState(() => _selectedBodyType = i),
                           child: Text(_bodyTypes[i], style: const TextStyle(fontSize: 11)),
                         ),
@@ -893,16 +972,16 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
             const SizedBox(height: 10),
             if (_selectedBodyType > 0)
               Expanded(
-                child: shad.TextField(
+                child: TextField(
                   controller: _bodyController,
-                  placeholder: Text(_selectedBodyType == 1 ? '{\n  "key": "value"\n}' : 'Request body...'),
+                  decoration: InputDecoration(hintText: _selectedBodyType == 1 ? '{\n  "key": "value"\n}' : 'Request body...', border: const OutlineInputBorder()),
                   style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
                 ),
               )
             else
               Expanded(
                 child: Center(
-                  child: Text('No body', style: TextStyle(color: colorScheme.mutedForeground)),
+                  child: Text('No body', style: TextStyle(color: colorScheme.outline)),
                 ),
               ),
           ],
@@ -911,8 +990,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
     );
   }
 
-  Widget _buildAuthTab(shad.ColorScheme colorScheme) {
-    return shad.Card(
+  Widget _buildAuthTab(ColorScheme colorScheme) {
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: SingleChildScrollView(
@@ -924,11 +1003,11 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 4),
                     child: _selectedAuthType == i
-                        ? shad.Button.primary(
+                        ? FilledButton.tonal(
                             onPressed: () => setState(() => _selectedAuthType = i),
                             child: Text(_authTypes[i], style: const TextStyle(fontSize: 11)),
                           )
-                        : shad.Button.outline(
+                        : OutlinedButton(
                             onPressed: () => setState(() => _selectedAuthType = i),
                             child: Text(_authTypes[i], style: const TextStyle(fontSize: 11)),
                           ),
@@ -937,44 +1016,44 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
               ),
               const SizedBox(height: 16),
               if (_selectedAuthType == 1) ...[
-                Text('Token', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.foreground)),
+                Text('Token', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
                 const SizedBox(height: 6),
-                shad.TextField(controller: _bearerTokenController, placeholder: const Text('Enter bearer token')),
+                TextField(controller: _bearerTokenController, decoration: const InputDecoration(hintText: 'Enter bearer token', border: OutlineInputBorder())),
               ] else if (_selectedAuthType == 2) ...[
-                Text('Username', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.foreground)),
+                Text('Username', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
                 const SizedBox(height: 6),
-                shad.TextField(controller: _basicUserController, placeholder: const Text('Username')),
+                TextField(controller: _basicUserController, decoration: const InputDecoration(hintText: 'Username', border: OutlineInputBorder())),
                 const SizedBox(height: 12),
-                Text('Password', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.foreground)),
+                Text('Password', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
                 const SizedBox(height: 6),
-                shad.TextField(controller: _basicPassController, placeholder: const Text('Password')),
+                TextField(controller: _basicPassController, obscureText: true, decoration: const InputDecoration(hintText: 'Password', border: OutlineInputBorder())),
               ] else if (_selectedAuthType == 3) ...[
-                Text('Key Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.foreground)),
+                Text('Key Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
                 const SizedBox(height: 6),
-                shad.TextField(controller: _apiKeyNameController, placeholder: const Text('X-API-Key')),
+                TextField(controller: _apiKeyNameController, decoration: const InputDecoration(hintText: 'X-API-Key', border: OutlineInputBorder())),
                 const SizedBox(height: 12),
-                Text('Key Value', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.foreground)),
+                Text('Key Value', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
                 const SizedBox(height: 6),
-                shad.TextField(controller: _apiKeyValueController, placeholder: const Text('Your API key')),
+                TextField(controller: _apiKeyValueController, decoration: const InputDecoration(hintText: 'Your API key', border: OutlineInputBorder())),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Text('Add to:', style: TextStyle(fontSize: 12, color: colorScheme.foreground)),
+                    Text('Add to:', style: TextStyle(fontSize: 12, color: colorScheme.onSurface)),
                     const SizedBox(width: 8),
                     _apiKeyLocation == 'header'
-                        ? shad.Button.primary(onPressed: () => setState(() => _apiKeyLocation = 'header'), child: const Text('Header', style: TextStyle(fontSize: 11)))
-                        : shad.Button.outline(onPressed: () => setState(() => _apiKeyLocation = 'header'), child: const Text('Header', style: TextStyle(fontSize: 11))),
+                        ? FilledButton.tonal(onPressed: () => setState(() => _apiKeyLocation = 'header'), child: const Text('Header', style: TextStyle(fontSize: 11)))
+                        : OutlinedButton(onPressed: () => setState(() => _apiKeyLocation = 'header'), child: const Text('Header', style: TextStyle(fontSize: 11))),
                     const SizedBox(width: 4),
                     _apiKeyLocation == 'query'
-                        ? shad.Button.primary(onPressed: () => setState(() => _apiKeyLocation = 'query'), child: const Text('Query Param', style: TextStyle(fontSize: 11)))
-                        : shad.Button.outline(onPressed: () => setState(() => _apiKeyLocation = 'query'), child: const Text('Query Param', style: TextStyle(fontSize: 11))),
+                        ? FilledButton.tonal(onPressed: () => setState(() => _apiKeyLocation = 'query'), child: const Text('Query Param', style: TextStyle(fontSize: 11)))
+                        : OutlinedButton(onPressed: () => setState(() => _apiKeyLocation = 'query'), child: const Text('Query Param', style: TextStyle(fontSize: 11))),
                   ],
                 ),
               ] else ...[
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text('No authentication', style: TextStyle(color: colorScheme.mutedForeground)),
+                    child: Text('No authentication', style: TextStyle(color: colorScheme.outline)),
                   ),
                 ),
               ],
@@ -984,5 +1063,4 @@ class _RequestScreenState extends ConsumerState<RequestScreen> {
       ),
     );
   }
-
 }

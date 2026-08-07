@@ -1,12 +1,10 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/material.dart' show showDialog;
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
-import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../shared/widgets/dbug_spinner.dart';
 import '../../../shared/utils/method_colors.dart';
 
@@ -52,7 +50,6 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
       final requestRepo = ref.read(requestRepositoryProvider);
 
       if (json is Map<String, dynamic> && json.containsKey('info')) {
-        // Postman Collection v2.1
         final name = json['info']['name'] ?? fileName.replaceAll('.json', '');
         final desc = json['info']['description']?.toString();
 
@@ -70,7 +67,6 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
           showDbugToast(context, message: 'Imported "$name"', type: ToastType.success);
         }
       } else {
-        // Unknown format — create empty collection
         await collectionRepo.createCollection(
           name: fileName.replaceAll('.json', ''),
           description: 'Imported from $fileName',
@@ -93,7 +89,6 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
       if (item is! Map<String, dynamic>) continue;
 
       if (item.containsKey('item') && item['item'] is List) {
-        // It's a folder — recurse
         final folderName = item['name'] ?? 'Folder';
         final subCollection = await ref.read(collectionRepositoryProvider).createCollection(
           name: '$prefix$folderName',
@@ -102,7 +97,6 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         );
         await _parsePostmanItems(item['item'] as List, requestRepo, subCollection.id, '');
       } else if (item.containsKey('request')) {
-        // It's a request
         final req = item['request'] as Map<String, dynamic>;
         final name = item['name'] ?? 'Untitled';
         final method = (req['method'] ?? 'GET').toString().toUpperCase();
@@ -166,8 +160,8 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     });
   }
 
-  void _openRequest(RequestModel request, Map<String, String> collectionHeaders, {String? collectionId}) {
-    context.go('/request', extra: {'request': request, 'collectionHeaders': collectionHeaders, 'collectionId': collectionId});
+  void _openRequest(RequestModel request, Map<String, String> collectionHeaders, {String? collectionId, String? collectionAuthType, String? collectionAuthData}) {
+    context.go('/request', extra: {'request': request, 'collectionHeaders': collectionHeaders, 'collectionId': collectionId, 'collectionAuthType': collectionAuthType, 'collectionAuthData': collectionAuthData});
   }
 
   @override
@@ -178,7 +172,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final collectionsAsync = ref.watch(collectionsProvider);
 
     return Padding(
@@ -192,20 +186,20 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Collections', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.foreground)),
+                    Text('Collections', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
-                    Text('Organize your requests into collections', style: TextStyle(fontSize: 13, color: colorScheme.mutedForeground)),
+                    Text('Organize your requests into collections', style: Theme.of(context).textTheme.bodyMedium),
                   ],
                 ),
               ),
               if (_showFileExplorer)
-                shad.Button.ghost(onPressed: () => setState(() => _showFileExplorer = false), leading: const Icon(LucideIcons.x, size: 16), child: const Text('Close Explorer'))
+                TextButton.icon(onPressed: () => setState(() => _showFileExplorer = false), icon: const Icon(LucideIcons.x, size: 16), label: const Text('Close Explorer'))
               else ...[
-                shad.Button.outline(onPressed: _importFromFile, leading: const Icon(LucideIcons.upload, size: 16), child: const Text('Import')),
+                OutlinedButton.icon(onPressed: _importFromFile, icon: const Icon(LucideIcons.upload, size: 16), label: const Text('Import')),
                 const SizedBox(width: 8),
-                shad.Button.outline(onPressed: () => setState(() => _showFileExplorer = true), leading: const Icon(LucideIcons.folderOpen, size: 16), child: const Text('Browse')),
+                OutlinedButton.icon(onPressed: () => setState(() => _showFileExplorer = true), icon: const Icon(LucideIcons.folderOpen, size: 16), label: const Text('Browse')),
                 const SizedBox(width: 8),
-                shad.Button.primary(onPressed: () => _showCreateDialog(context), leading: const Icon(LucideIcons.plus, size: 16), child: const Text('New Collection')),
+                FilledButton.icon(onPressed: () => _showCreateDialog(context), icon: const Icon(LucideIcons.plus, size: 16), label: const Text('New Collection')),
               ],
             ],
           ),
@@ -215,10 +209,13 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
           if (!_showFileExplorer)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: shad.TextField(
+              child: TextField(
                 controller: _searchController,
-                placeholder: const Text('Search requests by name, method, or URL...'),
-                style: const TextStyle(fontSize: 13),
+                decoration: const InputDecoration(
+                  hintText: 'Search requests by name, method, or URL...',
+                  isDense: true,
+                  prefixIcon: Icon(LucideIcons.search, size: 16),
+                ),
                 onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
               ),
             ),
@@ -236,7 +233,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                     error: (e, _) => Center(child: Text('Error: $e')),
                     data: (collections) {
                       if (collections.isEmpty) return _buildEmptyState(colorScheme);
-                      return shad.Card(
+                      return Card(
                         child: ListView.builder(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           itemCount: collections.length,
@@ -250,12 +247,12 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                               onDelete: () async {
                                 final confirmed = await showDialog<bool>(
                                   context: context,
-                                  builder: (context) => shad.AlertDialog(
+                                  builder: (context) => AlertDialog(
                                     title: const Text('Delete Collection'),
                                     content: Text('Delete "${collection.name}" and all its requests?'),
                                     actions: [
-                                      shad.Button.ghost(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                                      shad.Button.primary(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+                                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                                      FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
                                     ],
                                   ),
                                 );
@@ -279,24 +276,24 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     );
   }
 
-  Widget _buildEnvSection(shad.ColorScheme colorScheme) {
+  Widget _buildEnvSection(ColorScheme colorScheme) {
     final activeEnv = ref.watch(activeEnvironmentProvider);
 
     if (activeEnv == null) {
-      return shad.Card(
+      return Card(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
-              Icon(LucideIcons.triangleAlert, size: 16, color: const Color(0xFFF59E0B)),
+              const Icon(LucideIcons.triangleAlert, size: 16, color: Colors.orange),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'No active environment — {{variables}} will not be substituted',
-                  style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
-              shad.Button.outline(
+              OutlinedButton(
                 onPressed: () => context.go('/environments'),
                 child: const Text('Set Up', style: TextStyle(fontSize: 11)),
               ),
@@ -308,7 +305,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
 
     final variables = activeEnv.variables;
 
-    return shad.Card(
+    return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Column(
@@ -318,22 +315,16 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
               children: [
                 Icon(LucideIcons.braces, size: 14, color: colorScheme.primary),
                 const SizedBox(width: 8),
-                Text(
-                  activeEnv.name,
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.foreground),
-                ),
+                Text(activeEnv.name, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(width: 6),
-                Text(
-                  '${variables.length} var${variables.length == 1 ? '' : 's'}',
-                  style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground),
-                ),
+                Text('${variables.length} var${variables.length == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodySmall),
                 const Spacer(),
-                shad.Button.ghost(
+                TextButton.icon(
                   onPressed: () => _showQuickAddVarDialog(context),
-                  leading: const Icon(LucideIcons.plus, size: 14),
-                  child: const Text('Add Var', style: TextStyle(fontSize: 11)),
+                  icon: const Icon(LucideIcons.plus, size: 14),
+                  label: const Text('Add Var', style: TextStyle(fontSize: 11)),
                 ),
-                shad.Button.ghost(
+                TextButton(
                   onPressed: () => context.go('/environments'),
                   child: const Text('Manage', style: TextStyle(fontSize: 11)),
                 ),
@@ -348,22 +339,15 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: colorScheme.muted.withValues(alpha: 0.5),
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          '{{${e.key}}}',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.primary, fontFamily: 'monospace'),
-                        ),
+                        Text('{{${e.key}}}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.primary, fontFamily: 'monospace')),
                         const SizedBox(width: 4),
-                        Text(
-                          '= ${e.value}',
-                          style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground, fontFamily: 'monospace'),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        Text('= ${e.value}', style: TextStyle(fontSize: 11, color: colorScheme.outline, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   );
@@ -383,19 +367,19 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => shad.AlertDialog(
+        builder: (context, setDialogState) => AlertDialog(
           title: const Text('Add Variable'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              shad.TextField(controller: nameController, placeholder: const Text('Variable name')),
+              TextField(controller: nameController, decoration: const InputDecoration(hintText: 'Variable name')),
               const SizedBox(height: 12),
-              shad.TextField(controller: valueController, placeholder: const Text('Value')),
+              TextField(controller: valueController, decoration: const InputDecoration(hintText: 'Value')),
             ],
           ),
           actions: [
-            shad.Button.ghost(onPressed: () { nameController.dispose(); valueController.dispose(); Navigator.pop(context); }, child: const Text('Cancel')),
-            shad.Button.primary(
+            TextButton(onPressed: () { nameController.dispose(); valueController.dispose(); Navigator.pop(context); }, child: const Text('Cancel')),
+            FilledButton(
               onPressed: () async {
                 if (nameController.text.isNotEmpty) {
                   final env = ref.read(activeEnvironmentProvider);
@@ -420,24 +404,24 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     );
   }
 
-  Widget _buildEmptyState(shad.ColorScheme colorScheme) {
-    return shad.Card(
+  Widget _buildEmptyState(ColorScheme colorScheme) {
+    return Card(
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(LucideIcons.folderOpen, size: 48, color: colorScheme.mutedForeground),
+            Icon(LucideIcons.folderOpen, size: 48, color: colorScheme.outline),
             const SizedBox(height: 16),
-            Text('No collections yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+            Text('No collections yet', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('Create a collection or import an OpenAPI spec', style: TextStyle(color: colorScheme.mutedForeground)),
+            Text('Create a collection or import an OpenAPI spec', style: TextStyle(color: colorScheme.outline)),
             const SizedBox(height: 16),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                shad.Button.primary(onPressed: () => _showCreateDialog(context), leading: const Icon(LucideIcons.plus, size: 16), child: const Text('New Collection')),
+                FilledButton.icon(onPressed: () => _showCreateDialog(context), icon: const Icon(LucideIcons.plus, size: 16), label: const Text('New Collection')),
                 const SizedBox(width: 8),
-                shad.Button.outline(onPressed: _importFromFile, leading: const Icon(LucideIcons.upload, size: 16), child: const Text('Import File')),
+                OutlinedButton.icon(onPressed: _importFromFile, icon: const Icon(LucideIcons.upload, size: 16), label: const Text('Import File')),
               ],
             ),
           ],
@@ -453,19 +437,19 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => shad.AlertDialog(
+        builder: (context, setDialogState) => AlertDialog(
           title: const Text('New Collection'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              shad.TextField(controller: nameController, placeholder: const Text('Collection name')),
+              TextField(controller: nameController, decoration: const InputDecoration(hintText: 'Collection name')),
               const SizedBox(height: 12),
-              shad.TextField(controller: descController, placeholder: const Text('Description (optional)')),
+              TextField(controller: descController, decoration: const InputDecoration(hintText: 'Description (optional)')),
             ],
           ),
           actions: [
-            shad.Button.ghost(onPressed: () { nameController.dispose(); descController.dispose(); Navigator.pop(context); }, child: const Text('Cancel')),
-            shad.Button.primary(
+            TextButton(onPressed: () { nameController.dispose(); descController.dispose(); Navigator.pop(context); }, child: const Text('Cancel')),
+            FilledButton(
               onPressed: () async {
                 if (nameController.text.isNotEmpty) {
                   await ref.read(collectionRepositoryProvider).createCollection(
@@ -492,7 +476,7 @@ class _CollectionExpandable extends ConsumerWidget {
   final bool isExpanded;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
-  final void Function(RequestModel request, Map<String, String> headers, {String? collectionId}) onRequestTap;
+  final void Function(RequestModel request, Map<String, String> headers, {String? collectionId, String? collectionAuthType, String? collectionAuthData}) onRequestTap;
   final String searchQuery;
 
   const _CollectionExpandable({
@@ -506,57 +490,63 @@ class _CollectionExpandable extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final headerCount = collection.globalHeaders.length;
+    final hasAuth = collection.authType != 'none';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        GestureDetector(
-          onTap: onToggle,
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                Icon(isExpanded ? LucideIcons.folderOpen : LucideIcons.folder, size: 16, color: const Color(0xFFF59E0B)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        ListTile(
+          dense: true,
+          visualDensity: VisualDensity.compact,
+          leading: Icon(isExpanded ? LucideIcons.folderOpen : LucideIcons.folder, size: 16, color: Colors.orange),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(collection.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+              if (collection.description != null)
+                Text(collection.description!, style: TextStyle(fontSize: 11, color: colorScheme.outline), overflow: TextOverflow.ellipsis),
+            ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (headerCount > 0 || hasAuth)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(collection.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.foreground), overflow: TextOverflow.ellipsis),
-                      if (collection.description != null)
-                        Text(collection.description!, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground), overflow: TextOverflow.ellipsis),
+                      if (headerCount > 0) ...[
+                        Icon(LucideIcons.key, size: 10, color: colorScheme.outline),
+                        const SizedBox(width: 3),
+                        Text('$headerCount', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: colorScheme.outline)),
+                      ],
+                      if (headerCount > 0 && hasAuth) const SizedBox(width: 6),
+                      if (hasAuth) ...[
+                        Icon(LucideIcons.shield, size: 10, color: colorScheme.outline),
+                        const SizedBox(width: 3),
+                        Text(collection.authType.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: colorScheme.outline)),
+                      ],
                     ],
                   ),
                 ),
-                if (headerCount > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(LucideIcons.key, size: 10, color: colorScheme.primary),
-                        const SizedBox(width: 3),
-                        Text('$headerCount', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: colorScheme.primary)),
-                      ],
-                    ),
-                  ),
-                shad.IconButton.ghost(
-                  icon: Icon(LucideIcons.key, size: 16, color: headerCount > 0 ? colorScheme.primary : colorScheme.mutedForeground),
-                  onPressed: () => _showHeadersDialog(context, ref),
-                ),
-                Icon(isExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18, color: colorScheme.mutedForeground),
-                const SizedBox(width: 4),
-                shad.IconButton.ghost(icon: const Icon(LucideIcons.trash2, size: 14), onPressed: onDelete),
-              ],
-            ),
+              IconButton(
+                icon: Icon(LucideIcons.key, size: 16, color: headerCount > 0 ? colorScheme.primary : colorScheme.outline),
+                onPressed: () => _showHeadersDialog(context, ref),
+                visualDensity: VisualDensity.compact,
+              ),
+              Icon(isExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18, color: colorScheme.outline),
+              const SizedBox(width: 4),
+              IconButton(icon: const Icon(LucideIcons.trash2, size: 14), onPressed: onDelete, visualDensity: VisualDensity.compact),
+            ],
           ),
+          onTap: onToggle,
         ),
         if (isExpanded) ...[
           if (headerCount > 0)
@@ -565,6 +555,8 @@ class _CollectionExpandable extends ConsumerWidget {
             collectionId: collection.id,
             onRequestTap: onRequestTap,
             collectionHeaders: collection.globalHeaders,
+            collectionAuthType: collection.authType != 'none' ? collection.authType : null,
+            collectionAuthData: collection.authType != 'none' ? collection.authData : null,
             searchQuery: searchQuery,
           ),
         ],
@@ -572,12 +564,12 @@ class _CollectionExpandable extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeadersPreview(shad.ColorScheme colorScheme) {
+  Widget _buildHeadersPreview(ColorScheme colorScheme) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: colorScheme.muted.withValues(alpha: 0.3),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
@@ -587,7 +579,7 @@ class _CollectionExpandable extends ConsumerWidget {
             children: [
               Icon(LucideIcons.key, size: 12, color: colorScheme.primary),
               const SizedBox(width: 6),
-              Text('Collection Headers', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.mutedForeground, letterSpacing: 0.5)),
+              Text('Collection Headers', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.outline, letterSpacing: 0.5)),
             ],
           ),
           const SizedBox(height: 6),
@@ -595,10 +587,10 @@ class _CollectionExpandable extends ConsumerWidget {
             padding: const EdgeInsets.only(bottom: 2),
             child: Row(
               children: [
-                Text(e.key, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.foreground, fontFamily: 'monospace')),
-                Text(': ', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
+                Text(e.key, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurface, fontFamily: 'monospace')),
+                Text(': ', style: TextStyle(fontSize: 11, color: colorScheme.outline)),
                 Expanded(
-                  child: Text(e.value, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis),
+                  child: Text(e.value, style: TextStyle(fontSize: 11, color: colorScheme.outline, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis),
                 ),
               ],
             ),
@@ -614,47 +606,175 @@ class _CollectionExpandable extends ConsumerWidget {
         .toList();
     if (entries.isEmpty) entries.add(KeyValueEntry());
 
+    String authType = collection.authType;
+    final bearerController = TextEditingController();
+    final basicUserController = TextEditingController();
+    final basicPassController = TextEditingController();
+    final apiKeyNameController = TextEditingController();
+    final apiKeyValueController = TextEditingController();
+    String apiKeyLocation = 'header';
+
+    // Parse existing auth data
+    try {
+      final data = Map<String, dynamic>.from(jsonDecode(collection.authData));
+      bearerController.text = data['token'] ?? '';
+      basicUserController.text = data['username'] ?? '';
+      basicPassController.text = data['password'] ?? '';
+      apiKeyNameController.text = data['name'] ?? '';
+      apiKeyValueController.text = data['value'] ?? '';
+      apiKeyLocation = data['location'] ?? 'header';
+    } catch (_) {}
+
     showDialog(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => shad.AlertDialog(
+        builder: (dialogContext, setDialogState) => AlertDialog(
           title: Row(
             children: [
-              Icon(LucideIcons.key, size: 18, color: shad.Theme.of(dialogContext).colorScheme.primary),
+              Icon(LucideIcons.settings2, size: 18, color: Theme.of(dialogContext).colorScheme.outline),
               const SizedBox(width: 8),
-              Text('${collection.name} Headers'),
+              Expanded(child: Text('${collection.name}')),
             ],
           ),
           content: SizedBox(
-            width: 450,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'These headers are automatically included in every request in this collection. Request-level headers take precedence.',
-                  style: TextStyle(fontSize: 12, color: shad.Theme.of(dialogContext).colorScheme.mutedForeground),
-                ),
-                const SizedBox(height: 16),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: KeyValueEditor(
-                      entries: entries,
-                      keyHint: 'Header name',
-                      valueHint: 'Value',
-                      onChanged: () => setDialogState(() {}),
+            width: 480,
+            child: DefaultTabController(
+              length: 2,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TabBar(
+                    tabs: const [Tab(text: 'Headers'), Tab(text: 'Auth')],
+                    tabAlignment: TabAlignment.start,
+                    isScrollable: true,
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 280,
+                    child: TabBarView(
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'These headers are automatically included in every request in this collection.',
+                              style: Theme.of(dialogContext).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 12),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                child: KeyValueEditor(
+                                  entries: entries,
+                                  keyHint: 'Header name',
+                                  valueHint: 'Value',
+                                  onChanged: () => setDialogState(() {}),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                'Auth is applied to all requests. Request-level auth takes precedence.',
+                                style: Theme.of(dialogContext).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: ['None', 'Bearer', 'Basic', 'API Key'].map((t) {
+                                  final typeMap = {'None': 'none', 'Bearer': 'bearer', 'Basic': 'basic', 'API Key': 'apikey'};
+                                  final isSelected = authType == typeMap[t];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 4),
+                                    child: isSelected
+                                        ? FilledButton.tonal(
+                                            onPressed: () => setDialogState(() => authType = typeMap[t]!),
+                                            child: Text(t, style: const TextStyle(fontSize: 11)),
+                                          )
+                                        : OutlinedButton(
+                                            onPressed: () => setDialogState(() => authType = typeMap[t]!),
+                                            child: Text(t, style: const TextStyle(fontSize: 11)),
+                                          ),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 16),
+                              if (authType == 'bearer') ...[
+                                Text('Token', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Theme.of(dialogContext).colorScheme.onSurface)),
+                                const SizedBox(height: 6),
+                                TextField(controller: bearerController, decoration: const InputDecoration(hintText: 'Enter bearer token', border: OutlineInputBorder())),
+                              ] else if (authType == 'basic') ...[
+                                Text('Username', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Theme.of(dialogContext).colorScheme.onSurface)),
+                                const SizedBox(height: 6),
+                                TextField(controller: basicUserController, decoration: const InputDecoration(hintText: 'Username', border: OutlineInputBorder())),
+                                const SizedBox(height: 12),
+                                Text('Password', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Theme.of(dialogContext).colorScheme.onSurface)),
+                                const SizedBox(height: 6),
+                                TextField(controller: basicPassController, obscureText: true, decoration: const InputDecoration(hintText: 'Password', border: OutlineInputBorder())),
+                              ] else if (authType == 'apikey') ...[
+                                Text('Key Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Theme.of(dialogContext).colorScheme.onSurface)),
+                                const SizedBox(height: 6),
+                                TextField(controller: apiKeyNameController, decoration: const InputDecoration(hintText: 'X-API-Key', border: OutlineInputBorder())),
+                                const SizedBox(height: 12),
+                                Text('Key Value', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Theme.of(dialogContext).colorScheme.onSurface)),
+                                const SizedBox(height: 6),
+                                TextField(controller: apiKeyValueController, decoration: const InputDecoration(hintText: 'Your API key', border: OutlineInputBorder())),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Text('Add to:', style: TextStyle(fontSize: 12, color: Theme.of(dialogContext).colorScheme.onSurface)),
+                                    const SizedBox(width: 8),
+                                    apiKeyLocation == 'header'
+                                        ? FilledButton.tonal(onPressed: () => setDialogState(() => apiKeyLocation = 'header'), child: const Text('Header', style: TextStyle(fontSize: 11)))
+                                        : OutlinedButton(onPressed: () => setDialogState(() => apiKeyLocation = 'header'), child: const Text('Header', style: TextStyle(fontSize: 11))),
+                                    const SizedBox(width: 4),
+                                    apiKeyLocation == 'query'
+                                        ? FilledButton.tonal(onPressed: () => setDialogState(() => apiKeyLocation = 'query'), child: const Text('Query Param', style: TextStyle(fontSize: 11)))
+                                        : OutlinedButton(onPressed: () => setDialogState(() => apiKeyLocation = 'query'), child: const Text('Query Param', style: TextStyle(fontSize: 11))),
+                                  ],
+                                ),
+                              ] else ...[
+                                Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Text('No collection auth', style: TextStyle(color: Theme.of(dialogContext).colorScheme.outline)),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           actions: [
-            shad.Button.ghost(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-            shad.Button.primary(
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(
               onPressed: () async {
                 final headers = entriesToMap(entries);
-                final updated = collection.copyWith(globalHeaders: headers);
+
+                String authData = '{}';
+                if (authType == 'bearer') {
+                  authData = jsonEncode({'token': bearerController.text});
+                } else if (authType == 'basic') {
+                  authData = jsonEncode({'username': basicUserController.text, 'password': basicPassController.text});
+                } else if (authType == 'apikey') {
+                  authData = jsonEncode({'name': apiKeyNameController.text, 'value': apiKeyValueController.text, 'location': apiKeyLocation});
+                }
+
+                final updated = collection.copyWith(
+                  globalHeaders: headers,
+                  authType: authType,
+                  authData: authData,
+                );
                 await ref.read(collectionRepositoryProvider).updateCollection(updated);
                 ref.invalidate(collectionsProvider);
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
@@ -670,15 +790,17 @@ class _CollectionExpandable extends ConsumerWidget {
 
 class _RequestList extends ConsumerWidget {
   final String collectionId;
-  final void Function(RequestModel request, Map<String, String> headers, {String? collectionId}) onRequestTap;
+  final void Function(RequestModel request, Map<String, String> headers, {String? collectionId, String? collectionAuthType, String? collectionAuthData}) onRequestTap;
   final Map<String, String> collectionHeaders;
+  final String? collectionAuthType;
+  final String? collectionAuthData;
   final String searchQuery;
 
-  const _RequestList({required this.collectionId, required this.onRequestTap, this.collectionHeaders = const {}, this.searchQuery = ''});
+  const _RequestList({required this.collectionId, required this.onRequestTap, this.collectionHeaders = const {}, this.collectionAuthType, this.collectionAuthData, this.searchQuery = ''});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final requestsAsync = ref.watch(requestsByCollectionProvider(collectionId));
 
     return requestsAsync.when(
@@ -688,7 +810,7 @@ class _RequestList extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(12),
-        child: Text('Error: $e', style: TextStyle(color: colorScheme.mutedForeground)),
+        child: Text('Error: $e', style: TextStyle(color: colorScheme.outline)),
       ),
       data: (requests) {
         final filtered = searchQuery.isEmpty ? requests : requests.where((req) {
@@ -699,38 +821,30 @@ class _RequestList extends ConsumerWidget {
         if (filtered.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(searchQuery.isEmpty ? 'No requests' : 'No matching requests', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
+            child: Text(searchQuery.isEmpty ? 'No requests' : 'No matching requests', style: TextStyle(fontSize: 12, color: colorScheme.outline)),
           );
         }
         return Padding(
           padding: const EdgeInsets.only(left: 16),
           child: Column(
-            children: filtered.map((req) => GestureDetector(
-            onTap: () => onRequestTap(req, collectionHeaders, collectionId: collectionId),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: methodColor(req.method).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(req.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: methodColor(req.method)), textAlign: TextAlign.center),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(req.name, style: TextStyle(fontSize: 12, color: colorScheme.foreground), overflow: TextOverflow.ellipsis)),
-                  ],
+            children: filtered.map((req) => ListTile(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              leading: Container(
+                width: 52,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: methodColor(req.method).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
                 ),
+                child: Text(req.method, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: methodColor(req.method)), textAlign: TextAlign.center),
               ),
+              title: Text(req.name, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+              onTap: () => onRequestTap(req, collectionHeaders, collectionId: collectionId, collectionAuthType: collectionAuthType, collectionAuthData: collectionAuthData),
             )).toList(),
           ),
         );
       },
     );
   }
-
 }

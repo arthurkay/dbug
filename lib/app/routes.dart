@@ -1,8 +1,7 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
-import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../features/collections/screens/collections_screen.dart';
 import '../features/history/screens/history_screen.dart';
 import '../features/openapi/screens/spec_import_screen.dart';
@@ -33,6 +32,8 @@ final appRouter = GoRouter(
             RequestModel? req;
             Map<String, String> collectionHeaders = {};
             String? collectionId;
+            String? collectionAuthType;
+            String? collectionAuthData;
             HistoryEntry? historyEntry;
             if (state.extra is RequestModel) {
               req = state.extra as RequestModel;
@@ -41,12 +42,16 @@ final appRouter = GoRouter(
               req = extra['request'] as RequestModel?;
               collectionHeaders = Map<String, String>.from(extra['collectionHeaders'] ?? {});
               collectionId = extra['collectionId'] as String?;
+              collectionAuthType = extra['collectionAuthType'] as String?;
+              collectionAuthData = extra['collectionAuthData'] as String?;
               historyEntry = extra['historyEntry'] as HistoryEntry?;
             }
             return NoTransitionPage(child: RequestScreen(
               initialRequest: req,
               collectionHeaders: collectionHeaders,
               collectionId: collectionId,
+              collectionAuthType: collectionAuthType,
+              collectionAuthData: collectionAuthData,
               historyEntry: historyEntry,
             ));
           },
@@ -105,12 +110,12 @@ class AdaptiveShell extends StatelessWidget {
 
   Widget _buildWideLayout(BuildContext context) {
     final currentPath = GoRouterState.of(context).uri.toString();
-    final colorScheme = shad.Theme.of(context).colorScheme;
-    return shad.Scaffold(
-      child: Row(
+    final colorScheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: Row(
         children: [
           SizedBox(width: 220, child: _Sidebar(currentPath: currentPath)),
-          Container(width: 1, color: colorScheme.border.withValues(alpha: 0.5)),
+          VerticalDivider(width: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
           Expanded(child: child),
         ],
       ),
@@ -118,7 +123,6 @@ class AdaptiveShell extends StatelessWidget {
   }
 
   Widget _buildNarrowLayout(BuildContext context, Widget child) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
     final currentIndex = _getNavIndex(GoRouterState.of(context).uri.toString());
     final routes = ['/request', '/collections', '/history', '/openapi'];
     final items = [
@@ -127,36 +131,17 @@ class AdaptiveShell extends StatelessWidget {
       (LucideIcons.clock, 'History'),
       (LucideIcons.globe, 'OpenAPI'),
     ];
-    return shad.Scaffold(
-      child: Column(
+    return Scaffold(
+      body: Column(
         children: [
           Expanded(child: child),
-          Container(
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: colorScheme.border.withValues(alpha: 0.5))),
-            ),
-            child: Row(
-              children: List.generate(items.length, (i) {
-                final isActive = currentIndex == i;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => context.go(routes[i]),
-                    behavior: HitTestBehavior.opaque,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(items[i].$1, size: 20, color: isActive ? colorScheme.primary : colorScheme.mutedForeground),
-                          const SizedBox(height: 4),
-                          Text(items[i].$2, style: TextStyle(fontSize: 10, fontWeight: isActive ? FontWeight.w600 : FontWeight.w400, color: isActive ? colorScheme.primary : colorScheme.mutedForeground)),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
+          NavigationBar(
+            selectedIndex: currentIndex,
+            onDestinationSelected: (i) => context.go(routes[i]),
+            destinations: items.map((item) => NavigationDestination(
+              icon: Icon(item.$1),
+              label: item.$2,
+            )).toList(),
           ),
         ],
       ),
@@ -179,12 +164,13 @@ class _Sidebar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final activeEnv = ref.watch(activeEnvironmentProvider);
     final envsAsync = ref.watch(environmentsProvider);
 
-    return Container(
-      color: colorScheme.card,
+    return Material(
+      color: colorScheme.surface,
       child: Column(
         children: [
           Container(
@@ -195,11 +181,11 @@ class _Sidebar extends ConsumerWidget {
               children: [
                 Icon(LucideIcons.bug, color: colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('dbug', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: colorScheme.foreground)),
+                Text('dbug', style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
               ],
             ),
           ),
-          Container(height: 1, color: colorScheme.border.withValues(alpha: 0.5)),
+          const Divider(height: 1),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -210,74 +196,80 @@ class _Sidebar extends ConsumerWidget {
                 _SidebarItem(icon: LucideIcons.globe, selectedIcon: LucideIcons.globe, label: 'OpenAPI Specs', path: '/openapi', currentPath: currentPath),
                 _SidebarItem(icon: LucideIcons.braces, selectedIcon: LucideIcons.braces, label: 'Environments', path: '/environments', currentPath: currentPath),
                 _SidebarItem(icon: LucideIcons.server, selectedIcon: LucideIcons.server, label: 'Mock Server', path: '/mock-server', currentPath: currentPath),
-                Container(height: 1, margin: const EdgeInsets.symmetric(horizontal: 16), color: colorScheme.border.withValues(alpha: 0.5)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Divider(),
+                ),
                 _SidebarItem(icon: LucideIcons.settings, selectedIcon: LucideIcons.settings, label: 'Settings', path: '/settings', currentPath: currentPath),
               ],
             ),
           ),
-          // Environment selector
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: colorScheme.border.withValues(alpha: 0.5))),
+              border: Border(top: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4))),
             ),
             child: envsAsync.when(
               loading: () => const SizedBox.shrink(),
               error: (_, __) => const SizedBox.shrink(),
               data: (envs) {
                 if (envs.isEmpty) return const SizedBox.shrink();
+                final activeName = activeEnv != null
+                    ? envs.where((e) => e.id == activeEnv.id).firstOrNull?.name ?? 'None'
+                    : 'None';
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('Environment', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.mutedForeground, letterSpacing: 0.5)),
+                    Text('ENVIRONMENT', style: textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.outline, letterSpacing: 0.5)),
                     const SizedBox(height: 6),
-                    shad.Select<String?>(
-                      value: activeEnv?.id,
-                      onChanged: (v) {
-                        if (v == null) {
-                          ref.read(activeEnvironmentProvider.notifier).setActive(null);
-                        } else {
-                          final env = envs.where((e) => e.id == v).firstOrNull;
-                          if (env != null) {
-                            ref.read(activeEnvironmentProvider.notifier).setActive(env);
-                          }
-                        }
-                      },
-                      itemBuilder: (context, value) {
-                        if (value == null) return Text('None', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground));
-                        final env = envs.where((e) => e.id == value).firstOrNull;
-                        return Text(env?.name ?? 'Unknown', style: TextStyle(fontSize: 12, color: colorScheme.foreground));
-                      },
-                      popup: (context) => shad.SelectPopup<String?>(
-                        items: shad.SelectItemList(
-                          children: [
-                            shad.SelectItemButton<String?>(
-                              value: null,
-                              child: Text('None', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
-                            ),
-                            ...envs.map((env) => shad.SelectItemButton<String?>(
-                              value: env.id,
-                              child: Row(
-                                children: [
-                                  Expanded(child: Text(env.name, style: const TextStyle(fontSize: 12))),
-                                  if (env.isOpenApiDefined)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(3),
-                                      ),
-                                      child: const Text('API', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: Color(0xFF3B82F6))),
-                                    ),
-                                  const SizedBox(width: 4),
-                                  Text('${env.variables.length} vars', style: TextStyle(fontSize: 10, color: colorScheme.mutedForeground)),
-                                ],
-                              ),
-                            )),
-                          ],
+                    MenuAnchor(
+                      menuChildren: [
+                        MenuItemButton(
+                          onPressed: () => ref.read(activeEnvironmentProvider.notifier).setActive(null),
+                          child: Row(
+                            children: [
+                              Icon(LucideIcons.circleOff, size: 14, color: colorScheme.outline),
+                              const SizedBox(width: 8),
+                              const Text('None'),
+                            ],
+                          ),
                         ),
-                      ),
+                        ...envs.map((env) => MenuItemButton(
+                          onPressed: () => ref.read(activeEnvironmentProvider.notifier).setActive(env),
+                          child: Row(
+                            children: [
+                              Icon(LucideIcons.circle, size: 14, color: env.isOpenApiDefined ? colorScheme.primary : colorScheme.outline),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(env.name, overflow: TextOverflow.ellipsis)),
+                              Text('${env.variables.length}', style: TextStyle(fontSize: 11, color: colorScheme.outline)),
+                            ],
+                          ),
+                        )),
+                      ],
+                      builder: (context, controller, child) {
+                        return InkWell(
+                          onTap: () => controller.open(),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(LucideIcons.circle, size: 10, color: activeEnv != null ? colorScheme.primary : colorScheme.outline),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(activeName, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                ),
+                                Icon(LucideIcons.chevronDown, size: 14, color: colorScheme.outline),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 );
@@ -308,25 +300,30 @@ class _SidebarItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSelected = currentPath.startsWith(path);
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: shad.Button.ghost(
-        onPressed: () => context.go(path),
-        alignment: Alignment.centerLeft,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              Icon(isSelected ? selectedIcon : icon, size: 18, color: isSelected ? colorScheme.primary : colorScheme.mutedForeground),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(label, style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400, color: isSelected ? colorScheme.primary : colorScheme.mutedForeground)),
-              ),
-            ],
+      child: ListTile(
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        leading: Icon(
+          isSelected ? selectedIcon : icon,
+          size: 18,
+          color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+        ),
+        title: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
           ),
         ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        selected: isSelected,
+        selectedTileColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        onTap: () => context.go(path),
       ),
     );
   }

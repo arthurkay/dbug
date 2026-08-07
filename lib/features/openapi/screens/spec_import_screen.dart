@@ -2,11 +2,10 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
-import 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/http_client_provider.dart';
@@ -23,8 +22,8 @@ class SpecImportScreen extends ConsumerStatefulWidget {
   ConsumerState<SpecImportScreen> createState() => _SpecImportScreenState();
 }
 
-class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
-  int _importMode = 0;
+class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final _urlController = TextEditingController();
   final _pasteController = TextEditingController();
   bool _showFileExplorer = false;
@@ -33,7 +32,14 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
   bool _isImporting = false;
 
   @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
   void dispose() {
+    _tabController.dispose();
     _urlController.dispose();
     _pasteController.dispose();
     super.dispose();
@@ -105,7 +111,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final specsAsync = ref.watch(allSpecsProvider);
 
     return Padding(
@@ -119,16 +125,16 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('OpenAPI Specs', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.foreground)),
+                    Text('OpenAPI Specs', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
                     const SizedBox(height: 4),
-                    Text('Import OpenAPI 3.x specifications to use as request collections', style: TextStyle(fontSize: 13, color: colorScheme.mutedForeground)),
+                    Text('Import OpenAPI 3.x specifications to use as request collections', style: TextStyle(fontSize: 13, color: colorScheme.outline)),
                   ],
                 ),
               ),
               if (_isImporting)
                 const Padding(padding: EdgeInsets.only(right: 12), child: SizedBox(width: 16, height: 16, child: DbugSpinner(strokeWidth: 2))),
               if (_showFileExplorer)
-                shad.Button.ghost(onPressed: () => setState(() => _showFileExplorer = false), leading: const Icon(LucideIcons.x, size: 16), child: const Text('Close Explorer')),
+                TextButton.icon(onPressed: () => setState(() => _showFileExplorer = false), icon: const Icon(LucideIcons.x, size: 16), label: const Text('Close Explorer')),
             ],
           ),
           const SizedBox(height: 16),
@@ -140,13 +146,14 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
               ),
             )
           else ...[
-            shad.Tabs(
-              index: _importMode,
-              onChanged: (i) => setState(() => _importMode = i),
-              children: const [
-                shad.TabItem(child: Text('From URL')),
-                shad.TabItem(child: Text('Paste')),
-                shad.TabItem(child: Text('From File')),
+            TabBar(
+              controller: _tabController,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              tabs: const [
+                Tab(text: 'From URL'),
+                Tab(text: 'Paste'),
+                Tab(text: 'From File'),
               ],
             ),
             const SizedBox(height: 16),
@@ -162,8 +169,8 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
     );
   }
 
-  Widget _buildImportContent(shad.ColorScheme colorScheme) {
-    switch (_importMode) {
+  Widget _buildImportContent(ColorScheme colorScheme) {
+    switch (_tabController.index) {
       case 0: return _buildUrlImport(colorScheme);
       case 1: return _buildPasteImport(colorScheme);
       case 2: return _buildFileImport(colorScheme);
@@ -171,20 +178,20 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
     }
   }
 
-  Widget _buildUrlImport(shad.ColorScheme colorScheme) {
-    return shad.Card(
+  Widget _buildUrlImport(ColorScheme colorScheme) {
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Import from URL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+            Text('Import from URL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: shad.TextField(controller: _urlController, placeholder: const Text('https://api.example.com/openapi.json'))),
+                Expanded(child: TextField(controller: _urlController, decoration: const InputDecoration(hintText: 'https://api.example.com/openapi.json', border: OutlineInputBorder()))),
                 const SizedBox(width: 8),
-                shad.Button.primary(
+                FilledButton(
                   onPressed: _isImporting ? null : () async {
                     if (_urlController.text.isNotEmpty) {
                       try {
@@ -212,21 +219,21 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
     );
   }
 
-  Widget _buildPasteImport(shad.ColorScheme colorScheme) {
-    return shad.Card(
+  Widget _buildPasteImport(ColorScheme colorScheme) {
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Paste Spec', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+            Text('Paste Spec', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
             const SizedBox(height: 12),
-            Expanded(child: shad.TextField(controller: _pasteController, placeholder: const Text('Paste OpenAPI JSON or YAML here...'), style: const TextStyle(fontFamily: 'monospace', fontSize: 13))),
+            Expanded(child: TextField(controller: _pasteController, decoration: const InputDecoration(hintText: 'Paste OpenAPI JSON or YAML here...', border: OutlineInputBorder()), style: const TextStyle(fontFamily: 'monospace', fontSize: 13), maxLines: null, expands: true)),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                shad.Button.primary(
+                FilledButton(
                   onPressed: _isImporting ? null : () { if (_pasteController.text.isNotEmpty) _parseAndImport(_pasteController.text); },
                   child: const Text('Parse & Import'),
                 ),
@@ -238,14 +245,14 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
     );
   }
 
-  Widget _buildFileImport(shad.ColorScheme colorScheme) {
-    return shad.Card(
+  Widget _buildFileImport(ColorScheme colorScheme) {
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Import from File', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+            Text('Import from File', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
             const SizedBox(height: 12),
             Expanded(
               child: _selectedFileName != null
@@ -254,7 +261,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
                       children: [
                         Container(
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: colorScheme.muted, borderRadius: BorderRadius.circular(8)),
+                          decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8)),
                           child: Row(
                             children: [
                               Icon(LucideIcons.fileText, size: 20, color: colorScheme.primary),
@@ -263,12 +270,12 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(_selectedFileName!, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.foreground), overflow: TextOverflow.ellipsis),
-                                    Text(_selectedFilePath!, style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground), overflow: TextOverflow.ellipsis),
+                                    Text(_selectedFileName!, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis),
+                                    Text(_selectedFilePath!, style: TextStyle(fontSize: 11, color: colorScheme.outline), overflow: TextOverflow.ellipsis),
                                   ],
                                 ),
                               ),
-                              shad.IconButton.ghost(icon: const Icon(LucideIcons.x, size: 16), onPressed: () => setState(() { _selectedFileName = null; _selectedFilePath = null; })),
+                              IconButton(icon: const Icon(LucideIcons.x, size: 16), onPressed: () => setState(() { _selectedFileName = null; _selectedFilePath = null; })),
                             ],
                           ),
                         ),
@@ -276,32 +283,32 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            shad.Button.outline(onPressed: () => setState(() { _selectedFileName = null; _selectedFilePath = null; }), child: const Text('Choose Different File')),
+                            OutlinedButton(onPressed: () => setState(() { _selectedFileName = null; _selectedFilePath = null; }), child: const Text('Choose Different File')),
                             const SizedBox(width: 8),
-                            shad.Button.primary(onPressed: _isImporting ? null : () { if (_selectedFilePath != null) _loadAndParseFile(_selectedFilePath!); }, child: const Text('Import')),
+                            FilledButton(onPressed: _isImporting ? null : () { if (_selectedFilePath != null) _loadAndParseFile(_selectedFilePath!); }, child: const Text('Import')),
                           ],
                         ),
                       ],
                     )
                   : Container(
                       width: double.infinity,
-                      decoration: BoxDecoration(border: Border.all(color: colorScheme.border.withValues(alpha: 0.5), width: 1), borderRadius: BorderRadius.circular(8)),
+                      decoration: BoxDecoration(border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 1), borderRadius: BorderRadius.circular(8)),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(LucideIcons.upload, size: 48, color: colorScheme.mutedForeground),
+                          Icon(LucideIcons.upload, size: 48, color: colorScheme.outline),
                           const SizedBox(height: 16),
-                          Text('Select a .json or .yaml file', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+                          Text('Select a .json or .yaml file', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                           const SizedBox(height: 4),
-                          Text('OpenAPI 3.x specification file', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)),
+                          Text('OpenAPI 3.x specification file', style: TextStyle(fontSize: 12, color: colorScheme.outline)),
                           const SizedBox(height: 16),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              shad.Button.primary(onPressed: _isImporting ? null : _pickFile, leading: const Icon(LucideIcons.upload, size: 16), child: const Text('Browse Files')),
+                              FilledButton.icon(onPressed: _isImporting ? null : _pickFile, icon: const Icon(LucideIcons.upload, size: 16), label: const Text('Browse Files')),
                               const SizedBox(width: 8),
-                              shad.Button.outline(onPressed: () => setState(() => _showFileExplorer = true), leading: const Icon(LucideIcons.folderOpen, size: 16), child: const Text('File Explorer')),
+                              OutlinedButton.icon(onPressed: () => setState(() => _showFileExplorer = true), icon: const Icon(LucideIcons.folderOpen, size: 16), label: const Text('File Explorer')),
                             ],
                           ),
                         ],
@@ -314,8 +321,8 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
     );
   }
 
-  Widget _buildImportedSpecs(shad.ColorScheme colorScheme, AsyncValue<List<OpenApiSpec>> specsAsync) {
-    return shad.Card(
+  Widget _buildImportedSpecs(ColorScheme colorScheme, AsyncValue<List<OpenApiSpec>> specsAsync) {
+    return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -323,20 +330,20 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Row(
               children: [
-                Text('Imported Specs', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.foreground)),
+                Text('Imported Specs', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                 const Spacer(),
-                specsAsync.whenData((specs) => Text('${specs.length}', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground))).when(skipLoadingOnRefresh: false, skipLoadingOnReload: false, data: (w) => w, error: (_, __) => const SizedBox.shrink(), loading: () => const SizedBox.shrink()),
+                specsAsync.whenData((specs) => Text('${specs.length}', style: TextStyle(fontSize: 12, color: colorScheme.outline))).when(skipLoadingOnRefresh: false, skipLoadingOnReload: false, data: (w) => w, error: (_, __) => const SizedBox.shrink(), loading: () => const SizedBox.shrink()),
               ],
             ),
           ),
-          Container(height: 1, color: colorScheme.border.withValues(alpha: 0.5)),
+          Container(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
           Expanded(
             child: specsAsync.when(
               loading: () => const Center(child: DbugSpinner()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (specs) {
                 if (specs.isEmpty) {
-                  return Center(child: Text('No specs imported yet', style: TextStyle(fontSize: 12, color: colorScheme.mutedForeground)));
+                  return Center(child: Text('No specs imported yet', style: TextStyle(fontSize: 12, color: colorScheme.outline)));
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -372,7 +379,7 @@ class _SpecTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = shad.Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return GestureDetector(
       onTap: onTap,
@@ -387,12 +394,12 @@ class _SpecTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(spec.title ?? 'Untitled', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: colorScheme.foreground), overflow: TextOverflow.ellipsis),
-                  Text('${spec.endpoints.length} endpoints • ${spec.version ?? 'unknown'}', style: TextStyle(fontSize: 11, color: colorScheme.mutedForeground)),
+                  Text(spec.title ?? 'Untitled', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis),
+                  Text('${spec.endpoints.length} endpoints • ${spec.version ?? 'unknown'}', style: TextStyle(fontSize: 11, color: colorScheme.outline)),
                 ],
               ),
             ),
-            shad.IconButton.ghost(icon: const Icon(LucideIcons.trash2, size: 14), onPressed: onDelete),
+            IconButton(icon: const Icon(LucideIcons.trash2, size: 14), onPressed: onDelete),
           ],
         ),
       ),

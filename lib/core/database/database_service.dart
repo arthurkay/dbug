@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -159,11 +159,33 @@ class DatabaseService {
       await db.execute("ALTER TABLE history ADD COLUMN auth_type TEXT DEFAULT 'none'");
       await db.execute("ALTER TABLE history ADD COLUMN auth_data TEXT DEFAULT '{}'");
     }
+    if (oldVersion < 5) {
+      await db.execute("ALTER TABLE collections ADD COLUMN auth_type TEXT DEFAULT 'none'");
+      await db.execute("ALTER TABLE collections ADD COLUMN auth_data TEXT DEFAULT '{}'");
+    }
   }
 
   static Future<void> close() async {
     final db = await database;
     await db.close();
     _database = null;
+  }
+
+  @visibleForTesting
+  static Future<void> setTestDatabase(Database db) async {
+    if (_database != null && _database!.isOpen) {
+      await _database!.close();
+    }
+    _database = db;
+    _initialized = true;
+  }
+
+  @visibleForTesting
+  static Future<void> resetState() async {
+    if (_database != null && _database!.isOpen) {
+      await _database!.close();
+    }
+    _database = null;
+    _initialized = false;
   }
 }

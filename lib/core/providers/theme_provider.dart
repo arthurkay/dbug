@@ -1,15 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _kThemeKey = 'theme_mode';
 
-final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, shad.ThemeMode>((ref) {
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
   return ThemeModeNotifier();
 });
 
-class ThemeModeNotifier extends StateNotifier<shad.ThemeMode> {
-  ThemeModeNotifier() : super(shad.ThemeMode.system) {
+class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  ThemeModeNotifier() : super(ThemeMode.system) {
     _load();
   }
 
@@ -17,15 +17,15 @@ class ThemeModeNotifier extends StateNotifier<shad.ThemeMode> {
     final prefs = await SharedPreferences.getInstance();
     final value = prefs.getString(_kThemeKey);
     if (value == 'dark') {
-      state = shad.ThemeMode.dark;
+      state = ThemeMode.dark;
     } else if (value == 'light') {
-      state = shad.ThemeMode.light;
+      state = ThemeMode.light;
     } else {
-      state = shad.ThemeMode.system;
+      state = ThemeMode.system;
     }
   }
 
-  Future<void> setMode(shad.ThemeMode mode) async {
+  Future<void> setMode(ThemeMode mode) async {
     state = mode;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kThemeKey, mode.name);
