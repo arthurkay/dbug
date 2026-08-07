@@ -2,7 +2,7 @@ class AppConstants {
   AppConstants._();
 
   static const String appName = 'dbug';
-  static const String appVersion = '0.0.7';
+  static const String appVersion = '0.0.8';
 
   static const String dbName = 'dbug.db';
   static const int dbVersion = 5;
