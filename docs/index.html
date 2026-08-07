@@ -56,6 +56,7 @@
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       overflow-x: hidden;
+      word-break: break-word;
     }
 
     a { color: inherit; text-decoration: none; }
@@ -115,6 +116,7 @@
       text-align: center;
       padding: 160px 24px 100px;
       position: relative;
+      overflow: hidden;
     }
     .hero::before {
       content: '';
@@ -193,6 +195,7 @@
       font-family: var(--mono);
       font-size: 13px;
       color: var(--text-secondary);
+      max-width: 100%;
     }
     .install-cmd .prompt { color: var(--text-tertiary); }
     .install-cmd code { color: var(--text); }
@@ -518,6 +521,8 @@
       line-height: 1.6;
       color: var(--text-secondary);
       overflow: auto;
+      max-width: 100%;
+      word-break: break-all;
     }
     .mockup-json .key { color: var(--text); }
     .mockup-json .string { color: #22c55e; }
@@ -657,9 +662,16 @@
         font-size: 14px;
       }
       .mobile-menu-btn { display: block; }
-      .hero { padding: 120px 20px 60px; }
+      .hero { padding: 120px 16px 48px; }
       .hero h1 { letter-spacing: -1.5px; }
       .hero p { font-size: 15px; }
+      .hero-badge {
+        font-size: 11px;
+        max-width: 90%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .hero-actions { flex-direction: column; align-items: center; }
       .hero-actions .btn { width: 100%; max-width: 280px; justify-content: center; }
       .install-cmd {
@@ -669,29 +681,51 @@
         -webkit-overflow-scrolling: touch;
       }
       .install-cmd code { white-space: nowrap; font-size: 11px; }
+      .install-section { padding: 48px 16px 60px; }
       .install-tabs { flex-direction: column; }
       .install-tab { border-bottom: none; border-left: 2px solid transparent; text-align: left; padding: 12px 20px; }
       .install-tab.active { border-left-color: var(--text); border-bottom-color: transparent; }
-      .install-panel { padding: 24px; }
+      .install-panel { padding: 20px; }
       .install-download-btn { width: 100%; justify-content: center; }
-      .mockup-section { padding: 0 20px 60px; }
+      .mockup-section { padding: 0 16px 48px; }
       .mockup-body { grid-template-columns: 1fr; }
       .mockup-sidebar { display: none; }
+      .mockup-request-bar { flex-wrap: wrap; }
+      .mockup-method-select { flex-shrink: 0; }
+      .mockup-url-input { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
       .mockup-content { flex-direction: column; }
-      .features { padding: 60px 20px; }
+      .features { padding: 48px 16px; }
+      .section-header { margin-bottom: 32px; }
       .section-header h2 { font-size: 28px; }
       .feature-grid { grid-template-columns: 1fr; }
       .feature-card { padding: 20px; }
-      .tech { padding: 60px 20px; }
+      .tech { padding: 48px 16px; }
       .tech-badge { font-size: 12px; padding: 6px 12px; }
     }
 
     @media (max-width: 480px) {
-      .hero { padding: 100px 16px 48px; }
-      .hero h1 { font-size: 40px; letter-spacing: -1px; }
+      .hero { padding: 100px 12px 36px; }
+      .hero h1 { font-size: 36px; letter-spacing: -1px; }
       .hero p { font-size: 14px; }
-      .features { padding: 48px 16px; }
+      .hero-badge { font-size: 10px; max-width: 95%; }
+      .hero-actions .btn { max-width: 100%; }
+      .install-cmd { max-width: 100%; }
+      .install-cmd code { font-size: 10px; }
+      .install-section { padding: 36px 12px 48px; }
+      .install-panel { padding: 16px; }
+      .mockup-section { padding: 0 12px 36px; }
+      .mockup-request-bar { padding: 10px 12px; gap: 6px; }
+      .mockup-method-select { font-size: 10px; padding: 6px 8px; }
+      .mockup-url-input { font-size: 10px; padding: 6px 8px; }
+      .mockup-send-btn { font-size: 10px; padding: 6px 12px; }
+      .features { padding: 36px 12px; }
       .section-header h2 { font-size: 24px; }
+      .feature-card { padding: 16px; }
+      .feature-card h3 { font-size: 14px; }
+      .feature-card p { font-size: 12px; }
+      .tech { padding: 36px 12px; }
+      .tech-badge { font-size: 11px; padding: 5px 10px; }
+      .tech-badge .dot { width: 6px; height: 6px; }
     }
   </style>
 </head>
