@@ -597,7 +597,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            widget.initialRequest!.name,
+                            _requestNameController.text.isNotEmpty
+                                ? _requestNameController.text
+                                : widget.initialRequest?.name ?? '',
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -756,6 +758,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
         ..addAll(mapToEntries(req.headers));
       if (_headers.isEmpty) _headers.add(KeyValueEntry());
     });
+    ref.read(windowTitleProvider.notifier).state = req.name.isNotEmpty ? req.name : 'Request Builder';
     _saveBuilderState();
   }
 
@@ -838,8 +841,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Tooltip(
-            message: _buildResolvedUrlPreview(),
+          child: _UrlTooltip(
+            tooltipText: _buildResolvedUrlPreview,
             child: TextField(
               controller: _urlController,
               decoration: const InputDecoration(hintText: 'Enter URL (supports {{variables}})', isDense: true),
@@ -1065,6 +1068,73 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
           ),
         ),
       ),
+    );
+  }
+}
+
+class _UrlTooltip extends StatefulWidget {
+  final String Function() tooltipText;
+  final Widget child;
+
+  const _UrlTooltip({required this.tooltipText, required this.child});
+
+  @override
+  State<_UrlTooltip> createState() => _UrlTooltipState();
+}
+
+class _UrlTooltipState extends State<_UrlTooltip> {
+  OverlayEntry? _overlayEntry;
+  Offset _mousePos = Offset.zero;
+
+  void _showOverlay() {
+    final text = widget.tooltipText();
+    if (text.isEmpty) return;
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        left: _mousePos.dx + 12,
+        top: _mousePos.dy - 8,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.inverseSurface,
+              borderRadius: BorderRadius.circular(6),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2))],
+            ),
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onInverseSurface, fontFamily: 'monospace'),
+            ),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  @override
+  void dispose() {
+    _removeOverlay();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => _showOverlay(),
+      onHover: (e) {
+        _mousePos = e.position;
+        _overlayEntry?.markNeedsBuild();
+      },
+      onExit: (_) => _removeOverlay(),
+      child: widget.child,
     );
   }
 }
