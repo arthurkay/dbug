@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/active_environment_provider.dart';
 import '../../../core/providers/repository_providers.dart';
+import '../../../core/providers/window_title_provider.dart';
 import '../../../core/constants/app_constants.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -12,6 +13,7 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.read(windowTitleProvider.notifier).state = 'Settings';
     final themeMode = ref.watch(themeModeProvider);
     final activeEnv = ref.watch(activeEnvironmentProvider);
     final envsAsync = ref.watch(userEnvironmentsProvider);

@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/http/http_client.dart';
+import '../utils/syntax_highlighter.dart';
 
 class ResponseView extends StatefulWidget {
   final HttpResponse response;
@@ -22,6 +23,7 @@ class _ResponseViewState extends State<ResponseView> {
     final colorScheme = Theme.of(context).colorScheme;
     final resp = widget.response;
     final isJson = _isJsonBody(resp);
+    final contentType = _detectContentType(resp);
 
     return Card(
       child: Padding(
@@ -46,7 +48,7 @@ class _ResponseViewState extends State<ResponseView> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Text('Body'),
-                            if (isJson) ...[
+                            if (contentType != 'text') ...[
                               const SizedBox(width: 4),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -54,7 +56,7 @@ class _ResponseViewState extends State<ResponseView> {
                                   color: Colors.green.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(3),
                                 ),
-                                child: const Text('JSON', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.green)),
+                                child: Text(contentType.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.green)),
                               ),
                             ],
                           ],
@@ -119,8 +121,20 @@ class _ResponseViewState extends State<ResponseView> {
   bool _isJsonBody(HttpResponse resp) {
     final contentType = resp.headers['content-type'] ?? '';
     if (contentType.contains('application/json')) return true;
+    if (contentType.contains('xml') || contentType.contains('yaml') || contentType.contains('yml')) return false;
     final body = resp.body.trimLeft();
     return body.startsWith('{') || body.startsWith('[');
+  }
+
+  String _detectContentType(HttpResponse resp) {
+    final contentType = resp.headers['content-type'] ?? '';
+    if (contentType.contains('application/json') || contentType.contains('text/json')) return 'json';
+    if (contentType.contains('xml') || contentType.contains('text/xml') || contentType.contains('application/xml')) return 'xml';
+    if (contentType.contains('yaml') || contentType.contains('yml') || contentType.contains('text/yaml')) return 'yaml';
+    final body = resp.body.trimLeft();
+    if (body.startsWith('{') || body.startsWith('[')) return 'json';
+    if (body.startsWith('<')) return 'xml';
+    return 'text';
   }
 
   Widget _buildStatusBar(ColorScheme colorScheme, HttpResponse resp) {
@@ -146,7 +160,7 @@ class _ResponseViewState extends State<ResponseView> {
           ),
         ),
         const SizedBox(width: 8),
-        Text(resp.statusCodeLabel, style: TextStyle(fontSize: 12, color: colorScheme.outline)),
+        Text(resp.statusCodeLabel, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
         const Spacer(),
         _buildMetaChip(LucideIcons.timer, '${resp.timeMs}ms', colorScheme),
         const SizedBox(width: 12),
@@ -159,9 +173,9 @@ class _ResponseViewState extends State<ResponseView> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 13, color: colorScheme.outline),
+        Icon(icon, size: 13, color: colorScheme.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: colorScheme.outline, fontWeight: FontWeight.w500)),
+        Text(label, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
       ],
     );
   }
@@ -172,9 +186,9 @@ class _ResponseViewState extends State<ResponseView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(LucideIcons.inbox, size: 32, color: colorScheme.outline),
+            Icon(LucideIcons.inbox, size: 32, color: colorScheme.onSurfaceVariant),
             const SizedBox(height: 8),
-            Text('Empty response body', style: TextStyle(color: colorScheme.outline, fontSize: 13)),
+            Text('Empty response body', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13)),
           ],
         ),
       );
@@ -188,7 +202,7 @@ class _ResponseViewState extends State<ResponseView> {
         color: colorScheme.surfaceContainerHighest,
         borderRadius: const BorderRadius.all(Radius.circular(8)),
       ),
-      child: _buildLineView(colorScheme, displayBody),
+      child: _buildHighlightedView(colorScheme, displayBody, resp),
     );
   }
 
@@ -202,8 +216,10 @@ class _ResponseViewState extends State<ResponseView> {
     }
   }
 
-  Widget _buildLineView(ColorScheme colorScheme, String body) {
+  Widget _buildHighlightedView(ColorScheme colorScheme, String body, HttpResponse resp) {
     final lines = body.split('\n');
+    final contentType = resp.headers['content-type'] ?? '';
+    final spans = SyntaxHighlighter.highlight(body, contentType);
 
     return Container(
       width: double.infinity,
@@ -226,7 +242,7 @@ class _ResponseViewState extends State<ResponseView> {
                 padding: const EdgeInsets.symmetric(vertical: 0),
                 child: Text(
                   '${i + 1}',
-                  style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.outline, height: 1.5),
+                  style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant, height: 1.5),
                   textAlign: TextAlign.right,
                 ),
               )),
@@ -235,8 +251,8 @@ class _ResponseViewState extends State<ResponseView> {
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(14),
-              child: SelectableText(
-                body,
+              child: SelectableText.rich(
+                TextSpan(children: spans),
                 style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 12,
@@ -254,7 +270,7 @@ class _ResponseViewState extends State<ResponseView> {
   Widget _buildHeaders(ColorScheme colorScheme, HttpResponse resp) {
     if (resp.headers.isEmpty) {
       return Center(
-        child: Text('No response headers', style: TextStyle(color: colorScheme.outline)),
+        child: Text('No response headers', style: TextStyle(color: colorScheme.onSurfaceVariant)),
       );
     }
 
@@ -283,7 +299,7 @@ class _ResponseViewState extends State<ResponseView> {
                     child: SelectableText(key, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.primary, fontFamily: 'monospace')),
                   ),
                   Expanded(
-                    child: SelectableText(value, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.outline)),
+                    child: SelectableText(value, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant)),
                   ),
                 ],
               ),

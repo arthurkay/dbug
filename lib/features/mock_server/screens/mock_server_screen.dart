@@ -6,6 +6,7 @@ import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import '../../../core/providers/repository_providers.dart';
+import '../../../core/providers/window_title_provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/models/mock_endpoint.dart';
 import '../../../shared/widgets/toast_helper.dart';
@@ -23,6 +24,12 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
   bool _isRunning = false;
   HttpServer? _server;
   final int _port = AppConstants.defaultMockPort;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(windowTitleProvider.notifier).state = 'Mock Server';
+  }
 
   Future<void> _startServer() async {
     try {

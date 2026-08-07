@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:window_manager/window_manager.dart';
 import '../features/collections/screens/collections_screen.dart';
 import '../features/history/screens/history_screen.dart';
 import '../features/openapi/screens/spec_import_screen.dart';
@@ -14,6 +15,7 @@ import '../core/models/request_model.dart';
 import '../core/models/history_entry.dart';
 import '../core/providers/active_environment_provider.dart';
 import '../core/providers/repository_providers.dart';
+import '../core/providers/window_title_provider.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -93,13 +95,15 @@ final appRouter = GoRouter(
   ],
 );
 
-class AdaptiveShell extends StatelessWidget {
+class AdaptiveShell extends ConsumerWidget {
   final Widget child;
 
   const AdaptiveShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final screenTitle = ref.watch(windowTitleProvider);
+    windowManager.setTitle('dbug — $screenTitle');
     final isWide = MediaQuery.of(context).size.width > 768;
 
     if (isWide) {

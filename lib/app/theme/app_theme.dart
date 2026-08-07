@@ -22,26 +22,72 @@ class DbugTheme {
   static const Color textTertiaryLight = Color(0xFFA1A1AA);
 
   static ThemeData get light => createYaruTheme(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.grey,
+        colorScheme: ColorScheme(
           brightness: Brightness.light,
-        ).copyWith(
+          primary: const Color(0xFF18181B),
+          onPrimary: surfaceLight,
+          primaryContainer: surface2Light,
+          onPrimaryContainer: textLight,
+          secondary: const Color(0xFF71717A),
+          onSecondary: surfaceLight,
+          secondaryContainer: surfaceHoverLight,
+          onSecondaryContainer: textLight,
+          tertiary: const Color(0xFFA1A1AA),
+          onTertiary: surfaceLight,
+          tertiaryContainer: surface2Light,
+          onTertiaryContainer: textLight,
+          error: const Color(0xFFDC2626),
+          onError: surfaceLight,
+          errorContainer: const Color(0xFFFEE2E2),
+          onErrorContainer: const Color(0xFF991B1B),
           surface: surfaceLight,
           onSurface: textLight,
+          onSurfaceVariant: textSecondaryLight,
           outline: const Color(0xFFE4E4E7),
+          outlineVariant: surface2Light,
+          surfaceDim: surfaceLight,
+          surfaceBright: const Color(0xFFF8F8FA),
+          surfaceContainerLowest: surfaceLight,
+          surfaceContainerLow: const Color(0xFFF8F8FA),
+          surfaceContainer: surfaceHoverLight,
+          surfaceContainerHigh: surface2Light,
+          surfaceContainerHighest: const Color(0xFFD4D4D8),
         ),
       ).copyWith(
         scaffoldBackgroundColor: bgLight,
       );
 
   static ThemeData get dark => createYaruTheme(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.grey,
+        colorScheme: ColorScheme(
           brightness: Brightness.dark,
-        ).copyWith(
+          primary: const Color(0xFFD4D4D8),
+          onPrimary: bgDark,
+          primaryContainer: surface2Dark,
+          onPrimaryContainer: textDark,
+          secondary: const Color(0xFFA1A1AA),
+          onSecondary: bgDark,
+          secondaryContainer: surfaceDark,
+          onSecondaryContainer: textDark,
+          tertiary: const Color(0xFF71717A),
+          onTertiary: bgDark,
+          tertiaryContainer: surface2Dark,
+          onTertiaryContainer: textDark,
+          error: const Color(0xFFEF4444),
+          onError: bgDark,
+          errorContainer: const Color(0xFF7F1D1D),
+          onErrorContainer: const Color(0xFFFCA5A5),
           surface: surfaceDark,
           onSurface: textDark,
+          onSurfaceVariant: textSecondaryDark,
           outline: const Color(0xFF27272A),
+          outlineVariant: surface2Dark,
+          surfaceDim: bgDark,
+          surfaceBright: surface2Dark,
+          surfaceContainerLowest: bgDark,
+          surfaceContainerLow: const Color(0xFF111113),
+          surfaceContainer: surfaceDark,
+          surfaceContainerHigh: surface2Dark,
+          surfaceContainerHighest: const Color(0xFF2E2E32),
         ),
       ).copyWith(
         scaffoldBackgroundColor: bgDark,

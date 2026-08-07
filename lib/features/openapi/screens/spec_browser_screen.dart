@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/providers/repository_providers.dart';
+import '../../../core/providers/window_title_provider.dart';
 import '../../../core/models/openapi_spec.dart';
 import '../../../core/models/request_model.dart';
 import '../../../shared/widgets/toast_helper.dart';
@@ -34,14 +35,14 @@ class SpecBrowserScreen extends ConsumerWidget {
   }
 }
 
-class _SpecBrowserBody extends StatefulWidget {
+class _SpecBrowserBody extends ConsumerStatefulWidget {
   final OpenApiSpec spec;
   const _SpecBrowserBody({required this.spec});
   @override
-  State<_SpecBrowserBody> createState() => _SpecBrowserBodyState();
+  ConsumerState<_SpecBrowserBody> createState() => _SpecBrowserBodyState();
 }
 
-class _SpecBrowserBodyState extends State<_SpecBrowserBody> with SingleTickerProviderStateMixin {
+class _SpecBrowserBodyState extends ConsumerState<_SpecBrowserBody> with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   OpenApiEndpoint? _selectedEndpoint;
@@ -53,6 +54,9 @@ class _SpecBrowserBodyState extends State<_SpecBrowserBody> with SingleTickerPro
     super.initState();
     _detailTabController = TabController(length: 2, vsync: this);
     _searchController.addListener(() => setState(() => _searchQuery = _searchController.text));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(windowTitleProvider.notifier).state = widget.spec.title ?? 'OpenAPI Spec';
+    });
   }
 
   @override
@@ -160,7 +164,11 @@ class _SpecBrowserBodyState extends State<_SpecBrowserBody> with SingleTickerPro
                                 ...entry.value.map((ep) => _EndpointTile(
                                   endpoint: ep,
                                   isSelected: _selectedEndpoint == ep,
-                                  onTap: () => setState(() { _selectedEndpoint = ep; _detailTabController.index = 0; }),
+                                  onTap: () => setState(() {
+                                    _selectedEndpoint = ep;
+                                    _detailTabController.index = 0;
+                                    ref.read(windowTitleProvider.notifier).state = '${ep.method} ${ep.path}';
+                                  }),
                                 )),
                               ];
                             }).toList(),

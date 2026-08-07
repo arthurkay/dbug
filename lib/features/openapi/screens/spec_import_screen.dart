@@ -9,6 +9,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/http_client_provider.dart';
+import '../../../core/providers/window_title_provider.dart';
 import '../../../core/models/openapi_spec.dart';
 import '../../../shared/widgets/file_explorer.dart';
 import '../../../shared/widgets/toast_helper.dart';
@@ -34,7 +35,11 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
   @override
   void initState() {
     super.initState();
+    ref.read(windowTitleProvider.notifier).state = 'OpenAPI Specs';
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) setState(() {});
+    });
   }
 
   @override

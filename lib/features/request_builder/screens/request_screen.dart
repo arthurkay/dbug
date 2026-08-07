@@ -16,6 +16,7 @@ import '../../../shared/widgets/toast_helper.dart';
 import '../../../shared/widgets/dbug_spinner.dart';
 import '../../../shared/utils/method_colors.dart';
 import '../../../shared/utils/body_type_helpers.dart';
+import '../../../core/providers/window_title_provider.dart';
 
 class RequestScreen extends ConsumerStatefulWidget {
   final RequestModel? initialRequest;
@@ -81,6 +82,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
     _loadSplitRatio();
     _params = [KeyValueEntry()];
     _headers = [KeyValueEntry()];
+    ref.read(windowTitleProvider.notifier).state = 'Request Builder';
     if (widget.prefillMethod != null) _selectedMethod = widget.prefillMethod!;
     if (widget.prefillUrl != null) _urlController.text = widget.prefillUrl!;
     if (widget.historyEntry != null) {
@@ -242,6 +244,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
     _urlController.text = entry.url;
     _bodyController.text = entry.body ?? '';
     _requestNameController.text = entry.requestName ?? '';
+    ref.read(windowTitleProvider.notifier).state = entry.requestName?.isNotEmpty == true ? entry.requestName! : 'Request Builder';
 
     // Restore body type
     _selectedBodyType = bodyTypeStringToIndex(entry.bodyType);
@@ -312,6 +315,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
       ..clear()
       ..addAll(mapToEntries(req.headers));
     if (_headers.isEmpty) _headers.add(KeyValueEntry());
+    ref.read(windowTitleProvider.notifier).state = req.name.isNotEmpty ? req.name : 'Request Builder';
   }
 
   @override

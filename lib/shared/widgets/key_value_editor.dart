@@ -68,12 +68,12 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
                 const SizedBox(width: 32),
                 Expanded(
                   flex: 2,
-                  child: Text(widget.keyHint, style: TextStyle(fontSize: 11, color: colorScheme.outline, fontWeight: FontWeight.w500)),
+                  child: Text(widget.keyHint, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   flex: 3,
-                  child: Text(widget.valueHint, style: TextStyle(fontSize: 11, color: colorScheme.outline, fontWeight: FontWeight.w500)),
+                  child: Text(widget.valueHint, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
                 ),
                 const SizedBox(width: 32),
               ],

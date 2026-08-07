@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/active_environment_provider.dart';
+import '../../../core/providers/window_title_provider.dart';
 import '../../../core/models/environment_model.dart';
 import '../../../shared/widgets/key_value_editor.dart';
 import '../../../shared/widgets/toast_helper.dart';
@@ -18,6 +19,12 @@ class EnvironmentsScreen extends ConsumerStatefulWidget {
 
 class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
   String? _editingEnvId;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(windowTitleProvider.notifier).state = 'Environments';
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -10,6 +10,7 @@ import '../../../shared/utils/method_colors.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/active_environment_provider.dart';
+import '../../../core/providers/window_title_provider.dart';
 import '../../../core/repositories/request_repository.dart';
 import '../../../core/models/collection_model.dart';
 import '../../../core/models/request_model.dart';
@@ -29,6 +30,12 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
   final Set<String> _expandedCollections = {};
   final _searchController = TextEditingController();
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(windowTitleProvider.notifier).state = 'Collections';
+  }
 
   Future<void> _importFromFile() async {
     final result = await FilePicker.platform.pickFiles(
@@ -347,7 +354,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                       children: [
                         Text('{{${e.key}}}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.primary, fontFamily: 'monospace')),
                         const SizedBox(width: 4),
-                        Text('= ${e.value}', style: TextStyle(fontSize: 11, color: colorScheme.outline, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis),
+                        Text('= ${e.value}', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   );
@@ -410,11 +417,11 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(LucideIcons.folderOpen, size: 48, color: colorScheme.outline),
+            Icon(LucideIcons.folderOpen, size: 48, color: colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
             Text('No collections yet', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('Create a collection or import an OpenAPI spec', style: TextStyle(color: colorScheme.outline)),
+            Text('Create a collection or import an OpenAPI spec', style: TextStyle(color: colorScheme.onSurfaceVariant)),
             const SizedBox(height: 16),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -506,7 +513,7 @@ class _CollectionExpandable extends ConsumerWidget {
             children: [
               Text(collection.name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
               if (collection.description != null)
-                Text(collection.description!, style: TextStyle(fontSize: 11, color: colorScheme.outline), overflow: TextOverflow.ellipsis),
+                Text(collection.description!, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
             ],
           ),
           trailing: Row(
@@ -523,15 +530,15 @@ class _CollectionExpandable extends ConsumerWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (headerCount > 0) ...[
-                        Icon(LucideIcons.key, size: 10, color: colorScheme.outline),
+                        Icon(LucideIcons.key, size: 10, color: colorScheme.onSurfaceVariant),
                         const SizedBox(width: 3),
-                        Text('$headerCount', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: colorScheme.outline)),
+                        Text('$headerCount', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: colorScheme.onSurfaceVariant)),
                       ],
                       if (headerCount > 0 && hasAuth) const SizedBox(width: 6),
                       if (hasAuth) ...[
-                        Icon(LucideIcons.shield, size: 10, color: colorScheme.outline),
+                        Icon(LucideIcons.shield, size: 10, color: colorScheme.onSurfaceVariant),
                         const SizedBox(width: 3),
-                        Text(collection.authType.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: colorScheme.outline)),
+                        Text(collection.authType.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: colorScheme.onSurfaceVariant)),
                       ],
                     ],
                   ),
@@ -541,7 +548,7 @@ class _CollectionExpandable extends ConsumerWidget {
                 onPressed: () => _showHeadersDialog(context, ref),
                 visualDensity: VisualDensity.compact,
               ),
-              Icon(isExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18, color: colorScheme.outline),
+              Icon(isExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18, color: colorScheme.onSurfaceVariant),
               const SizedBox(width: 4),
               IconButton(icon: const Icon(LucideIcons.trash2, size: 14), onPressed: onDelete, visualDensity: VisualDensity.compact),
             ],
@@ -579,7 +586,7 @@ class _CollectionExpandable extends ConsumerWidget {
             children: [
               Icon(LucideIcons.key, size: 12, color: colorScheme.primary),
               const SizedBox(width: 6),
-              Text('Collection Headers', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.outline, letterSpacing: 0.5)),
+              Text('Collection Headers', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant, letterSpacing: 0.5)),
             ],
           ),
           const SizedBox(height: 6),
@@ -588,9 +595,9 @@ class _CollectionExpandable extends ConsumerWidget {
             child: Row(
               children: [
                 Text(e.key, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurface, fontFamily: 'monospace')),
-                Text(': ', style: TextStyle(fontSize: 11, color: colorScheme.outline)),
+                Text(': ', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
                 Expanded(
-                  child: Text(e.value, style: TextStyle(fontSize: 11, color: colorScheme.outline, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis),
+                  child: Text(e.value, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis),
                 ),
               ],
             ),
@@ -810,7 +817,7 @@ class _RequestList extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(12),
-        child: Text('Error: $e', style: TextStyle(color: colorScheme.outline)),
+        child: Text('Error: $e', style: TextStyle(color: colorScheme.onSurfaceVariant)),
       ),
       data: (requests) {
         final filtered = searchQuery.isEmpty ? requests : requests.where((req) {
@@ -821,7 +828,7 @@ class _RequestList extends ConsumerWidget {
         if (filtered.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(searchQuery.isEmpty ? 'No requests' : 'No matching requests', style: TextStyle(fontSize: 12, color: colorScheme.outline)),
+            child: Text(searchQuery.isEmpty ? 'No requests' : 'No matching requests', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
           );
         }
         return Padding(
