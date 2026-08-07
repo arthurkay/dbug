@@ -203,6 +203,121 @@
     }
     .install-cmd .copy-btn:hover { color: var(--text); }
 
+    /* INSTALL SECTION */
+    .install-section {
+      padding: 80px 24px 100px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .install-container {
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .install-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .install-tab {
+      flex: 1;
+      padding: 16px 24px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+    .install-tab:hover {
+      color: var(--text-secondary);
+      background: var(--surface-hover);
+    }
+    .install-tab.active {
+      color: var(--text);
+      border-bottom-color: var(--text);
+    }
+    .install-tab .tab-icon {
+      display: inline-block;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    .install-panel {
+      display: none;
+      padding: 32px;
+    }
+    .install-panel.active {
+      display: block;
+    }
+    .install-method-block {
+      margin-bottom: 28px;
+    }
+    .install-method-block:last-child {
+      margin-bottom: 0;
+    }
+    .install-method-block h4 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+    .install-method-block .install-cmd {
+      margin-top: 0;
+      width: 100%;
+      max-width: 600px;
+    }
+    .install-download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 28px;
+      background: var(--text);
+      color: var(--bg);
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: var(--font);
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+    .install-download-btn:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      text-decoration: none;
+    }
+    .install-file-info {
+      display: block;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+    .install-steps {
+      margin-top: 16px;
+      padding-left: 20px;
+    }
+    .install-steps li {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      line-height: 1.6;
+    }
+    .install-steps code {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: rgba(255,255,255,0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text);
+    }
+
     /* MOCKUP */
     .mockup-section {
       padding: 0 24px 100px;
@@ -554,6 +669,11 @@
         -webkit-overflow-scrolling: touch;
       }
       .install-cmd code { white-space: nowrap; font-size: 11px; }
+      .install-tabs { flex-direction: column; }
+      .install-tab { border-bottom: none; border-left: 2px solid transparent; text-align: left; padding: 12px 20px; }
+      .install-tab.active { border-left-color: var(--text); border-bottom-color: transparent; }
+      .install-panel { padding: 24px; }
+      .install-download-btn { width: 100%; justify-content: center; }
       .mockup-section { padding: 0 20px 60px; }
       .mockup-body { grid-template-columns: 1fr; }
       .mockup-sidebar { display: none; }
@@ -613,7 +733,7 @@
   <h1>API testing,<br>simplified.</h1>
   <p>A fast, local API testing tool built with Flutter. Like Postman, but lighter, fully offline, and open source.</p>
   <div class="hero-actions">
-    <a href="https://github.com/arthurkay/dbug/releases" class="btn btn-primary" target="_blank">
+    <a href="#" class="btn btn-primary" id="heroDownload">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Download
     </a>
@@ -725,6 +845,106 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="install-section" id="install">
+  <div class="section-header">
+    <h2>Get started in seconds</h2>
+    <p>Available for Linux, macOS, and Windows.</p>
+  </div>
+  <div class="install-container">
+    <div class="install-tabs">
+      <button class="install-tab active" data-os="linux">
+        <span class="tab-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+        </span>
+        Linux
+      </button>
+      <button class="install-tab" data-os="macos">
+        <span class="tab-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83z"/><path d="M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+        </span>
+        macOS
+      </button>
+      <button class="install-tab" data-os="windows">
+        <span class="tab-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12V6.75l6-1.32v6.48L3 12zm6.75-8.04L21 3v8.86l-11.25-.09V3.96zM21 12.14V21l-11.25-1.68V12.05L21 12.14zM3 13l6 .09v6.37l-6-1.02V13z"/></svg>
+        </span>
+        Windows
+      </button>
+    </div>
+
+    <!-- Linux panel -->
+    <div class="install-panel active" data-panel="linux">
+      <div class="install-method-block">
+        <h4>Install script</h4>
+        <div class="install-cmd">
+          <span class="prompt">$</span>
+          <code class="install-curl-cmd">curl -fsSL https://raw.githubusercontent.com/arthurkay/dbug/main/install.sh | bash</code>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent)" aria-label="Copy">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+        <p style="font-size: 12px; color: var(--text-tertiary); margin-top: 8px;">
+          Detects your platform, installs to <code style="font-family: var(--mono); font-size: 11px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;">~/.local/share/dbug/</code>, and creates a desktop entry.
+        </p>
+      </div>
+      <div class="install-method-block">
+        <h4>Direct download</h4>
+        <a class="install-download-btn" data-file="dbug-linux-x64.tar.gz">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for Linux x64
+        </a>
+        <span class="install-file-info">.tar.gz — Extract and run the <code>dbug</code> binary</span>
+      </div>
+    </div>
+
+    <!-- macOS panel -->
+    <div class="install-panel" data-panel="macos">
+      <div class="install-method-block">
+        <h4>Install script</h4>
+        <div class="install-cmd">
+          <span class="prompt">$</span>
+          <code class="install-curl-cmd">curl -fsSL https://raw.githubusercontent.com/arthurkay/dbug/main/install.sh | bash</code>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent)" aria-label="Copy">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+        <p style="font-size: 12px; color: var(--text-tertiary); margin-top: 8px;">
+          Installs to <code style="font-family: var(--mono); font-size: 11px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;">/Applications/dbug.app</code> automatically.
+        </p>
+      </div>
+      <div class="install-method-block">
+        <h4>Direct download</h4>
+        <a class="install-download-btn" data-file="dbug-macos.zip">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for macOS
+        </a>
+        <span class="install-file-info">.zip — Unzip and drag <code>dbug.app</code> to Applications</span>
+        <ol class="install-steps">
+          <li>Unzip the downloaded file</li>
+          <li>Drag <code>dbug.app</code> to your Applications folder</li>
+          <li>On first launch, right-click → Open to bypass Gatekeeper</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Windows panel -->
+    <div class="install-panel" data-panel="windows">
+      <div class="install-method-block">
+        <h4>Direct download</h4>
+        <a class="install-download-btn" data-file="dbug-windows-x64.zip">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for Windows x64
+        </a>
+        <span class="install-file-info">.zip — Extract and run <code>dbug.exe</code></span>
+        <ol class="install-steps">
+          <li>Extract the zip file</li>
+          <li>Run <code>dbug.exe</code> from the extracted folder</li>
+        </ol>
       </div>
     </div>
   </div>
@@ -868,6 +1088,35 @@
     setTimeout(() => {
       btn.textContent = 'Send';
     }, 800);
+  });
+
+  // Extract version from hero badge and wire up download links
+  const heroBadge = document.querySelector('.hero-badge');
+  const versionMatch = heroBadge.textContent.match(/v[\d.]+/);
+  const appVersion = versionMatch ? versionMatch[0] : 'v0.0.8';
+  const baseUrl = 'https://github.com/arthurkay/dbug/releases/download';
+
+  // Wire up hero download button
+  const heroDownload = document.getElementById('heroDownload');
+  if (heroDownload) {
+    heroDownload.href = baseUrl + '/' + appVersion + '/dbug-linux-x64.tar.gz';
+  }
+
+  // Wire up install section download buttons
+  document.querySelectorAll('.install-download-btn').forEach(function(btn) {
+    var file = btn.getAttribute('data-file');
+    btn.href = baseUrl + '/' + appVersion + '/' + file;
+  });
+
+  // OS tab switching
+  document.querySelectorAll('.install-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      document.querySelectorAll('.install-tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelectorAll('.install-panel').forEach(function(p) { p.classList.remove('active'); });
+      tab.classList.add('active');
+      var panel = document.querySelector('[data-panel="' + tab.getAttribute('data-os') + '"]');
+      if (panel) panel.classList.add('active');
+    });
   });
 </script>
 
