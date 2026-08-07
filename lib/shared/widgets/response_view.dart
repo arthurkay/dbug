@@ -219,7 +219,7 @@ class _ResponseViewState extends State<ResponseView> {
   Widget _buildHighlightedView(ColorScheme colorScheme, String body, HttpResponse resp) {
     final lines = body.split('\n');
     final contentType = resp.headers['content-type'] ?? '';
-    final spans = SyntaxHighlighter.highlight(body, contentType);
+    final spans = SyntaxHighlighter.highlight(body, contentType, colorScheme.brightness);
 
     return Container(
       width: double.infinity,
@@ -227,42 +227,46 @@ class _ResponseViewState extends State<ResponseView> {
         color: colorScheme.surfaceContainerHighest,
         borderRadius: const BorderRadius.all(Radius.circular(8)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 48,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              border: Border(right: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4))),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.vertical,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 48,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                border: Border(right: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4))),
+              ),
+              child: Column(
+                children: List.generate(lines.length, (i) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 0),
+                  child: Text(
+                    '${i + 1}',
+                    style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant, height: 1.5),
+                    textAlign: TextAlign.right,
+                  ),
+                )),
+              ),
             ),
-            child: Column(
-              children: List.generate(lines.length, (i) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 0),
-                child: Text(
-                  '${i + 1}',
-                  style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant, height: 1.5),
-                  textAlign: TextAlign.right,
-                ),
-              )),
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(14),
-              child: SelectableText.rich(
-                TextSpan(children: spans),
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  color: colorScheme.onSurface,
-                  height: 1.5,
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.all(14),
+                child: SelectableText.rich(
+                  TextSpan(children: spans),
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    color: colorScheme.onSurface,
+                    height: 1.5,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -589,7 +589,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                           Padding(
                             padding: const EdgeInsets.only(right: 6),
                             child: IconButton(
-                              icon: Icon(_showEndpointList ? LucideIcons.panelLeftOpen : LucideIcons.panelLeftClose, size: 18, color: colorScheme.outline),
+                              icon: Icon(_showEndpointList ? LucideIcons.panelLeftOpen : LucideIcons.panelLeftClose, size: 18, color: colorScheme.onSurfaceVariant),
                               onPressed: () => setState(() => _showEndpointList = !_showEndpointList),
                             ),
                           ),
@@ -673,10 +673,10 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
           Expanded(
             child: requestsAsync.when(
               loading: () => const Center(child: SizedBox(width: 16, height: 16, child: DbugSpinner(strokeWidth: 2))),
-              error: (e, _) => Center(child: Text('Error', style: TextStyle(fontSize: 11, color: colorScheme.outline))),
+              error: (e, _) =>                         Center(child: Text('Error', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant))),
               data: (requests) {
                 if (requests.isEmpty) {
-                  return Center(child: Text('No requests', style: TextStyle(fontSize: 11, color: colorScheme.outline)));
+                  return                     Center(child: Text('No requests', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)));
                 }
                 final filtered = _endpointSearchQuery.isEmpty
                     ? requests
@@ -687,7 +687,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                             r.url.toLowerCase().contains(q);
                       }).toList();
                 if (filtered.isEmpty) {
-                  return Center(child: Text('No matching endpoints', style: TextStyle(fontSize: 11, color: colorScheme.outline)));
+                  return                     Center(child: Text('No matching endpoints', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)));
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -918,9 +918,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                   children: [
                     Row(
                       children: [
-                        Icon(LucideIcons.key, size: 12, color: colorScheme.outline),
+                        Icon(LucideIcons.key, size: 12, color: colorScheme.onSurfaceVariant),
                         const SizedBox(width: 6),
-                        Text('Collection Headers (inherited)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.outline, letterSpacing: 0.5)),
+                        Text('Collection Headers (inherited)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant, letterSpacing: 0.5)),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -929,8 +929,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                       child: Row(
                         children: [
                           Text(e.key, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurface, fontFamily: 'monospace')),
-                          Text(': ', style: TextStyle(fontSize: 11, color: colorScheme.outline)),
-                          Expanded(child: Text(e.value, style: TextStyle(fontSize: 11, color: colorScheme.outline, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis)),
+                          Text(': ', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+                          Expanded(child: Text(e.value, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant, fontFamily: 'monospace'), overflow: TextOverflow.ellipsis)),
                         ],
                       ),
                     )),
@@ -985,7 +985,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
             else
               Expanded(
                 child: Center(
-                  child: Text('No body', style: TextStyle(color: colorScheme.outline)),
+                    child: Text('No body', style: TextStyle(color: colorScheme.onSurfaceVariant)),
                 ),
               ),
           ],
@@ -1057,7 +1057,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen> with TickerProvid
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text('No authentication', style: TextStyle(color: colorScheme.outline)),
+                    child: Text('No authentication', style: TextStyle(color: colorScheme.onSurfaceVariant)),
                   ),
                 ),
               ],

@@ -1,29 +1,78 @@
 import 'package:flutter/widgets.dart';
 
+class _Colors {
+  final Color key;
+  final Color string;
+  final Color number;
+  final Color boolValue;
+  final Color nullValue;
+  final Color tag;
+  final Color attrName;
+  final Color attrValue;
+  final Color comment;
+  final Color punctuation;
+  final Color defaultText;
+
+  const _Colors({
+    required this.key,
+    required this.string,
+    required this.number,
+    required this.boolValue,
+    required this.nullValue,
+    required this.tag,
+    required this.attrName,
+    required this.attrValue,
+    required this.comment,
+    required this.punctuation,
+    required this.defaultText,
+  });
+}
+
+const _darkColors = _Colors(
+  key: Color(0xFF7DD3FC),
+  string: Color(0xFF86EFAC),
+  number: Color(0xFF93C5FD),
+  boolValue: Color(0xFFFCA5A5),
+  nullValue: Color(0xFFFCA5A5),
+  tag: Color(0xFF7DD3FC),
+  attrName: Color(0xFF93C5FD),
+  attrValue: Color(0xFF86EFAC),
+  comment: Color(0xFF71717A),
+  punctuation: Color(0xFFA1A1AA),
+  defaultText: Color(0xFFFAFAFA),
+);
+
+const _lightColors = _Colors(
+  key: Color(0xFF2563EB),
+  string: Color(0xFF16A34A),
+  number: Color(0xFF7C3AED),
+  boolValue: Color(0xFFDC2626),
+  nullValue: Color(0xFFDC2626),
+  tag: Color(0xFF2563EB),
+  attrName: Color(0xFF7C3AED),
+  attrValue: Color(0xFF16A34A),
+  comment: Color(0xFF9CA3AF),
+  punctuation: Color(0xFF6B7280),
+  defaultText: Color(0xFF09090B),
+);
+
 class SyntaxHighlighter {
   SyntaxHighlighter._();
 
-  static Color _keyColor = const Color(0xFF7DD3FC);
-  static Color _stringColor = const Color(0xFF86EFAC);
-  static Color _numberColor = const Color(0xFF93C5FD);
-  static Color _boolColor = const Color(0xFFFCA5A5);
-  static Color _nullColor = const Color(0xFFFCA5A5);
-  static Color _tagColor = const Color(0xFF7DD3FC);
-  static Color _attrNameColor = const Color(0xFF93C5FD);
-  static Color _attrValueColor = const Color(0xFF86EFAC);
-  static Color _commentColor = const Color(0xFF71717A);
-  static Color _punctuationColor = const Color(0xFFA1A1AA);
-  static Color _defaultColor = const Color(0xFFFAFAFA);
+  static _Colors _getColors(Brightness brightness) {
+    return brightness == Brightness.dark ? _darkColors : _lightColors;
+  }
 
-  static List<TextSpan> highlight(String body, String contentType) {
+  static List<TextSpan> highlight(String body, String contentType, Brightness brightness) {
+    final c = _getColors(brightness);
     if (contentType.contains('json') || _looksLikeJson(body)) {
-      return _highlightJson(body);
+      return _highlightJson(body, c);
     } else if (contentType.contains('xml') || _looksLikeXml(body)) {
-      return _highlightXml(body);
+      return _highlightXml(body, c);
     } else if (contentType.contains('yaml') || contentType.contains('yml') || _looksLikeYaml(body)) {
-      return _highlightYaml(body);
+      return _highlightYaml(body, c);
     }
-    return [TextSpan(text: body, style: TextStyle(color: _defaultColor, fontFamily: 'monospace', fontSize: 12))];
+    return [TextSpan(text: body, style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12))];
   }
 
   static bool _looksLikeJson(String body) {
@@ -41,7 +90,7 @@ class SyntaxHighlighter {
     return trimmed.contains(': ') && !trimmed.startsWith('{') && !trimmed.startsWith('<');
   }
 
-  static List<TextSpan> _highlightJson(String body) {
+  static List<TextSpan> _highlightJson(String body, _Colors c) {
     final spans = <TextSpan>[];
     final regex = RegExp(
       r'"([^"\\]|\\.)*"'   // strings (including keys)
@@ -58,7 +107,7 @@ class SyntaxHighlighter {
 
     for (final match in regex.allMatches(body)) {
       if (match.start > lastEnd) {
-        spans.add(TextSpan(text: body.substring(lastEnd, match.start), style: TextStyle(color: _defaultColor, fontFamily: 'monospace', fontSize: 12)));
+        spans.add(TextSpan(text: body.substring(lastEnd, match.start), style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
       }
 
       final token = match.group(0)!;
@@ -67,30 +116,30 @@ class SyntaxHighlighter {
 
       if (token.startsWith('"')) {
         if (expectKey) {
-          color = _keyColor;
+          color = c.key;
           weight = FontWeight.w600;
           expectKey = false;
         } else {
-          color = _stringColor;
+          color = c.string;
         }
         if (token == '"') {
           expectKey = true;
         }
       } else if (token == ':' || token == ',' || token == '{' || token == '}' || token == '[' || token == ']') {
-        color = _punctuationColor;
+        color = c.punctuation;
         if (token == ':' || token == ',') {
           expectKey = true;
         } else if (token == '{' || token == '[') {
           expectKey = true;
         }
       } else if (token == 'true' || token == 'false') {
-        color = _boolColor;
+        color = c.boolValue;
       } else if (token == 'null') {
-        color = _nullColor;
+        color = c.nullValue;
       } else if (RegExp(r'^[-+]?\d').hasMatch(token)) {
-        color = _numberColor;
+        color = c.number;
       } else {
-        color = _defaultColor;
+        color = c.defaultText;
       }
 
       spans.add(TextSpan(
@@ -102,13 +151,13 @@ class SyntaxHighlighter {
     }
 
     if (lastEnd < body.length) {
-      spans.add(TextSpan(text: body.substring(lastEnd), style: TextStyle(color: _defaultColor, fontFamily: 'monospace', fontSize: 12)));
+      spans.add(TextSpan(text: body.substring(lastEnd), style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
     }
 
     return spans;
   }
 
-  static List<TextSpan> _highlightXml(String body) {
+  static List<TextSpan> _highlightXml(String body, _Colors c) {
     final spans = <TextSpan>[];
     final regex = RegExp(
       r'<!--[\s\S]*?-->'           // comments
@@ -125,28 +174,28 @@ class SyntaxHighlighter {
 
     for (final match in regex.allMatches(body)) {
       if (match.start > lastEnd) {
-        spans.add(TextSpan(text: body.substring(lastEnd, match.start), style: TextStyle(color: _defaultColor, fontFamily: 'monospace', fontSize: 12)));
+        spans.add(TextSpan(text: body.substring(lastEnd, match.start), style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
       }
 
       final token = match.group(0)!;
       Color color;
 
       if (token.startsWith('<!--')) {
-        color = _commentColor;
+        color = c.comment;
       } else if (token.startsWith('<?')) {
-        color = _commentColor;
+        color = c.comment;
       } else if (token.startsWith('</')) {
-        color = _tagColor;
+        color = c.tag;
       } else if (token.startsWith('<')) {
-        color = _tagColor;
+        color = c.tag;
       } else if (token == '/>' || token == '>') {
-        color = _punctuationColor;
+        color = c.punctuation;
       } else if (token.startsWith(' ') && token.endsWith('=')) {
-        color = _attrNameColor;
+        color = c.attrName;
       } else if (token.startsWith('"') || token.startsWith("'")) {
-        color = _attrValueColor;
+        color = c.attrValue;
       } else {
-        color = _defaultColor;
+        color = c.defaultText;
       }
 
       spans.add(TextSpan(text: token, style: TextStyle(color: color, fontFamily: 'monospace', fontSize: 12)));
@@ -154,22 +203,22 @@ class SyntaxHighlighter {
     }
 
     if (lastEnd < body.length) {
-      spans.add(TextSpan(text: body.substring(lastEnd), style: TextStyle(color: _defaultColor, fontFamily: 'monospace', fontSize: 12)));
+      spans.add(TextSpan(text: body.substring(lastEnd), style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
     }
 
     return spans;
   }
 
-  static List<TextSpan> _highlightYaml(String body) {
+  static List<TextSpan> _highlightYaml(String body, _Colors c) {
     final spans = <TextSpan>[];
     final lines = body.split('\n');
 
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i];
-      if (i > 0) spans.add(TextSpan(text: '\n', style: TextStyle(color: _defaultColor, fontFamily: 'monospace', fontSize: 12)));
+      if (i > 0) spans.add(TextSpan(text: '\n', style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
 
       if (line.trimLeft().startsWith('#')) {
-        spans.add(TextSpan(text: line, style: TextStyle(color: _commentColor, fontFamily: 'monospace', fontSize: 12)));
+        spans.add(TextSpan(text: line, style: TextStyle(color: c.comment, fontFamily: 'monospace', fontSize: 12)));
         continue;
       }
 
@@ -178,22 +227,22 @@ class SyntaxHighlighter {
         final key = line.substring(0, colonIndex + 1);
         final value = line.substring(colonIndex + 1);
 
-        spans.add(TextSpan(text: key, style: TextStyle(color: _keyColor, fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.w600)));
+        spans.add(TextSpan(text: key, style: TextStyle(color: c.key, fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.w600)));
 
         if (value.isNotEmpty) {
           final trimmedValue = value.trimLeft();
           Color valueColor;
 
           if (trimmedValue == 'true' || trimmedValue == 'false') {
-            valueColor = _boolColor;
+            valueColor = c.boolValue;
           } else if (trimmedValue == 'null' || trimmedValue == '~') {
-            valueColor = _nullColor;
+            valueColor = c.nullValue;
           } else if (RegExp(r'^[-+]?\d').hasMatch(trimmedValue)) {
-            valueColor = _numberColor;
+            valueColor = c.number;
           } else if (trimmedValue.startsWith('"') || trimmedValue.startsWith("'")) {
-            valueColor = _stringColor;
+            valueColor = c.string;
           } else {
-            valueColor = _defaultColor;
+            valueColor = c.defaultText;
           }
 
           spans.add(TextSpan(text: value, style: TextStyle(color: valueColor, fontFamily: 'monospace', fontSize: 12)));
@@ -203,26 +252,26 @@ class SyntaxHighlighter {
         final indent = line.substring(0, dashEnd);
         final rest = line.substring(dashEnd);
 
-        spans.add(TextSpan(text: indent, style: TextStyle(color: _punctuationColor, fontFamily: 'monospace', fontSize: 12)));
+        spans.add(TextSpan(text: indent, style: TextStyle(color: c.punctuation, fontFamily: 'monospace', fontSize: 12)));
 
         if (rest.isNotEmpty) {
           final trimmedRest = rest.trimLeft();
           Color valueColor;
 
           if (trimmedRest == 'true' || trimmedRest == 'false') {
-            valueColor = _boolColor;
+            valueColor = c.boolValue;
           } else if (trimmedRest == 'null' || trimmedRest == '~') {
-            valueColor = _nullColor;
+            valueColor = c.nullValue;
           } else if (RegExp(r'^[-+]?\d').hasMatch(trimmedRest)) {
-            valueColor = _numberColor;
+            valueColor = c.number;
           } else {
-            valueColor = _stringColor;
+            valueColor = c.string;
           }
 
           spans.add(TextSpan(text: rest, style: TextStyle(color: valueColor, fontFamily: 'monospace', fontSize: 12)));
         }
       } else {
-        spans.add(TextSpan(text: line, style: TextStyle(color: _defaultColor, fontFamily: 'monospace', fontSize: 12)));
+        spans.add(TextSpan(text: line, style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
       }
     }
 
