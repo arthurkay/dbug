@@ -631,6 +631,9 @@ class _SchemaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (schema.properties.isNotEmpty || schema.ref != null) {
+      return _JsonSchemaPreview(schema: schema);
+    }
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
@@ -642,6 +645,162 @@ class _SchemaCard extends StatelessWidget {
       ),
       child: _SchemaView(schema: schema),
     );
+  }
+}
+
+class _JsonSchemaPreview extends StatelessWidget {
+  final OpenApiSchema schema;
+  const _JsonSchemaPreview({required this.schema});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final schemaName = schema.ref?.split('/').last;
+    final jsonLines = _schemaToJson(schema, 0);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (schemaName != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.06),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                border: Border(bottom: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4))),
+              ),
+              child: Row(
+                children: [
+                  Icon(LucideIcons.fileJson, size: 14, color: colorScheme.primary),
+                  const SizedBox(width: 6),
+                  SelectableText(schemaName, style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: colorScheme.primary)),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: SelectableText.rich(
+              TextSpan(
+                children: [
+                  for (var i = 0; i < jsonLines.length; i++) ...[
+                    TextSpan(
+                      text: '${(i + 1).toString().padLeft(3)}  ',
+                      style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
+                    ),
+                    ..._highlightJsonLine(jsonLines[i], colorScheme),
+                    const TextSpan(text: '\n'),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _schemaToJson(OpenApiSchema schema, int indent) {
+    final pad = '  ' * indent;
+    final innerPad = '  ' * (indent + 1);
+    final lines = <String>[];
+    final props = schema.properties;
+
+    if (props.isEmpty && schema.items == null) {
+      lines.add('$pad{}');
+      return lines;
+    }
+
+    lines.add('$pad{');
+    final entries = props.entries.toList();
+    for (var i = 0; i < entries.length; i++) {
+      final e = entries[i];
+      final isRequired = schema.requiredFields.contains(e.key);
+      final key = '"${e.key}"${isRequired ? '*' : ''}';
+      final val = _schemaValue(e.value, indent + 1);
+      final comma = i < entries.length - 1 ? ',' : '';
+      lines.add('$innerPad$key: $val$comma');
+    }
+    lines.add('$pad}');
+    return lines;
+  }
+
+  String _schemaValue(OpenApiSchema schema, int indent) {
+    if (schema.ref != null) return '"${schema.ref!.split('/').last}"';
+    if (schema.enumValues.isNotEmpty) return '[${schema.enumValues.map((v) => '"$v"').join(', ')}]';
+    if (schema.items != null) {
+      final itemVal = _schemaValue(schema.items!, indent);
+      return '[$itemVal]';
+    }
+    if (schema.properties.isNotEmpty) {
+      final inner = _schemaToJson(schema, indent);
+      return inner.join('\n');
+    }
+    final type = schema.format != null ? '${schema.type}(${schema.format})' : (schema.type ?? 'any');
+    return '"$type"';
+  }
+
+  List<TextSpan> _highlightJsonLine(String line, ColorScheme colorScheme) {
+    final spans = <TextSpan>[];
+    final keyPattern = RegExp(r'("[^*"]+"\*?):\s*');
+    final stringPattern = RegExp(r'"[^"]*"');
+    final bracketPattern = RegExp(r'[{}\[\],]');
+
+    var remaining = line;
+    while (remaining.isNotEmpty) {
+      final keyMatch = keyPattern.firstMatch(remaining);
+      if (keyMatch != null && keyMatch.start == 0) {
+        spans.add(TextSpan(
+          text: keyMatch.group(1)!,
+          style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: colorScheme.primary),
+        ));
+        remaining = remaining.substring(keyMatch.end);
+        final valMatch = stringPattern.firstMatch(remaining);
+        if (valMatch != null && valMatch.start == 0) {
+          final val = valMatch.group(0)!;
+          final isType = !val.contains(' ') && val != '""';
+          spans.add(TextSpan(
+            text: val,
+            style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: isType ? const Color(0xFF22C55E) : colorScheme.onSurface),
+          ));
+          remaining = remaining.substring(valMatch.end);
+        }
+        continue;
+      }
+
+      final stringMatch = stringPattern.firstMatch(remaining);
+      if (stringMatch != null && stringMatch.start == 0) {
+        spans.add(TextSpan(
+          text: stringMatch.group(0)!,
+          style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: const Color(0xFF22C55E)),
+        ));
+        remaining = remaining.substring(stringMatch.end);
+        continue;
+      }
+
+      final bracketMatch = bracketPattern.firstMatch(remaining);
+      if (bracketMatch != null && bracketMatch.start == 0) {
+        spans.add(TextSpan(
+          text: bracketMatch.group(0)!,
+          style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant),
+        ));
+        remaining = remaining.substring(bracketMatch.end);
+        continue;
+      }
+
+      spans.add(TextSpan(
+        text: remaining[0],
+        style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurface),
+      ));
+      remaining = remaining.substring(1);
+    }
+    return spans;
   }
 }
 
@@ -693,7 +852,9 @@ class _ResponseCard extends StatelessWidget {
           if (schema.type != null || schema.properties.isNotEmpty || schema.ref != null)
             Padding(
               padding: const EdgeInsets.all(12),
-              child: _SchemaView(schema: schema),
+              child: (schema.properties.isNotEmpty || schema.ref != null)
+                  ? _JsonSchemaPreview(schema: schema)
+                  : _SchemaView(schema: schema),
             ),
         ],
       ),

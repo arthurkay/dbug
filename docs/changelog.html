@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Changelog — dbug</title>
+  <meta name="description" content="Release history and changelog for dbug, a local API testing tool built with Flutter.">
+  <link rel="icon" href="assets/icon/dbug_icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #09090b;
+      --surface: #18181b;
+      --surface-hover: #1f1f23;
+      --surface-2: #27272a;
+      --border: rgba(255,255,255,0.06);
+      --border-strong: rgba(255,255,255,0.1);
+      --text: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-tertiary: #71717a;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root:not(.dark) {
+        --bg: #fafafa;
+        --surface: #ffffff;
+        --surface-hover: #f4f4f5;
+        --surface-2: #e4e4e7;
+        --border: rgba(0,0,0,0.06);
+        --border-strong: rgba(0,0,0,0.1);
+        --text: #09090b;
+        --text-secondary: #71717a;
+        --text-tertiary: #a1a1aa;
+        --shadow: 0 1px 3px rgba(0,0,0,0.08);
+        --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+      }
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(9,9,11,0.8);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    @media (prefers-color-scheme: light) {
+      nav:not(.dark) { background: rgba(250,250,250,0.8); }
+    }
+    nav .container {
+      max-width: 1100px; margin: 0 auto; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 60px;
+    }
+    nav .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 16px; letter-spacing: -0.3px;
+    }
+    nav .logo img { width: 28px; height: 28px; }
+    nav .nav-links { display: flex; align-items: center; gap: 8px; }
+    nav .nav-links a {
+      padding: 8px 14px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 500; color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+    nav .nav-links a:hover { color: var(--text); background: var(--surface); }
+    nav .nav-links .btn-nav {
+      background: var(--text);
+      color: var(--bg);
+      font-weight: 600;
+    }
+    nav .nav-links .btn-nav:hover { opacity: 0.9; }
+
+    .theme-toggle {
+      background: none; border: none; color: var(--text-secondary);
+      padding: 8px; cursor: pointer; border-radius: var(--radius-sm);
+      transition: all 0.15s ease;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .theme-toggle:hover { color: var(--text); background: var(--surface); }
+
+    .mobile-menu-btn {
+      display: none;
+      background: none; border: none; color: var(--text);
+      padding: 8px; cursor: pointer; border-radius: var(--radius-sm);
+    }
+    .mobile-menu-btn:hover { background: var(--surface); }
+
+    /* MAIN */
+    .main-content {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 120px 24px 100px;
+    }
+
+    .page-header {
+      margin-bottom: 56px;
+    }
+    .page-header h1 {
+      font-size: 36px; font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 12px;
+    }
+    .page-header p {
+      font-size: 16px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    /* TIMELINE */
+    .changelog {
+      position: relative;
+    }
+    .changelog::before {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0; left: 23px;
+      width: 1px;
+      background: var(--border-strong);
+    }
+
+    .release {
+      position: relative;
+      padding-left: 64px;
+      padding-bottom: 56px;
+    }
+    .release:last-child {
+      padding-bottom: 0;
+    }
+
+    .release-dot {
+      position: absolute;
+      left: 16px; top: 4px;
+      width: 15px; height: 15px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      border: 2px solid var(--border-strong);
+      z-index: 1;
+    }
+    .release:first-child .release-dot {
+      background: var(--text);
+      border-color: var(--text);
+    }
+
+    .release-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .release-version {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .release-version a {
+      transition: color 0.15s;
+    }
+    .release-version a:hover {
+      color: var(--text-secondary);
+    }
+    .release-date {
+      font-size: 13px;
+      color: var(--text-tertiary);
+      font-weight: 500;
+    }
+    .release-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      font-family: var(--mono);
+    }
+    .release-latest {
+      background: rgba(34,197,94,0.1);
+      color: #22c55e;
+    }
+    .release-latest .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+
+    .release-summary {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    .change-list {
+      list-style: none;
+    }
+    .change-list li {
+      position: relative;
+      padding: 6px 0 6px 20px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .change-list li::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 13px;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text-tertiary);
+    }
+    .change-list li code {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: rgba(255,255,255,0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text);
+    }
+
+    .change-tag {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .change-tag.feat { background: rgba(59,130,246,0.15); color: #60a5fa; }
+    .change-tag.fix { background: rgba(234,179,8,0.15); color: #facc15; }
+    .change-tag.chore { background: rgba(161,161,170,0.15); color: #a1a1aa; }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 24px;
+      text-align: center;
+    }
+    footer .container { max-width: 1100px; margin: 0 auto; }
+    footer p {
+      font-size: 13px;
+      color: var(--text-tertiary);
+    }
+    footer a { color: var(--text-secondary); transition: color 0.15s; }
+    footer a:hover { color: var(--text); }
+
+    /* MOBILE */
+    @media (max-width: 768px) {
+      nav .nav-links { display: none; }
+      nav .nav-links.open {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 60px; left: 0; right: 0;
+        background: rgba(9,9,11,0.95);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border);
+        padding: 16px;
+        gap: 4px;
+      }
+      nav .nav-links.open a {
+        width: 100%;
+        padding: 12px 16px;
+        font-size: 14px;
+      }
+      .mobile-menu-btn { display: block; }
+      .main-content { padding: 100px 20px 60px; }
+      .page-header h1 { font-size: 28px; }
+      .release { padding-left: 48px; }
+      .release-dot { left: 10px; }
+      .changelog::before { left: 16px; }
+      .release-version { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="container">
+    <a href="index.html" class="logo">
+      <img src="assets/icon/dbug_icon.svg" alt="dbug">
+      dbug
+    </a>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html#features">Features</a>
+      <a href="index.html#tech">Tech</a>
+      <a href="changelog.html">Changelog</a>
+      <a href="https://github.com/arthurkay/dbug" target="_blank">GitHub</a>
+      <a href="https://github.com/arthurkay/dbug/releases" target="_blank" class="btn-nav">Download</a>
+    </div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button class="mobile-menu-btn" id="menuBtn" aria-label="Toggle menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<main class="main-content">
+  <div class="page-header">
+    <h1>Changelog</h1>
+    <p>Release history for dbug. Each version includes bug fixes, new features, and improvements.</p>
+  </div>
+
+  <div class="changelog">
+
+    <!-- v0.1.1 -->
+    <div class="release">
+      <div class="release-dot"></div>
+      <div class="release-header">
+        <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.1.1">v0.1.1</a></span>
+        <span class="release-tag release-latest"><span class="dot"></span> Latest</span>
+        <span class="release-date">August 2026</span>
+      </div>
+      <p class="release-summary">JSON schema preview in the spec browser — see actual request/response parameters in formatted JSON.</p>
+      <ul class="change-list">
+        <li><span class="change-tag feat">Feat</span> Request body and response schemas now render as formatted JSON with line numbers and syntax highlighting</li>
+        <li><span class="change-tag feat">Feat</span> Schema names (e.g. <code>CreateVMRequest</code>, <code>VMInfo</code>) displayed as headings above JSON preview</li>
+        <li><span class="change-tag fix">Fix</span> Improved <code>$ref</code> resolution fallback for schema lookups in component schemas</li>
+        <li><span class="change-tag chore">Chore</span> Website changelog page with last 5 releases and navigation link</li>
+      </ul>
+    </div>
+
+    <!-- v0.1.0 -->
+    <div class="release">
+      <div class="release-dot"></div>
+      <div class="release-header">
+        <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.1.0">v0.1.0</a></span>
+        <span class="release-date">August 2026</span>
+      </div>
+      <p class="release-summary">Syntax highlighting themes, persistent window state, font harmonization, and full text selectability across the app.</p>
+      <ul class="change-list">
+        <li><span class="change-tag feat">Feat</span> 6 syntax highlighter themes (Default, GitHub, Monokai, Dracula, OneDark, Solarized) with dark/light variants</li>
+        <li><span class="change-tag feat">Feat</span> Syntax theme selector in Settings with live JSON preview</li>
+        <li><span class="change-tag feat">Feat</span> Window size, position, and maximized state persist across restarts</li>
+        <li><span class="change-tag feat">Feat</span> Minimum window size enforced at 900x600</li>
+        <li><span class="change-tag fix">Fix</span> Font floor raised app-wide from 9/10px to 11px for better readability</li>
+        <li><span class="change-tag fix">Fix</span> All endpoint data text now selectable (method badges, paths, URLs, params, status codes, schemas)</li>
+        <li><span class="change-tag fix">Fix</span> Invisible text on dark backgrounds — replaced <code>colorScheme.outline</code> with <code>onSurfaceVariant</code></li>
+        <li><span class="change-tag fix">Fix</span> RenderFlex overflow in endpoint detail view</li>
+        <li><span class="change-tag fix">Fix</span> Method badge width increased for long methods (DELETE)</li>
+        <li><span class="change-tag fix">Fix</span> Spec browser endpoint tiles show operationId/summary name alongside path</li>
+        <li><span class="change-tag chore">Chore</span> Responsive breakpoint changed from 768px to 900px</li>
+      </ul>
+    </div>
+
+    <!-- v0.0.9 -->
+    <div class="release">
+      <div class="release-dot"></div>
+      <div class="release-header">
+        <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.0.9">v0.0.9</a></span>
+        <span class="release-date">August 2026</span>
+      </div>
+      <p class="release-summary">Add endpoints to collections, collection picker, and improved website navigation.</p>
+      <ul class="change-list">
+        <li><span class="change-tag feat">Feat</span> Add endpoints directly to collections from the request builder</li>
+        <li><span class="change-tag feat">Feat</span> Collection picker dropdown when adding endpoints</li>
+        <li><span class="change-tag fix">Fix</span> Website download button now scrolls to install section</li>
+        <li><span class="change-tag chore">Chore</span> Website installation section with OS tabs and direct download links</li>
+      </ul>
+    </div>
+
+    <!-- v0.0.8 -->
+    <div class="release">
+      <div class="release-dot"></div>
+      <div class="release-header">
+        <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.0.8">v0.0.8</a></span>
+        <span class="release-date">August 2026</span>
+      </div>
+      <p class="release-summary">Dark/light theme legibility fixes, request name sync, and scrollable response body.</p>
+      <ul class="change-list">
+        <li><span class="change-tag fix">Fix</span> Request name now updates automatically when switching endpoints</li>
+        <li><span class="change-tag fix">Fix</span> Cursor-following URL tooltip shows resolved URL with variable substitution</li>
+        <li><span class="change-tag fix">Fix</span> Response body overflow — now scrollable with proper constraints</li>
+        <li><span class="change-tag fix">Fix</span> Request headers legibility in dark theme</li>
+        <li><span class="change-tag fix">Fix</span> Theme-aware syntax highlighting in response viewer</li>
+      </ul>
+    </div>
+
+    <!-- v0.0.7 -->
+    <div class="release">
+      <div class="release-dot"></div>
+      <div class="release-header">
+        <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.0.7">v0.0.7</a></span>
+        <span class="release-date">August 2026</span>
+      </div>
+      <p class="release-summary">Dark theme legibility overhaul with neutral surfaces and readable text colors.</p>
+      <ul class="change-list">
+        <li><span class="change-tag feat">Feat</span> cal.com-inspired theme with neutral dark surfaces</li>
+        <li><span class="change-tag feat">Feat</span> Redesigned website with cal.com design system</li>
+        <li><span class="change-tag fix">Fix</span> Neutral surface colors replacing overly dark backgrounds</li>
+        <li><span class="change-tag fix">Fix</span> Readable text colors across all screens</li>
+        <li><span class="change-tag fix">Fix</span> Remaining outline text color issues for dark mode contrast</li>
+      </ul>
+    </div>
+
+    <!-- v0.0.3 -->
+    <div class="release">
+      <div class="release-dot"></div>
+      <div class="release-header">
+        <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.0.3">v0.0.3</a></span>
+        <span class="release-date">July 2026</span>
+      </div>
+      <p class="release-summary">Code quality fixes, deployment setup, and cross-platform improvements.</p>
+      <ul class="change-list">
+        <li><span class="change-tag feat">Feat</span> Cross-platform app icons for Linux, macOS, and Windows</li>
+        <li><span class="change-tag feat">Feat</span> Linux desktop integration with .desktop entry</li>
+        <li><span class="change-tag feat">Feat</span> Install script for downloading, installing, and updating dbug</li>
+        <li><span class="change-tag feat">Feat</span> Release CI for automated builds</li>
+        <li><span class="change-tag fix">Fix</span> Select dropdowns and environment activation</li>
+        <li><span class="change-tag fix">Fix</span> Split ratio persistence</li>
+        <li><span class="change-tag chore">Chore</span> Code quality improvements and test coverage</li>
+        <li><span class="change-tag chore">Chore</span> GitHub Pages deployment for website</li>
+      </ul>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>Built with Flutter &middot; <a href="https://github.com/arthurkay/dbug" target="_blank">Source on GitHub</a> &middot; MIT License</p>
+  </div>
+</footer>
+
+<script>
+  // Theme toggle
+  const themeToggle = document.getElementById('themeToggle');
+  const html = document.documentElement;
+
+  const savedTheme = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  if (savedTheme === 'light' || (!savedTheme && !prefersDark)) {
+    html.classList.remove('dark');
+  } else {
+    html.classList.add('dark');
+  }
+
+  function updateThemeIcon() {
+    const isDark = html.classList.contains('dark');
+    themeToggle.querySelector('.icon-sun').style.display = isDark ? 'block' : 'none';
+    themeToggle.querySelector('.icon-moon').style.display = isDark ? 'none' : 'block';
+  }
+
+  updateThemeIcon();
+
+  themeToggle.addEventListener('click', function() {
+    html.classList.toggle('dark');
+    localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+    updateThemeIcon();
+  });
+
+  // Mobile menu
+  document.getElementById('menuBtn').addEventListener('click', function() {
+    document.getElementById('navLinks').classList.toggle('open');
+  });
+</script>
+
+<style>
+  .icon-sun { display: none; }
+  .icon-moon { display: block; }
+  .dark .icon-sun { display: block; }
+  .dark .icon-moon { display: none; }
+</style>
+
+</body>
+</html>

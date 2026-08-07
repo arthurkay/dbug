@@ -150,6 +150,14 @@ class OpenApiParser {
       if (resolved != null) {
         return _parseSchema(root, resolved);
       }
+      final refName = ref.split('/').last;
+      final componentSchemas = root['components'] is Map ? (root['components'] as Map)['schemas'] : null;
+      if (componentSchemas is Map && componentSchemas.containsKey(refName)) {
+        final fallback = componentSchemas[refName];
+        if (fallback is Map<String, dynamic>) {
+          return _parseSchema(root, fallback);
+        }
+      }
       return OpenApiSchema(type: 'object', ref: ref);
     }
 
