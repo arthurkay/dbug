@@ -1,7 +1,7 @@
 [Setup]
 AppId={{B5E3C8A2-4F7D-4E9A-A1C3-8D6F2E5B7C9D}
 AppName=dbug
-AppVersion=0.1.2
+AppVersion=0.1.3
 AppPublisher=com.dbug
 AppPublisherURL=https://github.com/arthurkay/dbug
 AppSupportURL=https://github.com/arthurkay/dbug/issues
@@ -21,11 +21,11 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridingAllowed=yes
 SetupIconFile=..\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\dbug.exe
-VersionInfoVersion=0.1.2.0
+VersionInfoVersion=0.1.3.0
 VersionInfoCompany=com.dbug
 VersionInfoDescription=dbug - Local API Testing Tool
 VersionInfoProductName=dbug
-VersionInfoProductVersion=0.1.2
+VersionInfoProductVersion=0.1.3
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
