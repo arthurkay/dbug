@@ -94,6 +94,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       _loadFromHistoryEntry(widget.historyEntry!);
     } else if (widget.initialRequest != null) {
       _loadFromRequest(widget.initialRequest!);
+      _loadLatestHistoryForRequest(widget.initialRequest!.id);
     } else {
       _loadBuilderState();
     }
@@ -350,6 +351,17 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       default:
         _selectedAuthType = 0;
     }
+
+    // Restore response from history
+    if (entry.statusCode != null) {
+      _lastResponse = HttpResponse(
+        statusCode: entry.statusCode!,
+        headers: const {},
+        body: entry.responseBody ?? '',
+        timeMs: entry.responseTimeMs ?? 0,
+        sizeBytes: entry.responseSize ?? 0,
+      );
+    }
   }
 
   void _loadFromRequest(RequestModel req) {
@@ -374,6 +386,44 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
             ? req.name
             : 'Request Builder';
       }
+    });
+  }
+
+  Future<void> _loadLatestHistoryForRequest(String requestId) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final historyRepo = ref.read(historyRepositoryProvider);
+      final latest = await historyRepo.getLatestByRequestId(requestId);
+      if (!mounted || latest == null) return;
+      setState(() {
+        _urlController.text = latest.url;
+        _selectedMethod = latest.method;
+        _bodyController.text = latest.body ?? '';
+        _selectedBodyType = bodyTypeStringToIndex(latest.bodyType);
+        try {
+          final headersMap = Map<String, String>.from(jsonDecode(latest.headers));
+          _headers
+            ..clear()
+            ..addAll(mapToEntries(headersMap));
+        } catch (_) {}
+        if (_headers.isEmpty) _headers.add(KeyValueEntry());
+        try {
+          final paramsMap = Map<String, String>.from(jsonDecode(latest.queryParams));
+          _params
+            ..clear()
+            ..addAll(mapToEntries(paramsMap));
+        } catch (_) {}
+        if (_params.isEmpty) _params.add(KeyValueEntry());
+        if (latest.statusCode != null) {
+          _lastResponse = HttpResponse(
+            statusCode: latest.statusCode!,
+            headers: const {},
+            body: latest.responseBody ?? '',
+            timeMs: latest.responseTimeMs ?? 0,
+            sizeBytes: latest.responseSize ?? 0,
+          );
+        }
+      });
     });
   }
 
@@ -1037,6 +1087,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
         ? req.name
         : 'Request Builder';
     _saveBuilderState();
+    _loadLatestHistoryForRequest(req.id);
   }
 
   Widget _buildResponseSplit(ColorScheme colorScheme) {

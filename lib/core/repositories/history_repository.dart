@@ -111,4 +111,37 @@ class HistoryRepository {
     final result = await db.rawQuery('SELECT COUNT(*) as cnt FROM history');
     return (result.first['cnt'] as int?) ?? 0;
   }
+
+  Future<HistoryEntry?> getLatestByRequestId(String requestId) async {
+    final db = await DatabaseService.database;
+    final rows = await db.query(
+      'history',
+      where: 'request_id = ?',
+      whereArgs: [requestId],
+      orderBy: 'sent_at DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    return HistoryEntry(
+      id: row['id'] as String,
+      requestId: row['request_id'] as String?,
+      method: row['method'] as String,
+      url: row['url'] as String,
+      statusCode: row['status_code'] as int?,
+      responseTimeMs: row['response_time_ms'] as int?,
+      responseSize: row['response_size'] as int?,
+      responseBody: row['response_body'] as String?,
+      sentAt: DateTime.fromMillisecondsSinceEpoch(row['sent_at'] as int),
+      requestName: row['request_name'] as String?,
+      collectionId: row['collection_id'] as String?,
+      headers: (row['headers'] as String?) ?? '{}',
+      collectionHeaders: (row['collection_headers'] as String?) ?? '{}',
+      body: row['body'] as String?,
+      bodyType: row['body_type'] as String?,
+      queryParams: (row['query_params'] as String?) ?? '{}',
+      authType: (row['auth_type'] as String?) ?? 'none',
+      authData: (row['auth_data'] as String?) ?? '{}',
+    );
+  }
 }
