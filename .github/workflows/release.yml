@@ -87,14 +87,26 @@ jobs:
       - name: Build Windows release
         run: flutter build windows --release
 
-      - name: Package Windows build
+      - name: Package Windows build (zip)
         run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/dbug-windows-x64.zip
 
-      - name: Upload Windows artifact
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build Windows installer
+        run: "& 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' 'windows\\installer\\dbug.iss'"
+
+      - name: Upload Windows zip
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
           path: build/dbug-windows-x64.zip
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-setup
+          path: build/dbug-windows-x64-setup.exe
 
   publish-release:
     needs: [build-linux, build-macos, build-windows]
@@ -111,3 +123,4 @@ jobs:
             linux-x64/dbug-linux-x64.tar.gz
             macos-universal/dbug-macos.zip
             windows-x64/dbug-windows-x64.zip
+            windows-x64-setup/dbug-windows-x64-setup.exe
