@@ -71,7 +71,9 @@ jobs:
           path: build/dbug-macos.zip
 
   build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
+    env:
+      SQLITE3_LIB_DIR: "C:\\sqlite3"
     steps:
       - uses: actions/checkout@v4
 
@@ -84,15 +86,15 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Download sqlite3 native library
+      - name: Prepare sqlite3 native library
         shell: pwsh
         run: |
+          $dest = "C:\sqlite3"
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
           $url = "https://www.sqlite.org/2024/sqlite-dll-win-x64-3460000.zip"
           $zip = "$env:RUNNER_TEMP\sqlite3.zip"
-          $dest = "$env:RUNNER_TEMP\sqlite3"
           Invoke-WebRequest -Uri $url -OutFile $zip
-          Expand-Archive -Path $zip -DestinationPath $dest
-          echo "SQLITE3_LIB_DIR=$dest" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Expand-Archive -Path $zip -DestinationPath $dest -Force
           dir $dest
 
       - name: Build Windows release
