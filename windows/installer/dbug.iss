@@ -18,7 +18,6 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridingAllowed=yes
 SetupIconFile=..\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\dbug.exe
 VersionInfoVersion=0.1.4.0
