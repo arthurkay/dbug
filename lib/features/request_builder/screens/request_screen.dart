@@ -13,6 +13,7 @@ import '../../../core/providers/active_environment_provider.dart';
 import '../../../shared/widgets/key_value_editor.dart';
 import '../../../shared/widgets/response_view.dart';
 import '../../../shared/widgets/toast_helper.dart';
+import '../../../shared/widgets/json_body_editor.dart';
 import '../../../shared/widgets/dbug_spinner.dart';
 import '../../../shared/utils/method_colors.dart';
 import '../../../shared/utils/body_type_helpers.dart';
@@ -1395,13 +1396,21 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
               }),
             ),
             const SizedBox(height: 10),
-            if (_selectedBodyType > 0)
+            if (_selectedBodyType == 1)
+              Expanded(
+                child: JsonBodyEditor(
+                  controller: _bodyController,
+                  hintText: '{\n  "key": "value"\n}',
+                  contentType: 'application/json',
+                ),
+              )
+            else if (_selectedBodyType > 0)
               Expanded(
                 child: TextField(
                   controller: _bodyController,
                   decoration: InputDecoration(
-                    hintText: _selectedBodyType == 1
-                        ? '{\n  "key": "value"\n}'
+                    hintText: _selectedBodyType == 2
+                        ? 'Form data...\nkey=value'
                         : 'Request body...',
                     border: const OutlineInputBorder(),
                   ),
