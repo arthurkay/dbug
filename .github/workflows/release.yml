@@ -84,6 +84,17 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Download sqlite3 native library
+        shell: pwsh
+        run: |
+          $url = "https://www.sqlite.org/2024/sqlite-dll-win-x64-3460000.zip"
+          $zip = "$env:RUNNER_TEMP\sqlite3.zip"
+          $dest = "$env:RUNNER_TEMP\sqlite3"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dest
+          echo "SQLITE3_LIB_DIR=$dest" | Out-File -FilePath $env:GITHUB_ENV -Append
+          dir $dest
+
       - name: Build Windows release
         run: flutter build windows --release
 
