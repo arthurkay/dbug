@@ -113,7 +113,7 @@ class _ResponseViewState extends ConsumerState<ResponseView> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-            color: isActive ? colorScheme.onSurface : colorScheme.outline,
+            color: isActive ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
           ),
         ),
       ),

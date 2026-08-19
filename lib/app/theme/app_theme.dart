@@ -55,7 +55,7 @@ class DbugTheme {
         ),
       ).copyWith(
         scaffoldBackgroundColor: bgLight,
-      );
+      ).withoutInputFocusBorder();
 
   static ThemeData get dark => createYaruTheme(
         colorScheme: ColorScheme(
@@ -91,5 +91,18 @@ class DbugTheme {
         ),
       ).copyWith(
         scaffoldBackgroundColor: bgDark,
-      );
+      ).withoutInputFocusBorder();
+}
+
+extension on ThemeData {
+  /// dbug default: no focus ring on text inputs — a focused field keeps the
+  /// exact same border it has when enabled but unfocused.
+  ThemeData withoutInputFocusBorder() {
+    return copyWith(
+      inputDecorationTheme: inputDecorationTheme.copyWith(
+        focusedBorder: inputDecorationTheme.enabledBorder,
+        focusedErrorBorder: inputDecorationTheme.errorBorder,
+      ),
+    );
+  }
 }

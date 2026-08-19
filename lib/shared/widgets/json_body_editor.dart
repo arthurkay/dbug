@@ -179,7 +179,7 @@ class _JsonBodyEditorState extends ConsumerState<JsonBodyEditor> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-            color: isActive ? colorScheme.onSurface : colorScheme.outline,
+            color: isActive ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
           ),
         ),
       ),
@@ -235,10 +235,12 @@ class _JsonBodyEditorState extends ConsumerState<JsonBodyEditor> {
                 hintStyle: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 12,
-                  color: colorScheme.outline,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                   height: 1.5,
                 ),
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 contentPadding: const EdgeInsets.all(14),
                 isDense: true,
               ),

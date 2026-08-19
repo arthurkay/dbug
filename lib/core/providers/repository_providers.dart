@@ -34,6 +34,10 @@ final collectionsProvider = FutureProvider((ref) {
   return ref.watch(collectionRepositoryProvider).getAllCollections();
 });
 
+final collectionByIdProvider = FutureProvider.family((ref, String collectionId) {
+  return ref.watch(collectionRepositoryProvider).getCollection(collectionId);
+});
+
 final requestsByCollectionProvider = FutureProvider.family((ref, String collectionId) {
   return ref.watch(requestRepositoryProvider).getRequestsByCollection(collectionId);
 });

@@ -17,7 +17,9 @@ import '../../../shared/widgets/json_body_editor.dart';
 import '../../../shared/widgets/dbug_spinner.dart';
 import '../../../shared/utils/method_colors.dart';
 import '../../../shared/utils/body_type_helpers.dart';
+import '../../../core/models/collection_model.dart';
 import '../../../core/providers/window_title_provider.dart';
+import '../../collections/widgets/collection_settings_dialog.dart';
 
 class RequestScreen extends ConsumerStatefulWidget {
   final RequestModel? initialRequest;
@@ -106,6 +108,63 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
 
   static const _kBuilderStateKey = 'request_builder_state';
 
+  // Live collection settings: when the request belongs to a collection, the
+  // current global headers/auth come from the database (kept fresh through
+  // collectionByIdProvider) instead of the snapshot passed via the route.
+  // Cached in a field during build — not read via ref on demand — because
+  // _saveBuilderState also runs from dispose(), where ref is unusable.
+  Collection? _liveCollection;
+  String? _restoredCollectionId;
+
+  String? get _collectionId => widget.collectionId ?? _restoredCollectionId;
+
+  Map<String, String> get _collectionHeaders =>
+      _liveCollection?.globalHeaders ?? widget.collectionHeaders;
+
+  String? get _collectionAuthType =>
+      _liveCollection?.authType ?? widget.collectionAuthType;
+
+  String? get _collectionAuthData =>
+      _liveCollection?.authData ?? widget.collectionAuthData;
+
+  bool get _collectionAuthDefined =>
+      _collectionAuthType != null && _collectionAuthType != 'none';
+
+  /// True only when the collection auth would actually produce credentials —
+  /// a saved auth type with blank fields sends nothing and must not claim
+  /// otherwise in the UI.
+  bool get _hasCollectionAuth {
+    if (!_collectionAuthDefined) return false;
+    try {
+      final data =
+          Map<String, dynamic>.from(jsonDecode(_collectionAuthData ?? '{}'));
+      switch (_collectionAuthType) {
+        case 'bearer':
+          return ((data['token'] as String?)?.trim().isNotEmpty ?? false);
+        case 'basic':
+          return ((data['username'] as String?)?.trim().isNotEmpty ?? false);
+        case 'apikey':
+          return ((data['name'] as String?)?.trim().isNotEmpty ?? false) &&
+              ((data['value'] as String?)?.trim().isNotEmpty ?? false);
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// True when this request will actually send with the collection's auth
+  /// (no request-level auth is set to override it).
+  bool get _usesCollectionAuth => _selectedAuthType == 0 && _hasCollectionAuth;
+
+  Future<void> _editCollectionSettings({int initialTab = 0}) async {
+    final id = _collectionId;
+    if (id == null) return;
+    final collection =
+        await ref.read(collectionRepositoryProvider).getCollection(id);
+    if (collection == null || !mounted) return;
+    await showCollectionSettingsDialog(context, ref, collection,
+        initialTab: initialTab);
+  }
+
   Future<void> _saveBuilderState() async {
     final params = entriesToMap(_params);
     final headers = entriesToMap(_headers);
@@ -141,8 +200,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       'authData': authData,
       'headers': jsonEncode(headers),
       'params': jsonEncode(params),
-      'collectionId': widget.collectionId,
-      'collectionHeaders': jsonEncode(widget.collectionHeaders),
+      'collectionId': _collectionId,
+      'collectionHeaders': jsonEncode(_collectionHeaders),
       'currentRequestId': _currentRequestId,
       'bearerToken': _bearerTokenController.text,
       'basicUser': _basicUserController.text,
@@ -178,6 +237,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       _requestNameController.text = state['requestName'] ?? '';
       _selectedTab = ((state['tab'] ?? 0) as int).clamp(0, 3);
       _tabController.index = _selectedTab;
+      // Restore the collection link so global headers/auth apply again after
+      // a restart (the live values are then re-read via collectionByIdProvider).
+      _restoredCollectionId = state['collectionId'] as String?;
       _selectedBodyType = state['bodyType'] ?? 0;
       _currentRequestId = state['currentRequestId'];
       _apiKeyLocation = state['apiKeyLocation'] ?? 'header';
@@ -490,20 +552,18 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     }
 
     // Fall back to collection auth
-    if (widget.collectionAuthType == null ||
-        widget.collectionAuthType == 'none')
-      return {};
+    if (!_hasCollectionAuth) return {};
     try {
       final data = Map<String, dynamic>.from(
-        jsonDecode(widget.collectionAuthData ?? '{}'),
+        jsonDecode(_collectionAuthData ?? '{}'),
       );
-      switch (widget.collectionAuthType) {
+      switch (_collectionAuthType) {
         case 'bearer':
-          final token = (data['token'] as String?) ?? '';
+          final token = ((data['token'] as String?) ?? '').trim();
           if (token.isNotEmpty) return {'Authorization': 'Bearer $token'};
           break;
         case 'basic':
-          final user = (data['username'] as String?) ?? '';
+          final user = ((data['username'] as String?) ?? '').trim();
           final pass = (data['password'] as String?) ?? '';
           if (user.isNotEmpty) {
             final encoded = base64Encode(utf8.encode('$user:$pass'));
@@ -513,8 +573,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
         case 'apikey':
           final location = data['location'] ?? 'header';
           if (location == 'header') {
-            final name = (data['name'] as String?) ?? '';
-            final value = (data['value'] as String?) ?? '';
+            final name = ((data['name'] as String?) ?? '').trim();
+            final value = ((data['value'] as String?) ?? '').trim();
             if (name.isNotEmpty && value.isNotEmpty) return {name: value};
           }
           break;
@@ -534,10 +594,10 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     }
 
     // Collection-level API key query param (only if request doesn't override)
-    if (_selectedAuthType == 0 && widget.collectionAuthType == 'apikey') {
+    if (_selectedAuthType == 0 && _collectionAuthType == 'apikey') {
       try {
         final data = Map<String, dynamic>.from(
-          jsonDecode(widget.collectionAuthData ?? '{}'),
+          jsonDecode(_collectionAuthData ?? '{}'),
         );
         if (data['location'] == 'query') {
           final name = (data['name'] as String?) ?? '';
@@ -577,7 +637,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       final resolvedUrl = substituteVariables(url, variables);
 
       final headers = <String, String>{};
-      headers.addAll(widget.collectionHeaders);
+      headers.addAll(_collectionHeaders);
       headers.addAll(entriesToMap(_headers));
       headers.addAll(_buildAuthHeaders());
       final resolvedHeaders = headers.map(
@@ -652,9 +712,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
         requestName: _requestNameController.text.trim().isNotEmpty
             ? _requestNameController.text.trim()
             : '$_selectedMethod $resolvedUrl',
-        collectionId: widget.collectionId,
+        collectionId: _collectionId,
         headers: jsonEncode(entriesToMap(_headers)),
-        collectionHeaders: jsonEncode(widget.collectionHeaders),
+        collectionHeaders: jsonEncode(_collectionHeaders),
         body: _selectedBodyType > 0 ? _bodyController.text : null,
         bodyType: bodyType,
         queryParams: jsonEncode(_buildQueryParams()),
@@ -751,7 +811,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
         return;
       }
 
-      String? selectedId = widget.collectionId ?? collections.first.id;
+      String? selectedId = _collectionId ?? collections.first.id;
       final picked = await showDialog<String>(
         context: context,
         builder: (ctx) => StatefulBuilder(
@@ -826,12 +886,19 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    // Rebuild when the collection's global headers/auth are edited, keeping
+    // the last known value while a refresh is in flight.
+    final collectionId = _collectionId;
+    if (collectionId != null) {
+      final live = ref.watch(collectionByIdProvider(collectionId)).valueOrNull;
+      if (live != null) _liveCollection = live;
+    }
 
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          if (_showEndpointList && widget.collectionId != null) ...[
+          if (_showEndpointList && _collectionId != null) ...[
             _buildEndpointList(colorScheme),
             const SizedBox(width: 12),
           ],
@@ -844,7 +911,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
-                        if (widget.collectionId != null)
+                        if (_collectionId != null)
                           Padding(
                             padding: const EdgeInsets.only(right: 6),
                             child: IconButton(
@@ -928,7 +995,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
 
   Widget _buildEndpointList(ColorScheme colorScheme) {
     final requestsAsync = ref.watch(
-      requestsByCollectionProvider(widget.collectionId!),
+      requestsByCollectionProvider(_collectionId!),
     );
 
     return Container(
@@ -1250,14 +1317,19 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   }
 
   Widget _buildTabs(ColorScheme colorScheme) {
+    final globalHeaderCount = _collectionHeaders.length;
     return TabBar(
       controller: _tabController,
       onTap: (i) => setState(() => _selectedTab = i),
-      tabs: const [
-        Tab(text: 'Params'),
-        Tab(text: 'Headers'),
-        Tab(text: 'Body'),
-        Tab(text: 'Auth'),
+      tabs: [
+        const Tab(text: 'Params'),
+        Tab(
+          text: globalHeaderCount > 0
+              ? 'Headers · $globalHeaderCount global'
+              : 'Headers',
+        ),
+        const Tab(text: 'Body'),
+        Tab(text: _usesCollectionAuth ? 'Auth · global' : 'Auth'),
       ],
       isScrollable: true,
       tabAlignment: TabAlignment.start,
@@ -1303,78 +1375,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (widget.collectionHeaders.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          LucideIcons.key,
-                          size: 12,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Collection Headers (inherited)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurfaceVariant,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ...widget.collectionHeaders.entries.map(
-                      (e) => Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Row(
-                          children: [
-                            Text(
-                              e.key,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onSurface,
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                            Text(
-                              ': ',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                e.value,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: colorScheme.onSurfaceVariant,
-                                  fontFamily: 'monospace',
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            if (_collectionId != null ||
+                _collectionHeaders.isNotEmpty) ...[
+              _buildGlobalHeadersBox(colorScheme),
               const SizedBox(height: 10),
             ],
             Expanded(
@@ -1389,6 +1392,98 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildGlobalHeadersBox(ColorScheme colorScheme) {
+    final headers = _collectionHeaders;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                LucideIcons.key,
+                size: 12,
+                color: headers.isNotEmpty
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  headers.isNotEmpty
+                      ? 'Global headers · sent with every request in this collection'
+                      : 'Global headers · none defined for this collection',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurfaceVariant,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              if (_collectionId != null)
+                TextButton(
+                  onPressed: () => _editCollectionSettings(initialTab: 0),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: const Text('Edit', style: TextStyle(fontSize: 11)),
+                ),
+            ],
+          ),
+          if (headers.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            ...headers.entries.map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Row(
+                  children: [
+                    Text(
+                      e.key,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    Text(
+                      ': ',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        e.value,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant,
+                          fontFamily: 'monospace',
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1435,15 +1530,34 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
               )
             else if (_selectedBodyType > 0)
               Expanded(
-                child: TextField(
-                  controller: _bodyController,
-                  decoration: InputDecoration(
-                    hintText: _selectedBodyType == 2
-                        ? 'One field per line:\nkey=value'
-                        : 'Request body...',
-                    border: const OutlineInputBorder(),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: const BorderRadius.all(Radius.circular(8)),
                   ),
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                  child: TextField(
+                    controller: _bodyController,
+                    maxLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: InputDecoration(
+                      hintText: _selectedBodyType == 2
+                          ? 'One field per line:\nkey=value'
+                          : 'Request body...',
+                      hintStyle: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                        height: 1.5,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.all(14),
+                      isDense: true,
+                    ),
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
+                  ),
                 ),
               )
             else
@@ -1461,6 +1575,86 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     );
   }
 
+  static const _authTypeLabels = {
+    'bearer': 'Bearer',
+    'basic': 'Basic',
+    'apikey': 'API Key',
+  };
+
+  Widget _buildGlobalAuthBanner(ColorScheme colorScheme) {
+    final String message;
+    final IconData icon;
+    final bool highlighted;
+
+    if (_usesCollectionAuth) {
+      final label = _authTypeLabels[_collectionAuthType] ?? _collectionAuthType!;
+      message = 'Using global $label auth from this collection';
+      icon = LucideIcons.shieldCheck;
+      highlighted = true;
+    } else if (_hasCollectionAuth) {
+      final label = _authTypeLabels[_collectionAuthType] ?? _collectionAuthType!;
+      message = "Request auth overrides this collection's global $label auth";
+      icon = LucideIcons.shieldOff;
+      highlighted = false;
+    } else if (_collectionAuthDefined) {
+      final label = _authTypeLabels[_collectionAuthType] ?? _collectionAuthType!;
+      message =
+          'Global $label auth has empty credentials — nothing is applied';
+      icon = LucideIcons.shieldAlert;
+      highlighted = false;
+    } else {
+      message = 'No global auth defined for this collection';
+      icon = LucideIcons.shield;
+      highlighted = false;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: highlighted
+            ? colorScheme.primary.withValues(alpha: 0.08)
+            : colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: highlighted
+              ? colorScheme.primary.withValues(alpha: 0.4)
+              : colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: highlighted ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: highlighted ? colorScheme.primary : colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => _editCollectionSettings(initialTab: 1),
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            child: Text(
+              _collectionAuthDefined ? 'Edit' : 'Define',
+              style: const TextStyle(fontSize: 11),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAuthTab(ColorScheme colorScheme) {
     return Card(
       child: Padding(
@@ -1469,6 +1663,10 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_collectionId != null) ...[
+                _buildGlobalAuthBanner(colorScheme),
+                const SizedBox(height: 12),
+              ],
               Row(
                 children: List.generate(_authTypes.length, (i) {
                   return Padding(
