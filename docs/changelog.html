@@ -360,12 +360,31 @@
 
   <div class="changelog">
 
+    <!-- v0.1.6 -->
+    <div class="release">
+      <div class="release-dot"></div>
+      <div class="release-header">
+        <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.1.6">v0.1.6</a></span>
+        <span class="release-tag release-latest"><span class="dot"></span> Latest</span>
+        <span class="release-date">August 2026</span>
+      </div>
+      <p class="release-summary">Global auth &amp; headers visible on the request page, UI polish, and stability fixes.</p>
+      <ul class="change-list">
+        <li><span class="change-tag feat">Feat</span> Request page shows whether collection-wide auth/headers apply — tab badges, an auth status banner, and inline Edit buttons for collection settings</li>
+        <li><span class="change-tag feat">Feat</span> Mock server keeps running while you navigate, applies endpoint edits live, and the port is configurable</li>
+        <li><span class="change-tag feat">Feat</span> Form/Raw request bodies use a borderless multiline editor; no more focus ring on inputs; readable Pretty/Raw toggles in dark mode</li>
+        <li><span class="change-tag fix">Fix</span> Fresh installs could not create collections due to missing database columns</li>
+        <li><span class="change-tag fix">Fix</span> OpenAPI import handles cyclic schemas and integer enums</li>
+        <li><span class="change-tag fix">Fix</span> macOS install script now downloads the correct release asset and works with BSD sed/grep</li>
+        <li><span class="change-tag fix">Fix</span> Collection link (global auth/headers) survives app restarts</li>
+      </ul>
+    </div>
+
     <!-- v0.1.5 -->
     <div class="release">
       <div class="release-dot"></div>
       <div class="release-header">
         <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.1.5">v0.1.5</a></span>
-        <span class="release-tag release-latest"><span class="dot"></span> Latest</span>
         <span class="release-date">August 2026</span>
       </div>
       <p class="release-summary">Reliability fixes across form encoding, OpenAPI cleanup, and saved requests.</p>
