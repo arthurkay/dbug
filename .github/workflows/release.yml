@@ -33,7 +33,16 @@ jobs:
         run: flutter pub get
 
       - name: Build Linux release
-        run: flutter build linux --release
+        # package:sqlite3's build hook downloads a prebuilt libsqlite3.so from
+        # GitHub releases at build time; that download occasionally flakes on
+        # CI runners (v0.1.4 attempt 4 failed this way), so retry the build.
+        run: |
+          for attempt in 1 2 3; do
+            flutter build linux --release && exit 0
+            echo "Build failed (attempt $attempt), retrying in 15s..."
+            sleep 15
+          done
+          exit 1
 
       - name: Package Linux build
         run: tar -czf build/dbug-linux-x64.tar.gz -C build/linux/x64/release/bundle .

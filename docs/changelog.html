@@ -360,12 +360,29 @@
 
   <div class="changelog">
 
+    <!-- v0.1.5 -->
+    <div class="release">
+      <div class="release-dot"></div>
+      <div class="release-header">
+        <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.1.5">v0.1.5</a></span>
+        <span class="release-tag release-latest"><span class="dot"></span> Latest</span>
+        <span class="release-date">August 2026</span>
+      </div>
+      <p class="release-summary">Reliability fixes across form encoding, OpenAPI cleanup, and saved requests.</p>
+      <ul class="change-list">
+        <li><span class="change-tag fix">Fix</span> Form Data bodies are now properly URL-encoded, and Content-Type headers are set automatically per body type</li>
+        <li><span class="change-tag fix">Fix</span> OpenAPI-imported environments are linked to their spec — deleting a spec now reliably removes only its own environment</li>
+        <li><span class="change-tag fix">Fix</span> Cancelling the "Save to Collection" dialog no longer creates an orphaned request</li>
+        <li><span class="change-tag fix">Fix</span> Request builder tab controller leak resolved</li>
+        <li><span class="change-tag chore">Chore</span> Linux release build retries transient sqlite3 download failures on CI</li>
+      </ul>
+    </div>
+
     <!-- v0.1.4 -->
     <div class="release">
       <div class="release-dot"></div>
       <div class="release-header">
         <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.1.4">v0.1.4</a></span>
-        <span class="release-tag release-latest"><span class="dot"></span> Latest</span>
         <span class="release-date">August 2026</span>
       </div>
       <p class="release-summary">JSON request body editor with syntax highlighting, matching the response viewer.</p>
