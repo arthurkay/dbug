@@ -1,0 +1,8 @@
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          # Nested models must serialize to plain maps/lists so that
+          # toJson() output can be fed straight back into fromJson().
+          explicit_to_json: true

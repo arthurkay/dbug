@@ -221,5 +221,48 @@ void main() {
       final envs = await db.query('environments', where: 'name = ? AND source_type = ?', whereArgs: ['Test API', 'openapi']);
       expect(envs, isEmpty);
     });
+
+    test('auto-created environment is linked to the spec by source_spec_id', () async {
+      final saved = await repo.saveParsedSpec(
+        createTestParsedSpec(title: 'Linked', baseUrl: 'https://api.test.com'),
+      );
+
+      final db = await DatabaseService.database;
+      final envs = await db.query('environments', where: 'source_spec_id = ?', whereArgs: [saved.id]);
+      expect(envs, hasLength(1));
+      expect(envs.first['name'], 'Linked API');
+    });
+
+    test('only deletes the environment of the deleted spec when titles collide', () async {
+      final first = await repo.saveParsedSpec(
+        createTestParsedSpec(title: 'Same', baseUrl: 'https://one.test.com'),
+      );
+      final second = await repo.saveParsedSpec(
+        createTestParsedSpec(title: 'Same', baseUrl: 'https://two.test.com'),
+      );
+
+      await repo.deleteSpec(first.id);
+
+      final db = await DatabaseService.database;
+      final gone = await db.query('environments', where: 'source_spec_id = ?', whereArgs: [first.id]);
+      final kept = await db.query('environments', where: 'source_spec_id = ?', whereArgs: [second.id]);
+      expect(gone, isEmpty);
+      expect(kept, hasLength(1));
+    });
+
+    test('deletes legacy environments that have no source_spec_id', () async {
+      final saved = await repo.saveParsedSpec(
+        createTestParsedSpec(title: 'Legacy', baseUrl: 'https://api.test.com'),
+      );
+      final db = await DatabaseService.database;
+      await db.update('environments', {'source_spec_id': null},
+          where: 'source_spec_id = ?', whereArgs: [saved.id]);
+
+      await repo.deleteSpec(saved.id);
+
+      final envs = await db.query('environments',
+          where: 'name = ? AND source_type = ?', whereArgs: ['Legacy API', 'openapi']);
+      expect(envs, isEmpty);
+    });
   });
 }

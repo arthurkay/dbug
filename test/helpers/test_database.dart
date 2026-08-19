@@ -10,7 +10,7 @@ Future<Database> setupTestDatabase() async {
   final db = await databaseFactoryFfi.openDatabase(
     ':memory:',
     options: OpenDatabaseOptions(
-      version: 5,
+      version: 6,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE collections (
@@ -62,7 +62,8 @@ Future<Database> setupTestDatabase() async {
             name TEXT NOT NULL,
             variables TEXT DEFAULT '{}',
             is_active INTEGER DEFAULT 0,
-            source_type TEXT DEFAULT 'user'
+            source_type TEXT DEFAULT 'user',
+            source_spec_id TEXT
           )
         ''');
         await db.execute('''

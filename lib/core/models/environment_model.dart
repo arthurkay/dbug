@@ -13,6 +13,7 @@ class Environment with _$Environment {
     @Default({}) Map<String, String> variables,
     @Default(false) bool isActive,
     @Default('user') String sourceType,
+    String? sourceSpecId,
   }) = _Environment;
 
   factory Environment.fromJson(Map<String, dynamic> json) =>

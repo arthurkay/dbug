@@ -104,6 +104,25 @@ void main() {
     });
   });
 
+  group('sourceSpecId', () {
+    test('round-trips through create and getAllEnvironments', () async {
+      await repo.createEnvironment(name: 'Spec API', sourceType: 'openapi', sourceSpecId: 'spec-1');
+
+      final envs = await repo.getAllEnvironments();
+      expect(envs.single.sourceSpecId, 'spec-1');
+    });
+
+    test('deleteBySpecId only removes environments of that spec', () async {
+      await repo.createEnvironment(name: 'One API', sourceType: 'openapi', sourceSpecId: 'spec-1');
+      await repo.createEnvironment(name: 'Two API', sourceType: 'openapi', sourceSpecId: 'spec-2');
+      await repo.createEnvironment(name: 'User env');
+
+      await repo.deleteBySpecId('spec-1');
+      final envs = await repo.getAllEnvironments();
+      expect(envs.map((e) => e.name).toList(), ['Two API', 'User env']);
+    });
+  });
+
   group('getAllEnvironments', () {
     test('returns all environments ordered by name ASC', () async {
       await repo.createEnvironment(name: 'Zebra');

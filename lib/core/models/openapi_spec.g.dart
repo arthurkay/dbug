@@ -76,7 +76,9 @@ Map<String, dynamic> _$$OpenApiEndpointImplToJson(
   'operationId': instance.operationId,
   'parameters': instance.parameters.map((e) => e.toJson()).toList(),
   'requestBodySchema': instance.requestBodySchema?.toJson(),
-  'responseSchemas': instance.responseSchemas?.map((k, e) => MapEntry(k, e.toJson())),
+  'responseSchemas': instance.responseSchemas?.map(
+    (k, e) => MapEntry(k, e.toJson()),
+  ),
   'tags': instance.tags,
 };
 

@@ -81,6 +81,7 @@ class OpenApiRepository {
         'variables': jsonEncode(variables),
         'is_active': 0,
         'source_type': 'openapi',
+        'source_spec_id': specId,
       });
     }
 
@@ -135,10 +136,15 @@ class OpenApiRepository {
     }
     await db.delete('collections', where: 'source_spec_id = ?', whereArgs: [id]);
 
-    if (specTitle != null) {
-      await db.delete('environments', where: 'name = ? AND source_type = ?', whereArgs: ['$specTitle API', 'openapi']);
-    }
-    await db.delete('environments', where: 'name = ? AND source_type = ?', whereArgs: ['Imported API', 'openapi']);
+    await db.delete('environments', where: 'source_spec_id = ?', whereArgs: [id]);
+    // Legacy fallback: environments created before source_spec_id existed can
+    // only be matched by their generated name.
+    final legacyName = specTitle != null ? '$specTitle API' : 'Imported API';
+    await db.delete(
+      'environments',
+      where: 'source_spec_id IS NULL AND name = ? AND source_type = ?',
+      whereArgs: [legacyName, 'openapi'],
+    );
 
     await db.delete('openapi_specs', where: 'id = ?', whereArgs: [id]);
   }

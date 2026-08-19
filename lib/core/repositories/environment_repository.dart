@@ -10,6 +10,7 @@ class EnvironmentRepository {
     required String name,
     Map<String, String> variables = const {},
     String sourceType = 'user',
+    String? sourceSpecId,
   }) async {
     final db = await DatabaseService.database;
     final id = _uuid.v4();
@@ -20,9 +21,10 @@ class EnvironmentRepository {
       'variables': jsonEncode(variables),
       'is_active': 0,
       'source_type': sourceType,
+      'source_spec_id': sourceSpecId,
     });
 
-    return Environment(id: id, name: name, variables: variables, sourceType: sourceType);
+    return Environment(id: id, name: name, variables: variables, sourceType: sourceType, sourceSpecId: sourceSpecId);
   }
 
   Future<void> updateEnvironment(Environment env) async {
@@ -34,6 +36,7 @@ class EnvironmentRepository {
         'variables': jsonEncode(env.variables),
         'is_active': env.isActive ? 1 : 0,
         'source_type': env.sourceType,
+        'source_spec_id': env.sourceSpecId,
       },
       where: 'id = ?',
       whereArgs: [env.id],
@@ -61,50 +64,30 @@ class EnvironmentRepository {
     await db.delete('environments', where: 'source_type = ?', whereArgs: [sourceType]);
   }
 
-  Future<void> deleteByCollectionId(String collectionId) async {
+  Future<void> deleteBySpecId(String specId) async {
     final db = await DatabaseService.database;
-    await db.delete('environments', where: 'source_type = ? AND name LIKE ?', whereArgs: ['openapi', '%$collectionId%']);
+    await db.delete('environments', where: 'source_spec_id = ?', whereArgs: [specId]);
   }
 
   Future<List<Environment>> getAllEnvironments() async {
     final db = await DatabaseService.database;
     final rows = await db.query('environments', orderBy: 'name ASC');
 
-    return rows.map((row) => Environment(
-      id: row['id'] as String,
-      name: row['name'] as String,
-      variables: Map<String, String>.from(jsonDecode(row['variables'] as String? ?? '{}')),
-      isActive: (row['is_active'] as int?) == 1,
-      sourceType: row['source_type'] as String? ?? 'user',
-    )).toList();
+    return rows.map(_rowToEnvironment).toList();
   }
 
   Future<List<Environment>> getUserEnvironments() async {
     final db = await DatabaseService.database;
     final rows = await db.query('environments', where: 'source_type = ?', whereArgs: ['user'], orderBy: 'name ASC');
 
-    return rows.map((row) => Environment(
-      id: row['id'] as String,
-      name: row['name'] as String,
-      variables: Map<String, String>.from(jsonDecode(row['variables'] as String? ?? '{}')),
-      isActive: (row['is_active'] as int?) == 1,
-      sourceType: 'user',
-    )).toList();
+    return rows.map(_rowToEnvironment).toList();
   }
 
   Future<Environment?> getActive() async {
     final db = await DatabaseService.database;
     final rows = await db.query('environments', where: 'is_active = ?', whereArgs: [1]);
     if (rows.isEmpty) return null;
-
-    final row = rows.first;
-    return Environment(
-      id: row['id'] as String,
-      name: row['name'] as String,
-      variables: Map<String, String>.from(jsonDecode(row['variables'] as String? ?? '{}')),
-      isActive: true,
-      sourceType: row['source_type'] as String? ?? 'user',
-    );
+    return _rowToEnvironment(rows.first);
   }
 
   Future<Environment?> getForCollection(String collectionId) async {
@@ -113,19 +96,19 @@ class EnvironmentRepository {
     if (collRows.isEmpty) return null;
     final specId = collRows.first['source_spec_id'] as String?;
     if (specId == null) return null;
-    final rows = await db.query('environments', where: 'name LIKE ?', whereArgs: ['%API%']);
-    for (final row in rows) {
-      final vars = Map<String, String>.from(jsonDecode(row['variables'] as String? ?? '{}'));
-      if (vars.containsKey('baseUrl')) {
-        return Environment(
-          id: row['id'] as String,
-          name: row['name'] as String,
-          variables: vars,
-          isActive: (row['is_active'] as int?) == 1,
-          sourceType: row['source_type'] as String? ?? 'openapi',
-        );
-      }
-    }
-    return null;
+    final rows = await db.query('environments', where: 'source_spec_id = ?', whereArgs: [specId]);
+    if (rows.isEmpty) return null;
+    return _rowToEnvironment(rows.first);
+  }
+
+  Environment _rowToEnvironment(Map<String, dynamic> row) {
+    return Environment(
+      id: row['id'] as String,
+      name: row['name'] as String,
+      variables: Map<String, String>.from(jsonDecode(row['variables'] as String? ?? '{}')),
+      isActive: (row['is_active'] as int?) == 1,
+      sourceType: row['source_type'] as String? ?? 'user',
+      sourceSpecId: row['source_spec_id'] as String?,
+    );
   }
 }

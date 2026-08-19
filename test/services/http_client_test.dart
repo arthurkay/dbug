@@ -99,16 +99,16 @@ void main() {
       expect(AppConstants.appName, 'dbug');
     });
 
-    test('app version is 0.0.9', () {
-      expect(AppConstants.appVersion, '0.0.9');
+    test('app version is 0.1.5', () {
+      expect(AppConstants.appVersion, '0.1.5');
     });
 
     test('database name is dbug.db', () {
       expect(AppConstants.dbName, 'dbug.db');
     });
 
-    test('database version is 5', () {
-      expect(AppConstants.dbVersion, 5);
+    test('database version is 6', () {
+      expect(AppConstants.dbVersion, 6);
     });
 
     test('default mock port is 3001', () {

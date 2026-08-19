@@ -17,6 +17,7 @@ _$EnvironmentImpl _$$EnvironmentImplFromJson(Map<String, dynamic> json) =>
           const {},
       isActive: json['isActive'] as bool? ?? false,
       sourceType: json['sourceType'] as String? ?? 'user',
+      sourceSpecId: json['sourceSpecId'] as String?,
     );
 
 Map<String, dynamic> _$$EnvironmentImplToJson(_$EnvironmentImpl instance) =>
@@ -26,4 +27,5 @@ Map<String, dynamic> _$$EnvironmentImplToJson(_$EnvironmentImpl instance) =>
       'variables': instance.variables,
       'isActive': instance.isActive,
       'sourceType': instance.sourceType,
+      'sourceSpecId': instance.sourceSpecId,
     };

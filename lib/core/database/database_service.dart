@@ -94,7 +94,8 @@ class DatabaseService {
         name TEXT NOT NULL,
         variables TEXT DEFAULT '{}',
         is_active INTEGER DEFAULT 0,
-        source_type TEXT DEFAULT 'user'
+        source_type TEXT DEFAULT 'user',
+        source_spec_id TEXT
       )
     ''');
 
@@ -162,6 +163,9 @@ class DatabaseService {
     if (oldVersion < 5) {
       await db.execute("ALTER TABLE collections ADD COLUMN auth_type TEXT DEFAULT 'none'");
       await db.execute("ALTER TABLE collections ADD COLUMN auth_data TEXT DEFAULT '{}'");
+    }
+    if (oldVersion < 6) {
+      await db.execute("ALTER TABLE environments ADD COLUMN source_spec_id TEXT");
     }
   }
 

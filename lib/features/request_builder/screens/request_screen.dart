@@ -67,6 +67,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   final _bodyTypes = ['None', 'JSON', 'Form Data', 'Raw'];
   final _authTypes = ['None', 'Bearer', 'Basic', 'API Key'];
 
+  late final TabController _tabController;
+
   late final List<KeyValueEntry> _params;
   late final List<KeyValueEntry> _headers;
 
@@ -81,6 +83,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
     _loadSplitRatio();
     _params = [KeyValueEntry()];
     _headers = [KeyValueEntry()];
@@ -173,7 +176,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       _urlController.text = state['url'] ?? '';
       _bodyController.text = state['body'] ?? '';
       _requestNameController.text = state['requestName'] ?? '';
-      _selectedTab = state['tab'] ?? 0;
+      _selectedTab = ((state['tab'] ?? 0) as int).clamp(0, 3);
+      _tabController.index = _selectedTab;
       _selectedBodyType = state['bodyType'] ?? 0;
       _currentRequestId = state['currentRequestId'];
       _apiKeyLocation = state['apiKeyLocation'] ?? 'header';
@@ -440,6 +444,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   @override
   void dispose() {
     _saveBuilderState();
+    _tabController.dispose();
     _urlController.dispose();
     _bodyController.dispose();
     _requestNameController.dispose();
@@ -586,6 +591,18 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       String? body;
       if (_selectedBodyType > 0 && _bodyController.text.isNotEmpty) {
         body = substituteVariables(_bodyController.text, variables);
+        if (_selectedBodyType == 2) {
+          body = _encodeFormBody(body);
+        }
+        final hasContentType = resolvedHeaders.keys
+            .any((k) => k.toLowerCase() == 'content-type');
+        if (!hasContentType) {
+          resolvedHeaders['Content-Type'] = switch (_selectedBodyType) {
+            1 => 'application/json',
+            2 => 'application/x-www-form-urlencoded',
+            _ => 'text/plain',
+          };
+        }
       }
 
       final client = ref.read(httpClientProvider);
@@ -657,6 +674,19 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
+  }
+
+  String _encodeFormBody(String raw) {
+    final pairs = <String>[];
+    for (final line in raw.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      final eq = trimmed.indexOf('=');
+      final key = eq >= 0 ? trimmed.substring(0, eq) : trimmed;
+      final value = eq >= 0 ? trimmed.substring(eq + 1) : '';
+      pairs.add('${Uri.encodeQueryComponent(key)}=${Uri.encodeQueryComponent(value)}');
+    }
+    return pairs.join('&');
   }
 
   Future<void> _saveRequest() async {
@@ -758,7 +788,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Skip'),
+                child: const Text('Cancel'),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, selectedId),
@@ -768,6 +798,8 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
           ),
         ),
       );
+
+      if (picked == null) return;
 
       final req = await requestRepo.createRequest(
         collectionId: picked,
@@ -781,10 +813,11 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       );
       setState(() => _currentRequestId = req.id);
       ref.invalidate(collectionsProvider);
+      ref.invalidate(requestsByCollectionProvider(picked));
       if (mounted)
         showDbugToast(
           context,
-          message: picked != null ? 'Saved to collection' : 'Request saved',
+          message: 'Saved to collection',
           type: ToastType.success,
         );
     }
@@ -1218,11 +1251,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
 
   Widget _buildTabs(ColorScheme colorScheme) {
     return TabBar(
-      controller: TabController(
-        length: 4,
-        vsync: this,
-        initialIndex: _selectedTab,
-      ),
+      controller: _tabController,
       onTap: (i) => setState(() => _selectedTab = i),
       tabs: const [
         Tab(text: 'Params'),
@@ -1410,7 +1439,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                   controller: _bodyController,
                   decoration: InputDecoration(
                     hintText: _selectedBodyType == 2
-                        ? 'Form data...\nkey=value'
+                        ? 'One field per line:\nkey=value'
                         : 'Request body...',
                     border: const OutlineInputBorder(),
                   ),
