@@ -93,7 +93,7 @@ class OpenApiParser {
           parameters: parameters,
           requestBodySchema: requestBodySchema,
           responseSchemas: responseSchemas.isNotEmpty ? responseSchemas : null,
-          tags: (operation['tags'] as List?)?.cast<String>() ?? [],
+          tags: _stringList(operation['tags']),
         ));
       }
     });
@@ -142,20 +142,31 @@ class OpenApiParser {
     return _parseSchema(root, schema);
   }
 
-  static OpenApiSchema _parseSchema(Map<String, dynamic> root, Map<String, dynamic> schema) {
+  static OpenApiSchema _parseSchema(
+    Map<String, dynamic> root,
+    Map<String, dynamic> schema, [
+    Set<String> visitedRefs = const {},
+  ]) {
     final ref = schema['\$ref']?.toString();
 
     if (ref != null) {
+      // A $ref already on the current resolution path means the schema is
+      // cyclic (e.g. Category.parent -> Category); stop at the reference
+      // instead of recursing forever.
+      if (visitedRefs.contains(ref)) {
+        return OpenApiSchema(type: 'object', ref: ref);
+      }
+      final seen = {...visitedRefs, ref};
       final resolved = _resolveRef(root, ref);
       if (resolved != null) {
-        return _parseSchema(root, resolved);
+        return _parseSchema(root, resolved, seen);
       }
       final refName = ref.split('/').last;
       final componentSchemas = root['components'] is Map ? (root['components'] as Map)['schemas'] : null;
       if (componentSchemas is Map && componentSchemas.containsKey(refName)) {
         final fallback = componentSchemas[refName];
         if (fallback is Map<String, dynamic>) {
-          return _parseSchema(root, fallback);
+          return _parseSchema(root, fallback, seen);
         }
       }
       return OpenApiSchema(type: 'object', ref: ref);
@@ -165,12 +176,12 @@ class OpenApiParser {
     if (schema['properties'] is Map) {
       (schema['properties'] as Map).forEach((key, value) {
         if (value is Map) {
-          properties[key.toString()] = _parseSchema(root, value as Map<String, dynamic>);
+          properties[key.toString()] = _parseSchema(root, value as Map<String, dynamic>, visitedRefs);
         }
       });
     }
 
-    final requiredFields = (schema['required'] as List?)?.cast<String>() ?? [];
+    final requiredFields = _stringList(schema['required']);
 
     return OpenApiSchema(
       type: schema['type']?.toString(),
@@ -180,10 +191,18 @@ class OpenApiParser {
       properties: properties,
       requiredFields: requiredFields,
       items: schema['items'] is Map
-          ? _parseSchema(root, schema['items'] as Map<String, dynamic>)
+          ? _parseSchema(root, schema['items'] as Map<String, dynamic>, visitedRefs)
           : null,
-      enumValues: (schema['enum'] as List?)?.cast<String>() ?? [],
+      enumValues: _stringList(schema['enum']),
     );
+  }
+
+  /// Eagerly converts a JSON list to strings. Unlike a lazy `.cast<String>()`,
+  /// this neither defers type errors to first iteration nor rejects valid
+  /// non-string values (e.g. integer enums).
+  static List<String> _stringList(dynamic value) {
+    if (value is! List) return const [];
+    return value.map((e) => e.toString()).toList();
   }
 }
 

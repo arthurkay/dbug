@@ -304,6 +304,82 @@ paths:
         final spec = OpenApiParser.parse(raw);
         expect(spec!.rawContent, raw);
       });
+
+      test('parses a cyclic (self-referential) schema without recursing forever', () {
+        final spec = OpenApiParser.parse('''
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Cyclic API" },
+  "paths": {
+    "/categories": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": { "\$ref": "#/components/schemas/Category" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Category": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "parent": { "\$ref": "#/components/schemas/Category" }
+        }
+      }
+    }
+  }
+}
+''');
+        expect(spec, isNotNull);
+        final schema = spec!.endpoints.single.responseSchemas!['200']!;
+        expect(schema.properties['name']!.type, 'string');
+        // The cycle is cut at the self-reference, keeping the ref name.
+        expect(schema.properties['parent']!.ref, '#/components/schemas/Category');
+      });
+
+      test('non-string enum, tags, and required values are converted eagerly', () {
+        final spec = OpenApiParser.parse('''
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Enum API" },
+  "paths": {
+    "/things": {
+      "post": {
+        "tags": ["things"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["level"],
+                "properties": {
+                  "level": { "type": "integer", "enum": [1, 2, 3] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {}
+      }
+    }
+  }
+}
+''');
+        expect(spec, isNotNull);
+        final body = spec!.endpoints.single.requestBodySchema!;
+        // Materialized eagerly: serializing must not throw a deferred TypeError.
+        expect(body.properties['level']!.enumValues, ['1', '2', '3']);
+        expect(spec.endpoints.single.toJson(), isA<Map<String, dynamic>>());
+      });
     });
   });
 }

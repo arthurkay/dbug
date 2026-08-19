@@ -1,17 +1,15 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:shelf/shelf.dart' as shelf;
-import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/window_title_provider.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/models/mock_endpoint.dart';
 import '../../../shared/widgets/toast_helper.dart';
 import '../../../shared/widgets/dbug_spinner.dart';
 import '../../../shared/utils/method_colors.dart';
+import '../providers/mock_server_provider.dart';
 
 class MockServerScreen extends ConsumerStatefulWidget {
   const MockServerScreen({super.key});
@@ -21,75 +19,57 @@ class MockServerScreen extends ConsumerStatefulWidget {
 }
 
 class _MockServerScreenState extends ConsumerState<MockServerScreen> {
-  bool _isRunning = false;
-  HttpServer? _server;
-  final int _port = AppConstants.defaultMockPort;
+  late final TextEditingController _portController;
 
   @override
   void initState() {
     super.initState();
+    _portController = TextEditingController(
+      text: '${ref.read(mockServerProvider).port}',
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ref.read(windowTitleProvider.notifier).state = 'Mock Server';
     });
   }
 
+  @override
+  void dispose() {
+    _portController.dispose();
+    super.dispose();
+  }
+
   Future<void> _startServer() async {
-    try {
-      final endpoints = await ref.read(mockEndpointRepositoryProvider).getAllEndpoints();
+    final port = int.tryParse(_portController.text.trim());
+    if (port == null || port < 1 || port > 65535) {
+      showDbugToast(context,
+          message: 'Enter a valid port (1–65535)', type: ToastType.warning);
+      return;
+    }
 
-      shelf.Handler handler = (shelf.Request request) async {
-        final path = request.requestedUri.path;
-        final method = request.method.toUpperCase();
-
-        final match = endpoints.where((e) => e.method.toUpperCase() == method && e.path == path).firstOrNull;
-
-        if (match == null) {
-          return shelf.Response.notFound('{"error": "Not found"}', headers: {'content-type': 'application/json'});
-        }
-
-        if (match.delayMs > 0) {
-          await Future.delayed(Duration(milliseconds: match.delayMs));
-        }
-
-        return shelf.Response(
-          match.statusCode,
-          body: match.body ?? '{"status": "ok"}',
-          headers: {'content-type': 'application/json', ...match.headers},
-        );
-      };
-
-      _server = await shelf_io.serve(handler, 'localhost', _port);
-      setState(() => _isRunning = true);
-
-      if (mounted) {
-        showDbugToast(context, message: 'Mock server running on http://localhost:$_port', type: ToastType.success);
-      }
-    } catch (e) {
-      if (mounted) {
-        showDbugToast(context, message: 'Failed to start server: $e', type: ToastType.error);
-      }
+    final error = await ref.read(mockServerProvider.notifier).start(port);
+    if (!mounted) return;
+    if (error != null) {
+      showDbugToast(context, message: error, type: ToastType.error);
+    } else {
+      showDbugToast(context,
+          message: 'Mock server running on http://localhost:$port',
+          type: ToastType.success);
     }
   }
 
   Future<void> _stopServer() async {
-    await _server?.close(force: true);
-    _server = null;
-    setState(() => _isRunning = false);
+    await ref.read(mockServerProvider.notifier).stop();
     if (mounted) {
       showDbugToast(context, message: 'Mock server stopped', type: ToastType.info);
     }
   }
 
   @override
-  void dispose() {
-    _server?.close(force: true);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final endpointsAsync = ref.watch(mockEndpointsProvider);
+    final server = ref.watch(mockServerProvider);
+    final isRunning = server.isRunning;
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -111,39 +91,42 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
               SizedBox(
                 width: 80,
                 child: TextField(
-                  decoration: InputDecoration(
-                    hintText: '$_port',
+                  controller: _portController,
+                  enabled: !isRunning,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    hintText: 'Port',
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    border: const OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    border: OutlineInputBorder(),
                   ),
                   style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
                 ),
               ),
               const SizedBox(width: 8),
               OutlinedButton.icon(
-                onPressed: _isRunning ? _stopServer : _startServer,
-                icon: Icon(_isRunning ? LucideIcons.square : LucideIcons.play, size: 16),
-                label: Text(_isRunning ? 'Stop' : 'Start'),
+                onPressed: isRunning ? _stopServer : _startServer,
+                icon: Icon(isRunning ? LucideIcons.square : LucideIcons.play, size: 16),
+                label: Text(isRunning ? 'Stop' : 'Start'),
               ),
               const SizedBox(width: 8),
-              if (_isRunning)
+              if (isRunning) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Text('Running', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.green)),
+                  child: Text(':${server.port}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.green)),
                 ),
-              if (!_isRunning) ...[
                 const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: () => _showAddEndpointDialog(context),
-                  icon: const Icon(LucideIcons.plus, size: 16),
-                  label: const Text('Add Endpoint'),
-                ),
               ],
+              FilledButton.icon(
+                onPressed: () => _showAddEndpointDialog(context),
+                icon: const Icon(LucideIcons.plus, size: 16),
+                label: const Text('Add Endpoint'),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -285,8 +268,6 @@ class _EndpointTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return ListTile(
       dense: true,
       visualDensity: VisualDensity.compact,

@@ -75,11 +75,11 @@ detect_platform() {
         *) err "Unsupported architecture: $arch" ;;
     esac
 
-    ASSET_NAME="${APP_NAME}-${PLATFORM}-${ARCH}"
     if [[ "$PLATFORM" == "linux" ]]; then
-        ARCHIVE_NAME="${ASSET_NAME}.tar.gz"
+        ARCHIVE_NAME="${APP_NAME}-linux-${ARCH}.tar.gz"
     else
-        ARCHIVE_NAME="${ASSET_NAME}.zip"
+        # macOS releases ship a single universal bundle (no arch suffix).
+        ARCHIVE_NAME="${APP_NAME}-macos.zip"
     fi
 }
 
@@ -119,15 +119,16 @@ github_fetch() {
 }
 
 # Parse tag_name from release JSON
+# ([[:space:]] instead of \s — BSD sed/grep on macOS don't support \s)
 parse_version() {
-    grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name":\s*"v?([^"]+)".*/\1/'
+    grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name":[[:space:]]*"v?([^"]+)".*/\1/'
 }
 
 # Parse browser_download_url for a given asset name
 parse_download_url() {
     local json="$1" asset="$2"
-    echo "$json" | grep -o "\"browser_download_url\":\s*\"[^\"]*${asset}[^\"]*\"" \
-        | head -1 | sed -E 's/.*"browser_download_url":\s*"([^"]+)".*/\1/'
+    echo "$json" | grep -oE "\"browser_download_url\":[[:space:]]*\"[^\"]*${asset}[^\"]*\"" \
+        | head -1 | sed -E 's/.*"browser_download_url":[[:space:]]*"([^"]+)".*/\1/'
 }
 
 # ─── Version management ─────────────────────────────────────────────────────

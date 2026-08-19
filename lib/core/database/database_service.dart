@@ -42,7 +42,9 @@ class DatabaseService {
     }
   }
 
-  static Future<void> _onCreate(Database db, int version) async {
+  /// Creates the full, current-version schema. Also used by the test
+  /// database helper so tests can never drift from the real schema.
+  static Future<void> createSchema(Database db) async {
     await db.execute('''
       CREATE TABLE collections (
         id TEXT PRIMARY KEY,
@@ -51,6 +53,8 @@ class DatabaseService {
         source_type TEXT DEFAULT 'manual',
         source_spec_id TEXT,
         global_headers TEXT DEFAULT '{}',
+        auth_type TEXT DEFAULT 'none',
+        auth_data TEXT DEFAULT '{}',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )
@@ -141,6 +145,8 @@ class DatabaseService {
       'CREATE INDEX idx_requests_collection ON requests(collection_id)',
     );
   }
+
+  static Future<void> _onCreate(Database db, int version) => createSchema(db);
 
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
