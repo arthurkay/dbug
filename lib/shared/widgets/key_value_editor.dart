@@ -47,9 +47,12 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
   }
 
   void _removeEntry(int index) {
+    final removed = widget.entries[index];
     setState(() {
       widget.entries.removeAt(index);
     });
+    // Its TextFields detach during the rebuild; dispose once they're gone.
+    WidgetsBinding.instance.addPostFrameCallback((_) => removed.dispose());
     widget.onChanged?.call();
   }
 
@@ -103,9 +106,9 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
                       hintText: widget.keyHint,
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      border: const OutlineInputBorder(),
                     ),
                     style: TextStyle(fontSize: 12, color: entry.enabled ? null : colorScheme.outline),
+                    onChanged: (_) => widget.onChanged?.call(),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -117,9 +120,9 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
                       hintText: widget.valueHint,
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      border: const OutlineInputBorder(),
                     ),
                     style: TextStyle(fontSize: 12, color: entry.enabled ? null : colorScheme.outline),
+                    onChanged: (_) => widget.onChanged?.call(),
                   ),
                 ),
                 const SizedBox(width: 4),

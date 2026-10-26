@@ -1,25 +1,44 @@
 import 'dart:convert';
+import 'package:dio/dio.dart' show CancelToken, DioException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/security/secret_cipher.dart';
 import '../../../core/http/http_client.dart';
-import '../../../core/models/request_model.dart';
+import '../../../core/models/auth_config.dart';
+import '../../../core/models/collection_model.dart';
 import '../../../core/models/history_entry.dart';
+import '../../../core/models/request_model.dart';
+import '../../../core/providers/active_environment_provider.dart';
 import '../../../core/providers/http_client_provider.dart';
 import '../../../core/providers/repository_providers.dart';
-import '../../../core/providers/active_environment_provider.dart';
+import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/window_title_provider.dart';
+import '../../../core/request/request_composer.dart';
+import '../../../shared/utils/body_type_helpers.dart';
+import '../../../shared/utils/method_colors.dart';
+import '../../../shared/utils/syntax_highlighter.dart';
+import '../../../shared/widgets/auth_editor.dart';
+import '../../../shared/widgets/collection_picker_dialog.dart';
+import '../../../shared/widgets/dbug_spinner.dart';
+import '../../../shared/widgets/json_body_editor.dart';
 import '../../../shared/widgets/key_value_editor.dart';
 import '../../../shared/widgets/response_view.dart';
 import '../../../shared/widgets/toast_helper.dart';
-import '../../../shared/widgets/json_body_editor.dart';
-import '../../../shared/widgets/dbug_spinner.dart';
-import '../../../shared/utils/method_colors.dart';
-import '../../../shared/utils/body_type_helpers.dart';
-import '../../../core/models/collection_model.dart';
-import '../../../core/providers/window_title_provider.dart';
 import '../../collections/widgets/collection_settings_dialog.dart';
+
+/// Seals a request-builder draft saved before encryption existed. Drafts are
+/// otherwise only rewritten when the request screen saves, which would leave
+/// the old plaintext credentials on disk until then.
+Future<void> sealLegacyRequestDraft() async {
+  if (Secrets.isLocked) return;
+  final prefs = await SharedPreferences.getInstance();
+  final raw = prefs.getString(_RequestScreenState._kBuilderStateKey);
+  if (raw == null || SecretCipher.isSealed(raw)) return;
+  await prefs.setString(_RequestScreenState._kBuilderStateKey, Secrets.cipher.seal(raw));
+}
 
 class RequestScreen extends ConsumerStatefulWidget {
   final RequestModel? initialRequest;
@@ -57,34 +76,35 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   final _requestNameController = TextEditingController();
   int _selectedTab = 0;
   int _selectedBodyType = 0;
-  int _selectedAuthType = 0;
+  AuthConfig _auth = AuthConfig.none;
   bool _isSending = false;
+  CancelToken? _cancelToken;
   HttpResponse? _lastResponse;
   String? _currentRequestId;
   bool _showEndpointList = true;
   String _endpointSearchQuery = '';
   double _responseSplitRatio = 0.5;
 
+  /// The request as last loaded or saved; edits are compared against it to
+  /// warn before they're discarded.
+  RequestDraft? _cleanSnapshot;
+
   final _methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
   final _bodyTypes = ['None', 'JSON', 'Form Data', 'Raw'];
-  final _authTypes = ['None', 'Bearer', 'Basic', 'API Key'];
 
   late final TabController _tabController;
 
   late final List<KeyValueEntry> _params;
   late final List<KeyValueEntry> _headers;
 
-  // Auth controllers
-  final _bearerTokenController = TextEditingController();
-  final _basicUserController = TextEditingController();
-  final _basicPassController = TextEditingController();
-  final _apiKeyNameController = TextEditingController();
-  final _apiKeyValueController = TextEditingController();
-  String _apiKeyLocation = 'header'; // header or query
+  /// Responses larger than this aren't kept in the persisted draft.
+  static const _maxPersistedResponseChars = 256 * 1024;
 
   @override
   void initState() {
     super.initState();
+    // Creating the settings notifier applies the saved history limits.
+    ref.read(settingsProvider);
     _tabController = TabController(length: 4, vsync: this);
     _loadSplitRatio();
     _params = [KeyValueEntry()];
@@ -100,7 +120,9 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       _loadFromHistoryEntry(widget.historyEntry!);
     } else if (widget.initialRequest != null) {
       _loadFromRequest(widget.initialRequest!);
-      _loadLatestHistoryForRequest(widget.initialRequest!.id);
+      if (_currentRequestId != null) {
+        _loadLatestHistoryForRequest(_currentRequestId!);
+      }
     } else {
       _loadBuilderState();
     }
@@ -121,39 +143,21 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   Map<String, String> get _collectionHeaders =>
       _liveCollection?.globalHeaders ?? widget.collectionHeaders;
 
-  String? get _collectionAuthType =>
-      _liveCollection?.authType ?? widget.collectionAuthType;
+  AuthConfig get _collectionAuth => AuthConfig.fromStored(
+        _liveCollection?.authType ?? widget.collectionAuthType,
+        _liveCollection?.authData ?? widget.collectionAuthData,
+      );
 
-  String? get _collectionAuthData =>
-      _liveCollection?.authData ?? widget.collectionAuthData;
-
-  bool get _collectionAuthDefined =>
-      _collectionAuthType != null && _collectionAuthType != 'none';
+  bool get _collectionAuthDefined => _collectionAuth.type != AuthType.none;
 
   /// True only when the collection auth would actually produce credentials —
   /// a saved auth type with blank fields sends nothing and must not claim
   /// otherwise in the UI.
-  bool get _hasCollectionAuth {
-    if (!_collectionAuthDefined) return false;
-    try {
-      final data =
-          Map<String, dynamic>.from(jsonDecode(_collectionAuthData ?? '{}'));
-      switch (_collectionAuthType) {
-        case 'bearer':
-          return ((data['token'] as String?)?.trim().isNotEmpty ?? false);
-        case 'basic':
-          return ((data['username'] as String?)?.trim().isNotEmpty ?? false);
-        case 'apikey':
-          return ((data['name'] as String?)?.trim().isNotEmpty ?? false) &&
-              ((data['value'] as String?)?.trim().isNotEmpty ?? false);
-      }
-    } catch (_) {}
-    return false;
-  }
+  bool get _hasCollectionAuth => _collectionAuth.producesCredentials;
 
   /// True when this request will actually send with the collection's auth
   /// (no request-level auth is set to override it).
-  bool get _usesCollectionAuth => _selectedAuthType == 0 && _hasCollectionAuth;
+  bool get _usesCollectionAuth => _auth.type == AuthType.none && _hasCollectionAuth;
 
   Future<void> _editCollectionSettings({int initialTab = 0}) async {
     final id = _collectionId;
@@ -165,162 +169,153 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
         initialTab: initialTab);
   }
 
-  Future<void> _saveBuilderState() async {
-    final params = entriesToMap(_params);
-    final headers = entriesToMap(_headers);
+  // ---------------------------------------------------------------------------
+  // Draft <-> UI
 
-    String authType = 'none';
-    String authData = '{}';
-    if (_selectedAuthType == 1) {
-      authType = 'bearer';
-      authData = jsonEncode({'token': _bearerTokenController.text});
-    } else if (_selectedAuthType == 2) {
-      authType = 'basic';
-      authData = jsonEncode({
-        'username': _basicUserController.text,
-        'password': _basicPassController.text,
-      });
-    } else if (_selectedAuthType == 3) {
-      authType = 'apikey';
-      authData = jsonEncode({
-        'name': _apiKeyNameController.text,
-        'value': _apiKeyValueController.text,
-        'location': _apiKeyLocation,
-      });
+  /// The builder's current contents.
+  RequestDraft _currentDraft() => RequestDraft(
+        method: _selectedMethod,
+        url: _urlController.text,
+        name: _requestNameController.text,
+        bodyType: bodyTypeIndexToString(_selectedBodyType),
+        body: _bodyController.text,
+        headers: entriesToMap(_headers),
+        params: entriesToMap(_params),
+        auth: _auth,
+        tab: _selectedTab,
+        collectionId: _collectionId,
+        requestId: _currentRequestId,
+      );
+
+  /// Loads [draft]'s request fields into the editors (not tab/response).
+  void _applyDraft(RequestDraft draft) {
+    _selectedMethod = _methods.contains(draft.method) ? draft.method : 'GET';
+    _urlController.text = draft.url;
+    _requestNameController.text = draft.name;
+    _selectedBodyType = bodyTypeStringToIndex(draft.bodyType);
+    _bodyController.text = draft.body;
+    _auth = draft.auth;
+    _replaceEntries(_headers, draft.headers);
+    _replaceEntries(_params, draft.params);
+  }
+
+  void _replaceEntries(List<KeyValueEntry> entries, Map<String, String> values) {
+    // The editor's text fields still reference the old controllers until the
+    // next frame rebuilds them, so dispose those afterwards.
+    final old = List.of(entries);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final e in old) {
+        e.dispose();
+      }
+    });
+    entries
+      ..clear()
+      ..addAll(mapToEntries(values));
+    if (entries.isEmpty) entries.add(KeyValueEntry());
+  }
+
+  void _markClean() => _cleanSnapshot = _currentDraft();
+
+  bool get _hasUnsavedChanges {
+    final clean = _cleanSnapshot;
+    return clean != null && !clean.sameRequestAs(_currentDraft());
+  }
+
+  RequestDraft _draftFromRequest(RequestModel req) => RequestDraft(
+        method: req.method,
+        url: req.url,
+        name: req.name,
+        bodyType: req.bodyType,
+        body: req.body ?? '',
+        headers: req.headers,
+        params: req.queryParams,
+        auth: AuthConfig.fromStored(req.authType, req.authData),
+      );
+
+  static Map<String, String> _decodeStringMap(String? raw) {
+    try {
+      final decoded = jsonDecode(raw ?? '{}');
+      if (decoded is Map) {
+        return decoded.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+      }
+    } catch (e) {
+      debugPrint('Failed to parse stored map: $e');
     }
+    return {};
+  }
 
-    final state = {
-      'method': _selectedMethod,
-      'url': _urlController.text,
-      'body': _bodyController.text,
-      'requestName': _requestNameController.text,
-      'tab': _selectedTab,
-      'bodyType': _selectedBodyType,
-      'authType': authType,
-      'authData': authData,
-      'headers': jsonEncode(headers),
-      'params': jsonEncode(params),
-      'collectionId': _collectionId,
-      'collectionHeaders': jsonEncode(_collectionHeaders),
-      'currentRequestId': _currentRequestId,
-      'bearerToken': _bearerTokenController.text,
-      'basicUser': _basicUserController.text,
-      'basicPass': _basicPassController.text,
-      'apiKeyName': _apiKeyNameController.text,
-      'apiKeyValue': _apiKeyValueController.text,
-      'apiKeyLocation': _apiKeyLocation,
-      'response': _lastResponse != null
-          ? {
-              'statusCode': _lastResponse!.statusCode,
-              'body': _lastResponse!.body,
-              'timeMs': _lastResponse!.timeMs,
-              'sizeBytes': _lastResponse!.sizeBytes,
-            }
+  HttpResponse? _responseFromHistory(HistoryEntry entry) {
+    if (entry.statusCode == null) return null;
+    return HttpResponse(
+      statusCode: entry.statusCode!,
+      headers: _decodeStringMap(entry.responseHeaders),
+      body: entry.responseBody ?? '',
+      timeMs: entry.responseTimeMs ?? 0,
+      sizeBytes: entry.responseSize ?? 0,
+      isTruncated: entry.responseTruncated,
+    );
+  }
+
+  void _setWindowTitle(String name) {
+    ref.read(windowTitleProvider.notifier).state =
+        name.isNotEmpty ? name : 'Request Builder';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Persistence of the builder draft
+
+  Future<void> _saveBuilderState() async {
+    final response = _lastResponse;
+    final draft = _currentDraft().copyWith(
+      response: response != null &&
+              !response.isBinary &&
+              response.body.length <= _maxPersistedResponseChars
+          ? ResponseSnapshot(
+              statusCode: response.statusCode,
+              body: response.body,
+              timeMs: response.timeMs,
+              sizeBytes: response.sizeBytes,
+              headers: response.headers,
+            )
           : null,
-    };
-
+    );
+    // The draft holds credentials (auth, headers, the response), so it is
+    // sealed like the database fields; while locked it isn't persisted.
+    final sealed = Secrets.sealOrNull(jsonEncode(draft.toJson()));
+    if (sealed == null) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kBuilderStateKey, jsonEncode(state));
+    await prefs.setString(_kBuilderStateKey, sealed);
   }
 
   Future<void> _loadBuilderState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_kBuilderStateKey);
+      final raw = Secrets.cipher.open(prefs.getString(_kBuilderStateKey));
       if (raw == null || !mounted) return;
 
-      final state = jsonDecode(raw) as Map<String, dynamic>;
-
-      _selectedMethod = state['method'] ?? 'GET';
-      _urlController.text = state['url'] ?? '';
-      _bodyController.text = state['body'] ?? '';
-      _requestNameController.text = state['requestName'] ?? '';
-      _selectedTab = ((state['tab'] ?? 0) as int).clamp(0, 3);
-      _tabController.index = _selectedTab;
+      final draft = RequestDraft.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      _applyDraft(draft);
+      _selectedTab = draft.tab;
       // Restore the collection link so global headers/auth apply again after
       // a restart (the live values are then re-read via collectionByIdProvider).
-      _restoredCollectionId = state['collectionId'] as String?;
-      _selectedBodyType = state['bodyType'] ?? 0;
-      _currentRequestId = state['currentRequestId'];
-      _apiKeyLocation = state['apiKeyLocation'] ?? 'header';
-
-      final savedAuthType = state['authType'];
-      if (savedAuthType is String) {
-        switch (savedAuthType) {
-          case 'bearer':
-            _selectedAuthType = 1;
-            break;
-          case 'basic':
-            _selectedAuthType = 2;
-            break;
-          case 'apikey':
-            _selectedAuthType = 3;
-            break;
-          default:
-            _selectedAuthType = 0;
-        }
-      } else {
-        _selectedAuthType = savedAuthType ?? 0;
-      }
-
-      final savedAuthData = state['authData'];
-      if (savedAuthData is String && savedAuthData != '{}') {
-        try {
-          final data = jsonDecode(savedAuthData) as Map<String, dynamic>;
-          _bearerTokenController.text = data['token'] ?? '';
-          _basicUserController.text = data['username'] ?? '';
-          _basicPassController.text = data['password'] ?? '';
-          _apiKeyNameController.text = data['name'] ?? '';
-          _apiKeyValueController.text = data['value'] ?? '';
-          if (data['location'] != null) _apiKeyLocation = data['location'];
-        } catch (e) {
-          debugPrint('Failed to parse auth data: $e');
-        }
-      } else {
-        _bearerTokenController.text = state['bearerToken'] ?? '';
-        _basicUserController.text = state['basicUser'] ?? '';
-        _basicPassController.text = state['basicPass'] ?? '';
-        _apiKeyNameController.text = state['apiKeyName'] ?? '';
-        _apiKeyValueController.text = state['apiKeyValue'] ?? '';
-      }
-
-      try {
-        final headersMap = Map<String, String>.from(
-          jsonDecode(state['headers'] ?? '{}'),
-        );
-        _headers
-          ..clear()
-          ..addAll(mapToEntries(headersMap));
-      } catch (e) {
-        debugPrint('Failed to parse headers: $e');
-        _headers.clear();
-      }
-      if (_headers.isEmpty) _headers.add(KeyValueEntry());
-
-      try {
-        final paramsMap = Map<String, String>.from(
-          jsonDecode(state['params'] ?? '{}'),
-        );
-        _params
-          ..clear()
-          ..addAll(mapToEntries(paramsMap));
-      } catch (e) {
-        debugPrint('Failed to parse params: $e');
-        _params.clear();
-      }
-      if (_params.isEmpty) _params.add(KeyValueEntry());
-
-      final resp = state['response'];
-      if (resp != null && resp['statusCode'] != null) {
+      _restoredCollectionId = draft.collectionId;
+      _currentRequestId = draft.requestId;
+      final resp = draft.response;
+      if (resp != null) {
         _lastResponse = HttpResponse(
-          statusCode: resp['statusCode'],
-          headers: const {},
-          body: resp['body'] ?? '',
-          timeMs: resp['timeMs'] ?? 0,
-          sizeBytes: resp['sizeBytes'] ?? 0,
+          statusCode: resp.statusCode,
+          headers: resp.headers,
+          body: resp.body,
+          timeMs: resp.timeMs,
+          sizeBytes: resp.sizeBytes,
         );
       }
-
+      // Moving the controller makes the scrollable TabBar scroll to the tab,
+      // which throws if its viewport hasn't been laid out yet — wait a frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _tabController.index = _selectedTab;
+      });
+      _markClean();
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Failed to load saved request state: $e');
@@ -341,156 +336,55 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     );
   }
 
-  void _loadFromHistoryEntry(HistoryEntry entry) {
-    _selectedMethod = entry.method;
-    _urlController.text = entry.url;
-    _bodyController.text = entry.body ?? '';
-    _requestNameController.text = entry.requestName ?? '';
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        ref
-            .read(windowTitleProvider.notifier)
-            .state = entry.requestName?.isNotEmpty == true
-            ? entry.requestName!
-            : 'Request Builder';
-      }
-    });
+  // ---------------------------------------------------------------------------
+  // Loading requests and history
 
-    // Restore body type
-    _selectedBodyType = bodyTypeStringToIndex(entry.bodyType);
-
-    // Restore headers
-    try {
-      final headersMap = Map<String, String>.from(jsonDecode(entry.headers));
-      _headers
-        ..clear()
-        ..addAll(mapToEntries(headersMap));
-    } catch (e) {
-      debugPrint('Failed to parse history headers: $e');
-      _headers.clear();
-    }
-    if (_headers.isEmpty) _headers.add(KeyValueEntry());
-
-    // Restore query params
-    try {
-      final paramsMap = Map<String, String>.from(jsonDecode(entry.queryParams));
-      _params
-        ..clear()
-        ..addAll(mapToEntries(paramsMap));
-    } catch (e) {
-      debugPrint('Failed to parse history params: $e');
-      _params.clear();
-    }
-    if (_params.isEmpty) _params.add(KeyValueEntry());
-
-    // Restore auth type
-    switch (entry.authType) {
-      case 'bearer':
-        _selectedAuthType = 1;
-        try {
-          final data = jsonDecode(entry.authData);
-          _bearerTokenController.text = data['token'] ?? '';
-        } catch (e) {
-          debugPrint('Failed to parse bearer auth: $e');
-        }
-        break;
-      case 'basic':
-        _selectedAuthType = 2;
-        try {
-          final data = jsonDecode(entry.authData);
-          _basicUserController.text = data['username'] ?? '';
-          _basicPassController.text = data['password'] ?? '';
-        } catch (e) {
-          debugPrint('Failed to parse basic auth: $e');
-        }
-        break;
-      case 'apikey':
-        _selectedAuthType = 3;
-        try {
-          final data = jsonDecode(entry.authData);
-          _apiKeyNameController.text = data['name'] ?? '';
-          _apiKeyValueController.text = data['value'] ?? '';
-          _apiKeyLocation = data['location'] ?? 'header';
-        } catch (e) {
-          debugPrint('Failed to parse apikey auth: $e');
-        }
-        break;
-      default:
-        _selectedAuthType = 0;
-    }
-
-    // Restore response from history
-    if (entry.statusCode != null) {
-      _lastResponse = HttpResponse(
-        statusCode: entry.statusCode!,
-        headers: const {},
-        body: entry.responseBody ?? '',
-        timeMs: entry.responseTimeMs ?? 0,
-        sizeBytes: entry.responseSize ?? 0,
+  RequestDraft _draftFromHistory(HistoryEntry entry) => RequestDraft(
+        method: entry.method,
+        url: entry.url,
+        name: entry.requestName ?? '',
+        bodyType: entry.bodyType,
+        body: entry.body ?? '',
+        headers: _decodeStringMap(entry.headers),
+        params: _decodeStringMap(entry.queryParams),
+        auth: AuthConfig.fromStored(entry.authType, entry.authData),
       );
-    }
+
+  void _loadFromHistoryEntry(HistoryEntry entry) {
+    _applyDraft(_draftFromHistory(entry));
+    _lastResponse = _responseFromHistory(entry);
+    _markClean();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _setWindowTitle(entry.requestName ?? '');
+    });
   }
 
   void _loadFromRequest(RequestModel req) {
-    _currentRequestId = req.id;
-    _selectedMethod = req.method;
-    _urlController.text = req.url;
-    _bodyController.text = req.body ?? '';
-    _requestNameController.text = req.name;
-    _selectedBodyType = bodyTypeStringToIndex(req.bodyType);
-    _params
-      ..clear()
-      ..addAll(mapToEntries(req.queryParams));
-    if (_params.isEmpty) _params.add(KeyValueEntry());
-    _headers
-      ..clear()
-      ..addAll(mapToEntries(req.headers));
-    if (_headers.isEmpty) _headers.add(KeyValueEntry());
-
+    // An empty id marks an unsaved draft (e.g. "Send" from the spec browser);
+    // it must not be treated as an existing request when saving.
+    _currentRequestId = req.id.isEmpty ? null : req.id;
+    _applyDraft(_draftFromRequest(req));
+    _markClean();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        ref.read(windowTitleProvider.notifier).state = req.name.isNotEmpty
-            ? req.name
-            : 'Request Builder';
-      }
+      if (mounted) _setWindowTitle(req.name);
     });
   }
 
+  /// Replays the request's most recent send on top of the saved request: the
+  /// last-sent URL, body, headers and params, its auth when it had any, and
+  /// its response. The saved name and id are kept.
   Future<void> _loadLatestHistoryForRequest(String requestId) async {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      final historyRepo = ref.read(historyRepositoryProvider);
-      final latest = await historyRepo.getLatestByRequestId(requestId);
-      if (!mounted || latest == null) return;
-      setState(() {
-        _urlController.text = latest.url;
-        _selectedMethod = latest.method;
-        _bodyController.text = latest.body ?? '';
-        _selectedBodyType = bodyTypeStringToIndex(latest.bodyType);
-        try {
-          final headersMap = Map<String, String>.from(jsonDecode(latest.headers));
-          _headers
-            ..clear()
-            ..addAll(mapToEntries(headersMap));
-        } catch (_) {}
-        if (_headers.isEmpty) _headers.add(KeyValueEntry());
-        try {
-          final paramsMap = Map<String, String>.from(jsonDecode(latest.queryParams));
-          _params
-            ..clear()
-            ..addAll(mapToEntries(paramsMap));
-        } catch (_) {}
-        if (_params.isEmpty) _params.add(KeyValueEntry());
-        if (latest.statusCode != null) {
-          _lastResponse = HttpResponse(
-            statusCode: latest.statusCode!,
-            headers: const {},
-            body: latest.responseBody ?? '',
-            timeMs: latest.responseTimeMs ?? 0,
-            sizeBytes: latest.responseSize ?? 0,
-          );
-        }
-      });
+    final historyRepo = ref.read(historyRepositoryProvider);
+    final latest = await historyRepo.getLatestByRequestId(requestId);
+    if (!mounted || latest == null || _currentRequestId != requestId) return;
+    setState(() {
+      final fromHistory = _draftFromHistory(latest);
+      _applyDraft(fromHistory.copyWith(
+        name: _requestNameController.text,
+        auth: latest.authType != 'none' ? fromHistory.auth : _auth,
+      ));
+      _lastResponse = _responseFromHistory(latest);
+      _markClean();
     });
   }
 
@@ -510,11 +404,6 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     _urlController.dispose();
     _bodyController.dispose();
     _requestNameController.dispose();
-    _bearerTokenController.dispose();
-    _basicUserController.dispose();
-    _basicPassController.dispose();
-    _apiKeyNameController.dispose();
-    _apiKeyValueController.dispose();
     for (final e in _params) {
       e.dispose();
     }
@@ -524,363 +413,212 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     super.dispose();
   }
 
-  Map<String, String> _buildAuthHeaders() {
-    // Request-level auth takes precedence
-    if (_selectedAuthType != 0) {
-      switch (_selectedAuthType) {
-        case 1:
-          final token = _bearerTokenController.text.trim();
-          if (token.isNotEmpty) return {'Authorization': 'Bearer $token'};
-          break;
-        case 2:
-          final user = _basicUserController.text.trim();
-          final pass = _basicPassController.text;
-          if (user.isNotEmpty) {
-            final encoded = base64Encode(utf8.encode('$user:$pass'));
-            return {'Authorization': 'Basic $encoded'};
-          }
-          break;
-        case 3:
-          if (_apiKeyLocation == 'header') {
-            final name = _apiKeyNameController.text.trim();
-            final value = _apiKeyValueController.text.trim();
-            if (name.isNotEmpty && value.isNotEmpty) return {name: value};
-          }
-          break;
-      }
-      return {};
-    }
+  // ---------------------------------------------------------------------------
+  // Sending
 
-    // Fall back to collection auth
-    if (!_hasCollectionAuth) return {};
-    try {
-      final data = Map<String, dynamic>.from(
-        jsonDecode(_collectionAuthData ?? '{}'),
-      );
-      switch (_collectionAuthType) {
-        case 'bearer':
-          final token = ((data['token'] as String?) ?? '').trim();
-          if (token.isNotEmpty) return {'Authorization': 'Bearer $token'};
-          break;
-        case 'basic':
-          final user = ((data['username'] as String?) ?? '').trim();
-          final pass = (data['password'] as String?) ?? '';
-          if (user.isNotEmpty) {
-            final encoded = base64Encode(utf8.encode('$user:$pass'));
-            return {'Authorization': 'Basic $encoded'};
-          }
-          break;
-        case 'apikey':
-          final location = data['location'] ?? 'header';
-          if (location == 'header') {
-            final name = ((data['name'] as String?) ?? '').trim();
-            final value = ((data['value'] as String?) ?? '').trim();
-            if (name.isNotEmpty && value.isNotEmpty) return {name: value};
-          }
-          break;
-      }
-    } catch (_) {}
-    return {};
-  }
-
-  Map<String, String> _buildQueryParams() {
-    final params = entriesToMap(_params);
-
-    // Request-level API key query param
-    if (_selectedAuthType == 3 && _apiKeyLocation == 'query') {
-      final name = _apiKeyNameController.text.trim();
-      final value = _apiKeyValueController.text.trim();
-      if (name.isNotEmpty && value.isNotEmpty) params[name] = value;
-    }
-
-    // Collection-level API key query param (only if request doesn't override)
-    if (_selectedAuthType == 0 && _collectionAuthType == 'apikey') {
-      try {
-        final data = Map<String, dynamic>.from(
-          jsonDecode(_collectionAuthData ?? '{}'),
-        );
-        if (data['location'] == 'query') {
-          final name = (data['name'] as String?) ?? '';
-          final value = (data['value'] as String?) ?? '';
-          if (name.isNotEmpty &&
-              value.isNotEmpty &&
-              !params.containsKey(name)) {
-            params[name] = value;
-          }
-        }
-      } catch (_) {}
-    }
-
-    return params;
-  }
+  void _cancelSend() => _cancelToken?.cancel('Cancelled by user');
 
   Future<void> _sendRequest() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
-      if (mounted) {
-        showDbugToast(
-          context,
-          message: 'Enter a URL to send',
-          type: ToastType.warning,
-        );
-      }
+      showDbugToast(context, message: 'Enter a URL to send', type: ToastType.warning);
       return;
     }
 
+    final cancelToken = CancelToken();
     setState(() {
       _isSending = true;
+      _cancelToken = cancelToken;
       _lastResponse = null;
     });
 
+    // Read everything that needs ref up front: the screen may be left while
+    // the request is in flight, and the send should still land in history.
+    final draft = _currentDraft();
+    final composed = composeRequest(
+      method: draft.method,
+      url: draft.url,
+      params: draft.params,
+      headers: draft.headers,
+      bodyType: draft.bodyType,
+      body: draft.body,
+      auth: draft.auth,
+      collectionHeaders: _collectionHeaders,
+      collectionAuth: _collectionAuth,
+      variables: ref.read(activeVariablesProvider),
+    );
+    final client = ref.read(httpClientProvider);
+    final historyRepo = ref.read(historyRepositoryProvider);
+    final collectionHeaders = _collectionHeaders;
+
     try {
-      final variables = ref.read(activeVariablesProvider);
-      final resolvedUrl = substituteVariables(url, variables);
-
-      final headers = <String, String>{};
-      headers.addAll(_collectionHeaders);
-      headers.addAll(entriesToMap(_headers));
-      headers.addAll(_buildAuthHeaders());
-      final resolvedHeaders = headers.map(
-        (k, v) => MapEntry(k, substituteVariables(v, variables)),
-      );
-
-      final queryParams = _buildQueryParams().map(
-        (k, v) => MapEntry(k, substituteVariables(v, variables)),
-      );
-
-      String? body;
-      if (_selectedBodyType > 0 && _bodyController.text.isNotEmpty) {
-        body = substituteVariables(_bodyController.text, variables);
-        if (_selectedBodyType == 2) {
-          body = _encodeFormBody(body);
-        }
-        final hasContentType = resolvedHeaders.keys
-            .any((k) => k.toLowerCase() == 'content-type');
-        if (!hasContentType) {
-          resolvedHeaders['Content-Type'] = switch (_selectedBodyType) {
-            1 => 'application/json',
-            2 => 'application/x-www-form-urlencoded',
-            _ => 'text/plain',
-          };
-        }
-      }
-
-      final client = ref.read(httpClientProvider);
       final response = await client.sendRequest(
-        method: _selectedMethod,
-        url: resolvedUrl,
-        headers: resolvedHeaders,
-        queryParams: queryParams,
-        body: body,
+        method: composed.method,
+        url: composed.url,
+        headers: composed.headers,
+        queryParams: composed.queryParams,
+        body: composed.body,
+        cancelToken: cancelToken,
       );
 
-      setState(() => _lastResponse = response);
+      if (mounted) setState(() => _lastResponse = response);
 
-      // Build auth data for history
-      String authType = 'none';
-      String authData = '{}';
-      if (_selectedAuthType == 1) {
-        authType = 'bearer';
-        authData = jsonEncode({'token': _bearerTokenController.text.trim()});
-      } else if (_selectedAuthType == 2) {
-        authType = 'basic';
-        authData = jsonEncode({
-          'username': _basicUserController.text.trim(),
-          'password': _basicPassController.text,
-        });
-      } else if (_selectedAuthType == 3) {
-        authType = 'apikey';
-        authData = jsonEncode({
-          'name': _apiKeyNameController.text.trim(),
-          'value': _apiKeyValueController.text.trim(),
-          'location': _apiKeyLocation,
-        });
-      }
-
-      final bodyType = bodyTypeIndexToString(_selectedBodyType);
-
-      // Save to history
-      final historyRepo = ref.read(historyRepositoryProvider);
       await historyRepo.addEntry(
-        requestId: _currentRequestId,
-        method: _selectedMethod,
-        url: resolvedUrl,
+        requestId: draft.requestId,
+        method: composed.method,
+        // Keep the {{var}} template; the resolved URL is stored separately so
+        // env values (possibly secrets) aren't baked into replays.
+        url: url,
+        resolvedUrl: composed.url,
         statusCode: response.statusCode,
         responseTimeMs: response.timeMs,
         responseSize: response.sizeBytes,
         responseBody: response.body,
-        requestName: _requestNameController.text.trim().isNotEmpty
-            ? _requestNameController.text.trim()
-            : '$_selectedMethod $resolvedUrl',
-        collectionId: _collectionId,
-        headers: jsonEncode(entriesToMap(_headers)),
-        collectionHeaders: jsonEncode(_collectionHeaders),
-        body: _selectedBodyType > 0 ? _bodyController.text : null,
-        bodyType: bodyType,
-        queryParams: jsonEncode(_buildQueryParams()),
-        authType: authType,
-        authData: authData,
+        responseHeaders: response.headers,
+        requestName: draft.name.trim().isNotEmpty ? draft.name.trim() : '${composed.method} $url',
+        collectionId: draft.collectionId,
+        headers: jsonEncode(draft.headers),
+        collectionHeaders: jsonEncode(collectionHeaders),
+        body: draft.bodyType != null ? draft.body : null,
+        bodyType: draft.bodyType,
+        // Only the user's own params: auth-derived API keys are rebuilt from
+        // authType/authData (or the collection) when the entry is restored,
+        // and must not be baked in as plain request params.
+        queryParams: jsonEncode(draft.params),
+        authType: draft.auth.storedType,
+        authData: draft.auth.storedData,
       );
-      ref.invalidate(historyProvider);
-      _saveBuilderState();
+      if (mounted) {
+        ref.invalidate(historyProvider);
+        _saveBuilderState();
+      }
+    } on DioException catch (e) {
+      if (!mounted) return;
+      if (CancelToken.isCancel(e)) {
+        showDbugToast(context, message: 'Request cancelled', type: ToastType.info);
+      } else {
+        showDbugToast(context, message: 'Request failed: ${e.message}', type: ToastType.error);
+      }
     } catch (e) {
       if (mounted) {
-        showDbugToast(
-          context,
-          message: 'Request failed: $e',
-          type: ToastType.error,
-        );
+        showDbugToast(context, message: 'Request failed: $e', type: ToastType.error);
       }
     } finally {
-      if (mounted) setState(() => _isSending = false);
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+          _cancelToken = null;
+        });
+      }
     }
   }
 
-  String _encodeFormBody(String raw) {
-    final pairs = <String>[];
-    for (final line in raw.split('\n')) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty) continue;
-      final eq = trimmed.indexOf('=');
-      final key = eq >= 0 ? trimmed.substring(0, eq) : trimmed;
-      final value = eq >= 0 ? trimmed.substring(eq + 1) : '';
-      pairs.add('${Uri.encodeQueryComponent(key)}=${Uri.encodeQueryComponent(value)}');
+  // ---------------------------------------------------------------------------
+  // Saving
+
+  /// Saves the request; returns false when nothing was saved (no URL, or the
+  /// collection picker was cancelled).
+  Future<bool> _saveRequest() async {
+    final draft = _currentDraft();
+    final url = draft.url.trim();
+    if (url.isEmpty) {
+      showDbugToast(context, message: 'Enter a URL to save', type: ToastType.warning);
+      return false;
     }
-    return pairs.join('&');
-  }
-
-  Future<void> _saveRequest() async {
-    final name = _requestNameController.text.trim().isNotEmpty
-        ? _requestNameController.text.trim()
-        : '$_selectedMethod ${_urlController.text.trim()}';
-    final url = _urlController.text.trim();
-    if (url.isEmpty) return;
-
-    final bodyType = bodyTypeIndexToString(_selectedBodyType);
+    final name = draft.name.trim().isNotEmpty ? draft.name.trim() : '$_selectedMethod $url';
+    final body = draft.bodyType != null ? draft.body : null;
 
     final requestRepo = ref.read(requestRepositoryProvider);
-    final headers = entriesToMap(_headers);
-    final queryParams = entriesToMap(_params);
 
-    if (_currentRequestId != null) {
-      final existing = await requestRepo.getRequest(_currentRequestId!);
-      if (existing != null) {
-        final updated = existing.copyWith(
-          name: name,
-          method: _selectedMethod,
-          url: url,
-          headers: headers,
-          bodyType: bodyType,
-          body: _selectedBodyType > 0 ? _bodyController.text : null,
-          queryParams: queryParams,
-          updatedAt: DateTime.now(),
-        );
-        await requestRepo.updateRequest(updated);
-      }
-      ref.invalidate(collectionsProvider);
-      if (mounted)
-        showDbugToast(
-          context,
-          message: 'Request saved',
-          type: ToastType.success,
-        );
-    } else {
-      final collections = await ref
-          .read(collectionRepositoryProvider)
-          .getAllCollections();
-      if (!mounted) return;
+    // The saved request may have been deleted since it was opened; fall back
+    // to saving it as a new one instead of silently doing nothing.
+    final existing = _currentRequestId != null
+        ? await requestRepo.getRequest(_currentRequestId!)
+        : null;
 
-      if (collections.isEmpty) {
-        final req = await requestRepo.createRequest(
-          name: name,
-          method: _selectedMethod,
-          url: url,
-          headers: headers,
-          bodyType: bodyType,
-          body: _selectedBodyType > 0 ? _bodyController.text : null,
-          queryParams: queryParams,
-        );
-        setState(() => _currentRequestId = req.id);
-        ref.invalidate(collectionsProvider);
-        if (mounted)
-          showDbugToast(
-            context,
-            message: 'Request saved',
-            type: ToastType.success,
-          );
-        return;
-      }
-
-      String? selectedId = _collectionId ?? collections.first.id;
-      final picked = await showDialog<String>(
-        context: context,
-        builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setDialogState) => AlertDialog(
-            title: const Text('Save to Collection'),
-            content: SizedBox(
-              width: 360,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Choose a collection for this request.',
-                    style: Theme.of(ctx).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 12),
-                  ...collections.map(
-                    (c) => RadioListTile<String>(
-                      title: Text(c.name, style: const TextStyle(fontSize: 13)),
-                      subtitle: c.description != null
-                          ? Text(
-                              c.description!,
-                              style: const TextStyle(fontSize: 11),
-                            )
-                          : null,
-                      value: c.id,
-                      groupValue: selectedId,
-                      dense: true,
-                      onChanged: (v) => setDialogState(() => selectedId = v),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, selectedId),
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        ),
-      );
-
-      if (picked == null) return;
-
-      final req = await requestRepo.createRequest(
-        collectionId: picked,
+    if (existing != null) {
+      await requestRepo.updateRequest(existing.copyWith(
         name: name,
         method: _selectedMethod,
         url: url,
-        headers: headers,
-        bodyType: bodyType,
-        body: _selectedBodyType > 0 ? _bodyController.text : null,
-        queryParams: queryParams,
-      );
-      setState(() => _currentRequestId = req.id);
+        headers: draft.headers,
+        bodyType: draft.bodyType,
+        body: body,
+        queryParams: draft.params,
+        authType: draft.auth.storedType,
+        authData: draft.auth.storedData,
+        updatedAt: DateTime.now(),
+      ));
+      if (!mounted) return true;
       ref.invalidate(collectionsProvider);
-      ref.invalidate(requestsByCollectionProvider(picked));
-      if (mounted)
-        showDbugToast(
-          context,
-          message: 'Saved to collection',
-          type: ToastType.success,
-        );
+      if (existing.collectionId != null) {
+        ref.invalidate(requestsByCollectionProvider(existing.collectionId!));
+      }
+      _markClean();
+      showDbugToast(context, message: 'Request saved', type: ToastType.success);
+      return true;
     }
+
+    final collections = await ref.read(collectionRepositoryProvider).getAllCollections();
+    if (!mounted) return false;
+
+    String? collectionId;
+    if (collections.isNotEmpty) {
+      collectionId = await showCollectionPickerDialog(
+        context,
+        collections: collections,
+        initialId: _collectionId,
+      );
+      if (collectionId == null || !mounted) return false;
+    }
+
+    final req = await requestRepo.createRequest(
+      collectionId: collectionId,
+      name: name,
+      method: _selectedMethod,
+      url: url,
+      headers: draft.headers,
+      bodyType: draft.bodyType,
+      body: body,
+      queryParams: draft.params,
+      authType: draft.auth.storedType,
+      authData: draft.auth.storedData,
+    );
+    if (!mounted) return true;
+    setState(() => _currentRequestId = req.id);
+    ref.invalidate(collectionsProvider);
+    if (collectionId != null) {
+      ref.invalidate(requestsByCollectionProvider(collectionId));
+    }
+    _markClean();
+    showDbugToast(
+      context,
+      message: collectionId != null ? 'Saved to collection' : 'Request saved',
+      type: ToastType.success,
+    );
+    return true;
+  }
+
+  /// Asks what to do with unsaved edits. Returns true when it's fine to move
+  /// on (saved or discarded).
+  Future<bool> _confirmDiscardChanges() async {
+    if (!_hasUnsavedChanges) return true;
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Unsaved changes'),
+        content: const Text('This request has changes that haven\'t been saved.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, 'discard'), child: const Text('Discard')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, 'save'), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (!mounted) return false;
+    if (choice == 'discard') return true;
+    if (choice == 'save') return _saveRequest();
+    return false;
   }
 
   @override
@@ -958,33 +696,6 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                       ? _buildResponseSplit(colorScheme)
                       : _buildTabContent(colorScheme),
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _isSending ? null : _sendRequest,
-                        icon: _isSending
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: DbugSpinner(
-                                  strokeWidth: 2,
-                                  color: Color(0xFFFFFFFF),
-                                ),
-                              )
-                            : const Icon(LucideIcons.send, size: 14),
-                        label: Text(_isSending ? 'Sending...' : 'Send'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      onPressed: _saveRequest,
-                      icon: const Icon(LucideIcons.save, size: 14),
-                      label: const Text('Save'),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
@@ -999,13 +710,11 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     );
 
     return Container(
-      width: 220,
+      width: 240,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1014,14 +723,13 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
             padding: const EdgeInsets.all(10),
             child: Row(
               children: [
-                Icon(LucideIcons.list, size: 14, color: colorScheme.primary),
-                const SizedBox(width: 6),
                 Text(
-                  'Endpoints',
+                  'ENDPOINTS',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface,
+                    letterSpacing: 0.6,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -1041,11 +749,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
               onChanged: (v) => setState(() => _endpointSearchQuery = v),
             ),
           ),
-          const SizedBox(height: 6),
-          Container(
-            height: 1,
-            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
+          const SizedBox(height: 8),
           Expanded(
             child: requestsAsync.when(
               loading: () => const Center(
@@ -1096,7 +800,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                   );
                 }
                 return ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
                   itemCount: filtered.length,
                   itemBuilder: (context, i) {
                     final req = filtered[i];
@@ -1105,20 +809,22 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                       onTap: () => _switchToRequest(req),
                       behavior: HitTestBehavior.opaque,
                       child: Container(
+                        margin: const EdgeInsets.only(bottom: 1),
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                          horizontal: 6,
+                          vertical: 7,
                         ),
-                        color: isActive
-                            ? colorScheme.surfaceContainerHighest
-                            : null,
+                        decoration: BoxDecoration(
+                          color: isActive ? colorScheme.surfaceContainerHighest : null,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                         child: Row(
                           children: [
                             Container(
-                              width: 52,
+                              width: 50,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 4,
-                                vertical: 1,
+                                vertical: 2,
                               ),
                               decoration: BoxDecoration(
                                 color: methodColor(
@@ -1129,25 +835,25 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                               child: Text(
                                 req.method,
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                   color: methodColor(req.method),
                                 ),
                                 textAlign: TextAlign.center,
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 req.name,
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: isActive
                                       ? FontWeight.w600
                                       : FontWeight.w400,
                                   color: isActive
-                                      ? colorScheme.primary
-                                      : colorScheme.onSurface,
+                                      ? colorScheme.onSurface
+                                      : colorScheme.onSurfaceVariant,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1166,27 +872,16 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     );
   }
 
-  void _switchToRequest(RequestModel req) {
+  Future<void> _switchToRequest(RequestModel req) async {
+    if (req.id == _currentRequestId) return;
+    if (!await _confirmDiscardChanges() || !mounted) return;
     setState(() {
       _currentRequestId = req.id;
-      _selectedMethod = req.method;
-      _urlController.text = req.url;
-      _bodyController.text = req.body ?? '';
-      _requestNameController.text = req.name;
       _lastResponse = null;
-      _selectedBodyType = bodyTypeStringToIndex(req.bodyType);
-      _params
-        ..clear()
-        ..addAll(mapToEntries(req.queryParams));
-      if (_params.isEmpty) _params.add(KeyValueEntry());
-      _headers
-        ..clear()
-        ..addAll(mapToEntries(req.headers));
-      if (_headers.isEmpty) _headers.add(KeyValueEntry());
+      _applyDraft(_draftFromRequest(req));
+      _markClean();
     });
-    ref.read(windowTitleProvider.notifier).state = req.name.isNotEmpty
-        ? req.name
-        : 'Request Builder';
+    _setWindowTitle(req.name);
     _saveBuilderState();
     _loadLatestHistoryForRequest(req.id);
   }
@@ -1263,43 +958,105 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   }
 
   Widget _buildMethodUrlBar(ColorScheme colorScheme) {
+    final method = methodColor(_selectedMethod);
     return Row(
       children: [
-        DropdownButton<String>(
-          value: _selectedMethod,
-          underline: const SizedBox.shrink(),
-          isDense: true,
-          items: _methods
-              .map(
-                (m) => DropdownMenuItem(
-                  value: m,
-                  child: Text(
-                    m,
-                    style: TextStyle(
-                      color: methodColor(m),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
+        // Method, URL and Send read as one control, like a browser address bar.
+        Expanded(
+          child: Container(
+            height: 42,
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                PopupMenuButton<String>(
+                  tooltip: 'HTTP method',
+                  initialValue: _selectedMethod,
+                  onSelected: (v) => setState(() => _selectedMethod = v),
+                  itemBuilder: (_) => [
+                    for (final m in _methods)
+                      PopupMenuItem(
+                        value: m,
+                        height: 34,
+                        child: Text(m, style: TextStyle(color: methodColor(m), fontWeight: FontWeight.w700, fontSize: 12)),
+                      ),
+                  ],
+                  child: Container(
+                    margin: const EdgeInsets.all(5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: method.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_selectedMethod, style: TextStyle(color: method, fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 0.3)),
+                        const SizedBox(width: 4),
+                        Icon(LucideIcons.chevronDown, size: 14, color: method),
+                      ],
                     ),
                   ),
                 ),
-              )
-              .toList(),
-          onChanged: (v) {
-            if (v != null) setState(() => _selectedMethod = v);
-          },
+                Expanded(
+                  child: _UrlTooltip(
+                    tooltipText: _buildResolvedUrlPreview,
+                    child: TextField(
+                      controller: _urlController,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter URL (supports {{variables}})',
+                        isDense: true,
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                      ),
+                      style: TextStyle(fontFamily: codeFontFamily, fontSize: 13),
+                      onSubmitted: (_) {
+                        if (!_isSending) _sendRequest();
+                      },
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(4),
+                  // Fixed width so the bar doesn't shift when Send turns into Cancel.
+                  child: SizedBox(
+                    width: 100,
+                    height: double.infinity,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      onPressed: _isSending ? _cancelSend : _sendRequest,
+                      icon: _isSending
+                          ? SizedBox(
+                              width: 13,
+                              height: 13,
+                              child: DbugSpinner(strokeWidth: 2, color: colorScheme.onPrimary),
+                            )
+                          : const Icon(LucideIcons.send, size: 14),
+                      label: Text(_isSending ? 'Cancel' : 'Send'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(width: 8),
-        Expanded(
-          child: _UrlTooltip(
-            tooltipText: _buildResolvedUrlPreview,
-            child: TextField(
-              controller: _urlController,
-              decoration: const InputDecoration(
-                hintText: 'Enter URL (supports {{variables}})',
-                isDense: true,
-              ),
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-            ),
+        SizedBox(
+          height: 42,
+          child: OutlinedButton.icon(
+            onPressed: _isSending ? null : () => _saveRequest(),
+            icon: const Icon(LucideIcons.save, size: 14),
+            label: const Text('Save'),
           ),
         ),
       ],
@@ -1317,24 +1074,60 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
   }
 
   Widget _buildTabs(ColorScheme colorScheme) {
+    final paramCount = _params.where((e) => e.enabled && e.isValid).length;
+    final headerCount = _headers.where((e) => e.enabled && e.isValid).length;
     final globalHeaderCount = _collectionHeaders.length;
     return TabBar(
       controller: _tabController,
       onTap: (i) => setState(() => _selectedTab = i),
       tabs: [
-        const Tab(text: 'Params'),
+        Tab(child: _tabLabel('Params', paramCount > 0 ? '$paramCount' : null, colorScheme)),
         Tab(
-          text: globalHeaderCount > 0
-              ? 'Headers · $globalHeaderCount global'
-              : 'Headers',
+          child: _tabLabel(
+            'Headers',
+            headerCount + globalHeaderCount > 0 ? '${headerCount + globalHeaderCount}' : null,
+            colorScheme,
+            tooltip: globalHeaderCount > 0 ? '$globalHeaderCount from the collection' : null,
+          ),
         ),
-        const Tab(text: 'Body'),
-        Tab(text: _usesCollectionAuth ? 'Auth · global' : 'Auth'),
+        Tab(child: _tabLabel('Body', _selectedBodyType > 0 ? _bodyTypes[_selectedBodyType] : null, colorScheme)),
+        Tab(
+          child: _tabLabel(
+            'Auth',
+            _auth.type != AuthType.none ? _auth.type.label : (_usesCollectionAuth ? 'Collection' : null),
+            colorScheme,
+          ),
+        ),
       ],
       isScrollable: true,
       tabAlignment: TabAlignment.start,
-      labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 14),
     );
+  }
+
+  /// A tab title with an optional small badge (a count or the active type).
+  Widget _tabLabel(String text, String? badge, ColorScheme colorScheme, {String? tooltip}) {
+    final label = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(text),
+        if (badge != null) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              badge,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ],
+    );
+    return tooltip == null ? label : Tooltip(message: tooltip, child: label);
   }
 
   Widget _buildTabContent(ColorScheme colorScheme) {
@@ -1457,7 +1250,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
-                        fontFamily: 'monospace',
+                        fontFamily: codeFontFamily,
                       ),
                     ),
                     Text(
@@ -1473,7 +1266,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                         style: TextStyle(
                           fontSize: 11,
                           color: colorScheme.onSurfaceVariant,
-                          fontFamily: 'monospace',
+                          fontFamily: codeFontFamily,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1545,7 +1338,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                           ? 'One field per line:\nkey=value'
                           : 'Request body...',
                       hintStyle: TextStyle(
-                        fontFamily: 'monospace',
+                        fontFamily: codeFontFamily,
                         fontSize: 13,
                         color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                         height: 1.5,
@@ -1556,7 +1349,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                       contentPadding: const EdgeInsets.all(14),
                       isDense: true,
                     ),
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
+                    style: TextStyle(fontFamily: codeFontFamily, fontSize: 13, height: 1.5),
                   ),
                 ),
               )
@@ -1575,29 +1368,23 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     );
   }
 
-  static const _authTypeLabels = {
-    'bearer': 'Bearer',
-    'basic': 'Basic',
-    'apikey': 'API Key',
-  };
-
   Widget _buildGlobalAuthBanner(ColorScheme colorScheme) {
     final String message;
     final IconData icon;
     final bool highlighted;
 
     if (_usesCollectionAuth) {
-      final label = _authTypeLabels[_collectionAuthType] ?? _collectionAuthType!;
+      final label = _collectionAuth.type.label;
       message = 'Using global $label auth from this collection';
       icon = LucideIcons.shieldCheck;
       highlighted = true;
     } else if (_hasCollectionAuth) {
-      final label = _authTypeLabels[_collectionAuthType] ?? _collectionAuthType!;
+      final label = _collectionAuth.type.label;
       message = "Request auth overrides this collection's global $label auth";
       icon = LucideIcons.shieldOff;
       highlighted = false;
     } else if (_collectionAuthDefined) {
-      final label = _authTypeLabels[_collectionAuthType] ?? _collectionAuthType!;
+      final label = _collectionAuth.type.label;
       message =
           'Global $label auth has empty credentials — nothing is applied';
       icon = LucideIcons.shieldAlert;
@@ -1667,176 +1454,10 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                 _buildGlobalAuthBanner(colorScheme),
                 const SizedBox(height: 12),
               ],
-              Row(
-                children: List.generate(_authTypes.length, (i) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: _selectedAuthType == i
-                        ? FilledButton.tonal(
-                            onPressed: () =>
-                                setState(() => _selectedAuthType = i),
-                            child: Text(
-                              _authTypes[i],
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                          )
-                        : OutlinedButton(
-                            onPressed: () =>
-                                setState(() => _selectedAuthType = i),
-                            child: Text(
-                              _authTypes[i],
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                          ),
-                  );
-                }),
+              AuthEditor(
+                value: _auth,
+                onChanged: (next) => setState(() => _auth = next),
               ),
-              const SizedBox(height: 16),
-              if (_selectedAuthType == 1) ...[
-                Text(
-                  'Token',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _bearerTokenController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter bearer token',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ] else if (_selectedAuthType == 2) ...[
-                Text(
-                  'Username',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _basicUserController,
-                  decoration: const InputDecoration(
-                    hintText: 'Username',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Password',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _basicPassController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Password',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ] else if (_selectedAuthType == 3) ...[
-                Text(
-                  'Key Name',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _apiKeyNameController,
-                  decoration: const InputDecoration(
-                    hintText: 'X-API-Key',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Key Value',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _apiKeyValueController,
-                  decoration: const InputDecoration(
-                    hintText: 'Your API key',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text(
-                      'Add to:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _apiKeyLocation == 'header'
-                        ? FilledButton.tonal(
-                            onPressed: () =>
-                                setState(() => _apiKeyLocation = 'header'),
-                            child: const Text(
-                              'Header',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          )
-                        : OutlinedButton(
-                            onPressed: () =>
-                                setState(() => _apiKeyLocation = 'header'),
-                            child: const Text(
-                              'Header',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                    const SizedBox(width: 4),
-                    _apiKeyLocation == 'query'
-                        ? FilledButton.tonal(
-                            onPressed: () =>
-                                setState(() => _apiKeyLocation = 'query'),
-                            child: const Text(
-                              'Query Param',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          )
-                        : OutlinedButton(
-                            onPressed: () =>
-                                setState(() => _apiKeyLocation = 'query'),
-                            child: const Text(
-                              'Query Param',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                  ],
-                ),
-              ] else ...[
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      'No authentication',
-                      style: TextStyle(color: colorScheme.onSurfaceVariant),
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -1887,7 +1508,7 @@ class _UrlTooltipState extends State<_UrlTooltip> {
               style: TextStyle(
                 fontSize: 11,
                 color: Theme.of(context).colorScheme.onInverseSurface,
-                fontFamily: 'monospace',
+                fontFamily: codeFontFamily,
               ),
             ),
           ),

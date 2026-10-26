@@ -1,7 +1,12 @@
+; The version is passed by CI: ISCC /DAppVer=1.2.3 dbug.iss
+#ifndef AppVer
+  #define AppVer "0.0.0"
+#endif
+
 [Setup]
 AppId={{B5E3C8A2-4F7D-4E9A-A1C3-8D6F2E5B7C9D}
 AppName=dbug
-AppVersion=0.1.6
+AppVersion={#AppVer}
 AppPublisher=com.dbug
 AppPublisherURL=https://github.com/arthurkay/dbug
 AppSupportURL=https://github.com/arthurkay/dbug/issues
@@ -20,11 +25,11 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 SetupIconFile=..\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\dbug.exe
-VersionInfoVersion=0.1.6.0
+VersionInfoVersion={#AppVer}.0
 VersionInfoCompany=com.dbug
 VersionInfoDescription=dbug - Local API Testing Tool
 VersionInfoProductName=dbug
-VersionInfoProductVersion=0.1.6
+VersionInfoProductVersion={#AppVer}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

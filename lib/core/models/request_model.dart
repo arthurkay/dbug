@@ -15,6 +15,8 @@ class RequestModel with _$RequestModel {
     String? bodyType,
     String? body,
     @Default({}) Map<String, String> queryParams,
+    @Default('none') String authType,
+    @Default('{}') String authData,
     required DateTime createdAt,
     required DateTime updatedAt,
   }) = _RequestModel;

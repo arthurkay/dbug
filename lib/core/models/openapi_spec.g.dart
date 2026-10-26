@@ -91,6 +91,7 @@ _$OpenApiParameterImpl _$$OpenApiParameterImplFromJson(
   required: json['required'] as bool? ?? false,
   type: json['type'] as String?,
   schemaType: json['schemaType'] as String?,
+  example: json['example'] as String?,
 );
 
 Map<String, dynamic> _$$OpenApiParameterImplToJson(
@@ -102,6 +103,7 @@ Map<String, dynamic> _$$OpenApiParameterImplToJson(
   'required': instance.required,
   'type': instance.type,
   'schemaType': instance.schemaType,
+  'example': instance.example,
 };
 
 _$OpenApiSchemaImpl _$$OpenApiSchemaImplFromJson(Map<String, dynamic> json) =>

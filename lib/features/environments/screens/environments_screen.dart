@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../shared/widgets/page_header.dart';
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/active_environment_provider.dart';
 import '../../../core/providers/window_title_provider.dart';
@@ -41,16 +42,7 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Environments', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text('Manage variables for different environments', style: Theme.of(context).textTheme.bodyMedium),
-                  ],
-                ),
-              ),
+              Expanded(child: PageHeader(title: 'Environments', subtitle: 'Manage variables for different environments')),
               if (activeEnv != null)
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
@@ -79,7 +71,13 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
                 if (envs.isEmpty) return _buildEmptyState(colorScheme);
                 if (_editingEnvId != null) {
                   final editingEnv = envs.where((e) => e.id == _editingEnvId).firstOrNull;
-                  if (editingEnv != null) return _buildEditor(colorScheme, editingEnv);
+                  if (editingEnv != null) {
+                    return _EnvironmentEditor(
+                      key: ValueKey(editingEnv.id),
+                      env: editingEnv,
+                      onClose: () => setState(() => _editingEnvId = null),
+                    );
+                  }
                 }
                 return Card(
                   child: ListView.builder(
@@ -108,9 +106,8 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
                             ),
                           );
                           if (confirmed != true) return;
-                          if (activeEnv?.id == env.id) {
-                            ref.read(activeEnvironmentProvider.notifier).setActive(null);
-                          }
+                          // The active environment is derived from
+                          // environmentsProvider, so refreshing it is enough.
                           await ref.read(environmentRepositoryProvider).deleteEnvironment(env.id);
                           ref.invalidate(environmentsProvider);
                         },
@@ -122,59 +119,6 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildEditor(ColorScheme colorScheme, Environment env) {
-    final entries = mapToEntries(env.variables);
-    if (entries.isEmpty) entries.add(KeyValueEntry());
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(env.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-                ),
-                TextButton(
-                  onPressed: () => setState(() => _editingEnvId = null),
-                  child: const Text('Back'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text('${env.variables.length} variables', style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 16),
-            const Divider(),
-            Expanded(
-              child: SingleChildScrollView(
-                child: KeyValueEditor(entries: entries, keyHint: 'Variable name', valueHint: 'Value'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () async {
-                final vars = entriesToMap(entries);
-                final updated = env.copyWith(variables: vars);
-                await ref.read(environmentRepositoryProvider).updateEnvironment(updated);
-                ref.invalidate(environmentsProvider);
-                if (ref.read(activeEnvironmentProvider)?.id == env.id) {
-                  ref.read(activeEnvironmentProvider.notifier).setActive(updated.copyWith(isActive: true));
-                }
-                setState(() => _editingEnvId = null);
-                if (mounted) {
-                  showDbugToast(context, message: 'Environment saved', type: ToastType.success);
-                }
-              },
-              child: const Text('Save Variables'),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -202,36 +146,164 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
     );
   }
 
-  void _showCreateDialog(BuildContext context) {
+  Future<void> _showCreateDialog(BuildContext context) async {
     final nameController = TextEditingController();
 
-    showDialog(
+    final name = await showDialog<String>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('New Environment'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(hintText: 'Environment name (e.g. dev, staging)'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('New Environment'),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Environment name (e.g. dev, staging)'),
+          onSubmitted: (v) => Navigator.pop(context, v.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, nameController.text.trim()),
+            child: const Text('Create'),
           ),
+        ],
+      ),
+    );
+    // Disposed only after the dialog (and its exit animation) is gone.
+    nameController.dispose();
+    if (name == null || name.isEmpty) return;
+
+    await ref.read(environmentRepositoryProvider).createEnvironment(name: name);
+    ref.invalidate(environmentsProvider);
+  }
+}
+
+/// Edits one environment's variables. Owns its entries so edits survive
+/// rebuilds of the parent (provider refreshes, switching the active
+/// environment from the sidebar) until saved or discarded.
+class _EnvironmentEditor extends ConsumerStatefulWidget {
+  final Environment env;
+  final VoidCallback onClose;
+
+  const _EnvironmentEditor({super.key, required this.env, required this.onClose});
+
+  @override
+  ConsumerState<_EnvironmentEditor> createState() => _EnvironmentEditorState();
+}
+
+class _EnvironmentEditorState extends ConsumerState<_EnvironmentEditor> {
+  late final List<KeyValueEntry> _entries;
+  late Map<String, String> _saved;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _saved = Map.of(widget.env.variables);
+    _entries = mapToEntries(_saved);
+    if (_entries.isEmpty) _entries.add(KeyValueEntry());
+  }
+
+  @override
+  void dispose() {
+    for (final e in _entries) {
+      e.dispose();
+    }
+    super.dispose();
+  }
+
+  bool get _isDirty => !_mapEquals(entriesToMap(_entries), _saved);
+
+  static bool _mapEquals(Map<String, String> a, Map<String, String> b) {
+    if (a.length != b.length) return false;
+    for (final e in a.entries) {
+      if (b[e.key] != e.value) return false;
+    }
+    return true;
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final vars = entriesToMap(_entries);
+    try {
+      await ref.read(environmentRepositoryProvider).updateEnvironment(widget.env.copyWith(variables: vars));
+      ref.invalidate(environmentsProvider);
+      if (!mounted) return;
+      setState(() => _saved = vars);
+      showDbugToast(context, message: 'Environment saved', type: ToastType.success);
+    } catch (e) {
+      if (mounted) showDbugToast(context, message: 'Failed to save: $e', type: ToastType.error);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _close() async {
+    if (_isDirty) {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Discard changes?'),
+          content: Text('"${widget.env.name}" has unsaved variable changes.'),
           actions: [
-            TextButton(onPressed: () { nameController.dispose(); Navigator.pop(context); }, child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep editing')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Discard')),
+          ],
+        ),
+      );
+      if (discard != true || !mounted) return;
+    }
+    widget.onClose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final dirty = _isDirty;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(widget.env.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                ),
+                if (dirty)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.circleDot, size: 12, color: colorScheme.primary),
+                        const SizedBox(width: 4),
+                        Text('Unsaved changes', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                TextButton(onPressed: _close, child: const Text('Back')),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text('${entriesToMap(_entries).length} variables', style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 16),
+            const Divider(),
+            Expanded(
+              child: SingleChildScrollView(
+                child: KeyValueEditor(
+                  entries: _entries,
+                  keyHint: 'Variable name',
+                  valueHint: 'Value',
+                  onChanged: () => setState(() {}),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             FilledButton(
-              onPressed: () async {
-                if (nameController.text.isNotEmpty) {
-                  await ref.read(environmentRepositoryProvider).createEnvironment(name: nameController.text);
-                  ref.invalidate(environmentsProvider);
-                  ref.invalidate(userEnvironmentsProvider);
-                  nameController.dispose();
-                  if (context.mounted) Navigator.pop(context);
-                }
-              },
-              child: const Text('Create'),
+              onPressed: dirty && !_saving ? _save : null,
+              child: Text(_saving ? 'Saving…' : 'Save Variables'),
             ),
           ],
         ),
@@ -264,15 +336,17 @@ class _EnvironmentTile extends StatelessWidget {
     return ListTile(
       dense: true,
       visualDensity: VisualDensity.compact,
-      leading: isActive
-          ? Icon(LucideIcons.circleCheck, size: 16, color: colorScheme.primary)
-          : canActivate
-              ? IconButton(
-                  icon: Icon(LucideIcons.circle, size: 16, color: colorScheme.outline),
-                  onPressed: onActivate,
-                  visualDensity: VisualDensity.compact,
-                )
-              : Icon(LucideIcons.link, size: 16, color: colorScheme.outline),
+      // Every state uses the same IconButton footprint so names line up.
+      leading: IconButton(
+        tooltip: isActive ? 'Active environment' : (canActivate ? 'Make active' : null),
+        icon: Icon(
+          isActive ? LucideIcons.circleCheck : (canActivate ? LucideIcons.circle : LucideIcons.link),
+          size: 16,
+          color: isActive ? colorScheme.primary : colorScheme.outline,
+        ),
+        onPressed: !isActive && canActivate ? onActivate : null,
+        visualDensity: VisualDensity.compact,
+      ),
       title: Row(
         children: [
           Text(env.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
@@ -281,10 +355,11 @@ class _EnvironmentTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(3),
+                color: colorScheme.surfaceContainer,
+                border: Border.all(color: colorScheme.outlineVariant),
+                borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text('Collection', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.blue)),
+              child: Text('From spec', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant)),
             ),
           ],
         ],

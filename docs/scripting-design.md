@@ -22,7 +22,7 @@ Allow users to write pre-request and post-request JavaScript scripts for:
 - Embeds a lightweight JS engine, no external deps
 - Risk: FFI native compilation can break on some platforms
 - Package maintenance is sporadic
-- Currently in pubspec.yaml but unused
+- Not a dependency (previously in pubspec.yaml unused, since removed)
 
 ### 3. Dart-based assertion DSL — Simplest
 - Mini assertion language parsed in Dart:
@@ -71,5 +71,5 @@ and full JS compatibility, with Option 3 (Dart DSL) as a zero-dep fallback.
 - Script errors shown inline, don't block the request
 
 ### pubspec.yaml
-- Remove `flutter_js` if going with Node.js subprocess approach
-- Or keep it as Option 2 fallback
+- No changes for the Node.js subprocess approach
+- Add `flutter_js` only if Option 2 is chosen

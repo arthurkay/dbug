@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../shared/widgets/page_header.dart';
+import '../../../shared/utils/syntax_highlighter.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/http_client_provider.dart';
 import '../../../core/providers/window_title_provider.dart';
-import '../../../core/models/openapi_spec.dart';
+import '../../../core/repositories/openapi_repository.dart';
 import '../../../shared/widgets/file_explorer.dart';
 import '../../../shared/widgets/toast_helper.dart';
 import '../../../shared/widgets/dbug_spinner.dart';
@@ -71,7 +73,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
     try {
       final file = File(path);
       final content = await file.readAsString();
-      await _parseAndImport(content, sourceName: p.basename(path));
+      await _parseAndImport(content, sourceName: p.basename(path), sourceType: 'file');
     } catch (e) {
       if (mounted) {
         showDbugToast(context, message: 'Failed to read file: $e', type: ToastType.error);
@@ -79,15 +81,17 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
     }
   }
 
-  Future<void> _parseAndImport(String content, {String sourceName = 'clipboard'}) async {
+  Future<void> _parseAndImport(String content, {String sourceName = 'clipboard', String sourceType = 'paste', String? sourceUrl}) async {
     if (_isImporting) return;
     setState(() => _isImporting = true);
 
     try {
-      final parsed = OpenApiParser.parse(content);
-      if (parsed == null) {
+      final ParsedSpec parsed;
+      try {
+        parsed = OpenApiParser.parseOrThrow(content);
+      } on FormatException catch (e) {
         if (mounted) {
-          showDbugToast(context, message: 'Invalid OpenAPI spec in "$sourceName"', type: ToastType.error);
+          showDbugToast(context, message: 'Can\'t import "$sourceName": ${e.message}', type: ToastType.error);
         }
         return;
       }
@@ -99,8 +103,8 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
         return;
       }
 
-      await ref.read(openApiRepositoryProvider).saveParsedSpec(parsed, sourceType: 'file');
-      ref.invalidate(allSpecsProvider);
+      await ref.read(openApiRepositoryProvider).saveParsedSpec(parsed, sourceType: sourceType, sourceUrl: sourceUrl);
+      ref.invalidate(specSummariesProvider);
       ref.invalidate(collectionsProvider);
       ref.invalidate(environmentsProvider);
 
@@ -119,7 +123,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final specsAsync = ref.watch(allSpecsProvider);
+    final specsAsync = ref.watch(specSummariesProvider);
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -128,16 +132,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
         children: [
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('OpenAPI Specs', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
-                    const SizedBox(height: 4),
-                    Text('Import OpenAPI 3.x specifications to use as request collections', style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant)),
-                  ],
-                ),
-              ),
+              Expanded(child: PageHeader(title: 'OpenAPI Specs', subtitle: 'Import OpenAPI 3.x or Swagger 2.0 specs as request collections')),
               if (_isImporting)
                 const Padding(padding: EdgeInsets.only(right: 12), child: SizedBox(width: 16, height: 16, child: DbugSpinner(strokeWidth: 2))),
               if (_showFileExplorer)
@@ -164,12 +159,14 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
               ],
             ),
             const SizedBox(height: 16),
-            Expanded(flex: 3, child: _buildImportContent(colorScheme)),
-            const SizedBox(height: 12),
-            Flexible(
-              flex: 2,
-              child: _buildImportedSpecs(colorScheme, specsAsync),
-            ),
+            // The URL form is a single row, so it takes only the height it
+            // needs; paste/file get a fixed area. The spec list gets the rest.
+            if (_tabController.index == 0)
+              _buildImportContent(colorScheme)
+            else
+              SizedBox(height: 280, child: _buildImportContent(colorScheme)),
+            const SizedBox(height: 16),
+            Expanded(child: _buildImportedSpecs(colorScheme, specsAsync)),
           ],
         ],
       ),
@@ -196,7 +193,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: TextField(controller: _urlController, decoration: const InputDecoration(hintText: 'https://api.example.com/openapi.json', border: OutlineInputBorder()))),
+                Expanded(child: TextField(controller: _urlController, decoration: const InputDecoration(hintText: 'https://api.example.com/openapi.json'))),
                 const SizedBox(width: 8),
                 FilledButton(
                   onPressed: _isImporting ? null : () async {
@@ -208,7 +205,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
                           options: Options(responseType: ResponseType.plain),
                         );
                         final body = response.data?.toString() ?? '';
-                        await _parseAndImport(body, sourceName: _urlController.text);
+                        await _parseAndImport(body, sourceName: _urlController.text, sourceType: 'url', sourceUrl: _urlController.text);
                       } catch (e) {
                         if (mounted) {
                           showDbugToast(context, message: 'Failed to fetch: $e', type: ToastType.error);
@@ -235,7 +232,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
           children: [
             Text('Paste Spec', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
             const SizedBox(height: 12),
-            Expanded(child: TextField(controller: _pasteController, decoration: const InputDecoration(hintText: 'Paste OpenAPI JSON or YAML here...', border: OutlineInputBorder()), style: const TextStyle(fontFamily: 'monospace', fontSize: 13), maxLines: null, expands: true)),
+            Expanded(child: TextField(controller: _pasteController, decoration: const InputDecoration(hintText: 'Paste OpenAPI JSON or YAML here...'), style: TextStyle(fontFamily: codeFontFamily, fontSize: 13), maxLines: null, expands: true)),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -328,7 +325,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
     );
   }
 
-  Widget _buildImportedSpecs(ColorScheme colorScheme, AsyncValue<List<OpenApiSpec>> specsAsync) {
+  Widget _buildImportedSpecs(ColorScheme colorScheme, AsyncValue<List<OpenApiSpecSummary>> specsAsync) {
     return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -339,7 +336,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
               children: [
                 Text('Imported Specs', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                 const Spacer(),
-                specsAsync.whenData((specs) => Text('${specs.length}', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant))).when(skipLoadingOnRefresh: false, skipLoadingOnReload: false, data: (w) => w, error: (_, __) => const SizedBox.shrink(), loading: () => const SizedBox.shrink()),
+                specsAsync.whenData((specs) => Text('${specs.length}', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant))).when(skipLoadingOnRefresh: false, skipLoadingOnReload: false, data: (w) => w, error: (_, _) => const SizedBox.shrink(), loading: () => const SizedBox.shrink()),
               ],
             ),
           ),
@@ -361,9 +358,32 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
                       spec: spec,
                       onTap: () => context.go('/openapi/${spec.id}'),
                       onDelete: () async {
-                        await ref.read(openApiRepositoryProvider).deleteSpec(spec.id);
-                        ref.invalidate(allSpecsProvider);
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Delete Spec'),
+                            content: Text('Delete "${spec.title ?? 'Untitled'}"? Its generated collection, requests and environment are deleted too.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+                            ],
+                          ),
+                        );
+                        if (confirmed != true) return;
+                        final repo = ref.read(openApiRepositoryProvider);
+                        final collectionId = await repo.getCollectionForSpec(spec.id);
+                        await repo.deleteSpec(spec.id);
+                        ref.invalidate(specSummariesProvider);
+                        ref.invalidate(specByIdProvider(spec.id));
+                        ref.invalidate(collectionForSpecProvider(spec.id));
                         ref.invalidate(collectionsProvider);
+                        if (collectionId != null) {
+                          ref.invalidate(collectionByIdProvider(collectionId));
+                          ref.invalidate(requestsByCollectionProvider(collectionId));
+                        }
+                        // Its environment is gone too; the active environment
+                        // is derived from this list, so it clears itself.
+                        ref.invalidate(environmentsProvider);
                       },
                     );
                   },
@@ -378,7 +398,7 @@ class _SpecImportScreenState extends ConsumerState<SpecImportScreen> with Single
 }
 
 class _SpecTile extends StatelessWidget {
-  final OpenApiSpec spec;
+  final OpenApiSpecSummary spec;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
@@ -402,7 +422,7 @@ class _SpecTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(spec.title ?? 'Untitled', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis),
-                  Text('${spec.endpoints.length} endpoints • ${spec.version ?? 'unknown'}', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+                  Text('${spec.endpointCount} endpoints • ${spec.version ?? 'unknown'}', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
                 ],
               ),
             ),

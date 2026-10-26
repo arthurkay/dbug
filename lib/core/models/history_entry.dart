@@ -24,6 +24,13 @@ class HistoryEntry with _$HistoryEntry {
     @Default('{}') String queryParams,
     @Default('none') String authType,
     @Default('{}') String authData,
+    /// The URL actually sent (variables substituted). [url] keeps the raw
+    /// `{{var}}` template so replaying an entry stays environment-agnostic.
+    String? resolvedUrl,
+    /// Response headers as a JSON object string.
+    @Default('{}') String responseHeaders,
+    /// True when [responseBody] was cut to the history size cap.
+    @Default(false) bool responseTruncated,
   }) = _HistoryEntry;
 
   factory HistoryEntry.fromJson(Map<String, dynamic> json) =>

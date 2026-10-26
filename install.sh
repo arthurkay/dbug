@@ -28,6 +28,10 @@ ok()    { printf "${GREEN}✔${RESET} %s\n" "$*"; }
 warn()  { printf "${YELLOW}⚠${RESET} %s\n" "$*"; }
 err()   { printf "${RED}✖${RESET} %s\n" "$*" >&2; exit 1; }
 
+# Removes the download/staging dir however the script exits.
+TMP_DIR=""
+trap 'rm -rf "${TMP_DIR:-}"' EXIT
+
 # ─── Parse arguments ────────────────────────────────────────────────────────
 VERSION=""
 ACTION="install"
@@ -35,7 +39,9 @@ FORCE=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --version)   VERSION="$2"; shift 2 ;;
+        --version)
+            [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || err "--version requires a value (e.g. --version 0.1.6)"
+            VERSION="${2#v}"; shift 2 ;;
         --uninstall) ACTION="uninstall"; shift ;;
         --check)     ACTION="check"; shift ;;
         --force)     FORCE=true; shift ;;
@@ -64,7 +70,7 @@ detect_platform() {
         Linux*)  PLATFORM="linux" ;;
         Darwin*) PLATFORM="macos" ;;
         MINGW*|MSYS*|CYGWIN*)
-            err "Windows detected. Please download the .zip from the GitHub Releases page:\n  https://github.com/${REPO}/releases"
+            err "Windows detected. Download the installer or .zip from https://github.com/${REPO}/releases"
             ;;
         *) err "Unsupported OS: $os" ;;
     esac
@@ -76,6 +82,8 @@ detect_platform() {
     esac
 
     if [[ "$PLATFORM" == "linux" ]]; then
+        # Fail before any network calls rather than after a fruitless lookup.
+        [[ "$ARCH" == "x64" ]] || err "Linux ${ARCH} builds are not published yet. Build from source: https://github.com/${REPO}"
         ARCHIVE_NAME="${APP_NAME}-linux-${ARCH}.tar.gz"
     else
         # macOS releases ship a single universal bundle (no arch suffix).
@@ -91,6 +99,9 @@ check_deps() {
     done
     if [[ "$PLATFORM" == "macos" ]]; then
         command -v unzip &>/dev/null || missing+=("unzip")
+        command -v shasum &>/dev/null || missing+=("shasum")
+    else
+        command -v sha256sum &>/dev/null || missing+=("sha256sum")
     fi
     if [[ ${#missing[@]} -gt 0 ]]; then
         err "Missing required commands: ${missing[*]}"
@@ -141,7 +152,15 @@ get_install_dir() {
             BIN_DIR="${HOME}/.local/bin"
             ;;
         macos)
-            INSTALL_DIR="/Applications/${APP_NAME}.app"
+            # An existing install wherever it lives wins; otherwise prefer
+            # /Applications and fall back to ~/Applications without admin rights.
+            if [[ -d "${HOME}/Applications/${APP_NAME}.app" && ! -d "/Applications/${APP_NAME}.app" ]]; then
+                INSTALL_DIR="${HOME}/Applications/${APP_NAME}.app"
+            elif [[ -w "/Applications" ]]; then
+                INSTALL_DIR="/Applications/${APP_NAME}.app"
+            else
+                INSTALL_DIR="${HOME}/Applications/${APP_NAME}.app"
+            fi
             VERSION_FILE="${HOME}/.local/share/${APP_NAME}/.version"
             ;;
     esac
@@ -154,6 +173,14 @@ get_current_version() {
     else
         echo ""
     fi
+}
+
+# Prints -1, 0 or 1 as $1 is older than, equal to or newer than $2.
+compare_versions() {
+    if [[ "$1" == "$2" ]]; then echo 0; return; fi
+    local lowest
+    lowest=$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)
+    if [[ "$lowest" == "$1" ]]; then echo -1; else echo 1; fi
 }
 
 get_latest_version() {
@@ -176,9 +203,7 @@ get_release_json() {
 # ─── Download & extract ──────────────────────────────────────────────────────
 download_release() {
     local version="$1"
-    local tmp_dir
-    tmp_dir=$(mktemp -d)
-    TMP_DIR="$tmp_dir"
+    TMP_DIR=$(mktemp -d)
 
     info "Fetching release info for v${version}..."
     local release_json
@@ -189,9 +214,36 @@ download_release() {
     [[ -z "$download_url" ]] && err "Could not find asset '${ARCHIVE_NAME}' in release."
 
     info "Downloading ${ARCHIVE_NAME}..."
-    curl -fSL -o "${tmp_dir}/${ARCHIVE_NAME}" "$download_url" || err "Download failed."
+    curl -fSL -o "${TMP_DIR}/${ARCHIVE_NAME}" "$download_url" || err "Download failed."
 
-    echo "$tmp_dir"
+    verify_checksum "$release_json"
+}
+
+# Verifies the archive against the release's SHA256SUMS. Releases published
+# before checksums existed have no sums file; those only get a warning.
+verify_checksum() {
+    local release_json="$1"
+    local sums_url
+    sums_url=$(parse_download_url "$release_json" "SHA256SUMS")
+    if [[ -z "$sums_url" ]]; then
+        warn "This release has no SHA256SUMS; skipping checksum verification."
+        return 0
+    fi
+
+    curl -fsSL -o "${TMP_DIR}/SHA256SUMS" "$sums_url" || err "Failed to download SHA256SUMS."
+
+    local expected
+    expected=$(awk -v f="$ARCHIVE_NAME" '$2 == f || $2 == "*" f { print $1; exit }' "${TMP_DIR}/SHA256SUMS")
+    [[ -n "$expected" ]] || err "SHA256SUMS has no entry for ${ARCHIVE_NAME}; refusing to install."
+
+    local actual
+    if [[ "$PLATFORM" == "macos" ]]; then
+        actual=$(shasum -a 256 "${TMP_DIR}/${ARCHIVE_NAME}" | awk '{ print $1 }')
+    else
+        actual=$(sha256sum "${TMP_DIR}/${ARCHIVE_NAME}" | awk '{ print $1 }')
+    fi
+    [[ "$actual" == "$expected" ]] || err "Checksum mismatch for ${ARCHIVE_NAME} (expected ${expected}, got ${actual}). Refusing to install."
+    ok "Checksum verified."
 }
 
 extract_archive() {
@@ -212,11 +264,31 @@ extract_archive() {
 install_linux() {
     local dest="$1" version="$2"
 
-    mkdir -p "$dest"
-    extract_archive "$TMP_DIR" "$dest"
+    # Extract into a staging dir and swap it in, so files dropped from a newer
+    # release don't linger next to the new ones.
+    local staging="${TMP_DIR}/bundle"
+    extract_archive "$TMP_DIR" "$staging"
+    [[ -x "${staging}/${APP_NAME}" || -f "${staging}/${APP_NAME}" ]] || err "Archive does not contain the ${APP_NAME} binary."
+    chmod +x "${staging}/${APP_NAME}"
 
-    # Make binary executable
-    chmod +x "${dest}/${APP_NAME}" 2>/dev/null || true
+    info "Installing to ${dest}..."
+    mkdir -p "$(dirname "$dest")"
+    # Never delete user data with the old bundle: path_provider used to fall
+    # back to ~/.local/share/dbug (this install dir) for app data.
+    if compgen -G "${dest}/*.db*" > /dev/null; then
+        local data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/zm.co.cloud.dbug" f
+        mkdir -p "$data_dir"
+        for f in "${dest}"/*.db*; do
+            if [[ -e "${data_dir}/$(basename "$f")" ]]; then
+                cp -a "$f" "${data_dir}/$(basename "$f").from-install-dir"
+            else
+                cp -a "$f" "${data_dir}/"
+            fi
+        done
+        warn "Preserved database files from ${dest} in ${data_dir}"
+    fi
+    rm -rf "$dest"
+    mv "$staging" "$dest"
 
     # Create symlink in ~/.local/bin
     mkdir -p "$BIN_DIR"
@@ -227,7 +299,9 @@ install_linux() {
     if [[ -f "$desktop_src" ]]; then
         local desktop_dir="${HOME}/.local/share/applications"
         mkdir -p "$desktop_dir"
-        cp "$desktop_src" "${desktop_dir}/zm.co.cloud.dbug.desktop"
+        # Absolute Exec path: the app menu must not depend on ~/.local/bin
+        # being on the desktop session's PATH.
+        sed -e "s|^Exec=.*|Exec=${dest}/${APP_NAME}|" "$desktop_src" > "${desktop_dir}/zm.co.cloud.dbug.desktop"
         ok "Desktop entry installed."
     fi
 
@@ -235,6 +309,7 @@ install_linux() {
     local icons_src="${dest}/data/icons"
     if [[ -d "$icons_src" ]]; then
         local icons_dest="${HOME}/.local/share/icons"
+        mkdir -p "$icons_dest"
         cp -r "${icons_src}/"* "${icons_dest}/" 2>/dev/null || true
         ok "Icons installed."
     fi
@@ -257,25 +332,19 @@ install_linux() {
 install_macos() {
     local dest="$1" version="$2"
 
-    # Remove old version if present
-    if [[ -d "$dest" ]]; then
-        info "Removing previous installation..."
-        rm -rf "$dest"
-    fi
+    # Extract and verify before touching the existing install, so a failure
+    # never leaves the user without an app.
+    local staging="${TMP_DIR}/bundle"
+    extract_archive "$TMP_DIR" "$staging"
+    local app
+    app=$(find "$staging" -maxdepth 2 -name "${APP_NAME}.app" -type d | head -1)
+    [[ -n "$app" ]] || err "Archive does not contain ${APP_NAME}.app."
 
-    extract_archive "$TMP_DIR" "/Applications"
-
-    # The zip contains dbug.app directly
-    if [[ -d "/Applications/${APP_NAME}.app" ]]; then
-        ok "Installed to /Applications/${APP_NAME}.app"
-    else
-        # Might be nested — look for it
-        local found
-        found=$(find /Applications -maxdepth 2 -name "${APP_NAME}.app" -newer "${TMP_DIR}/${ARCHIVE_NAME}" 2>/dev/null | head -1)
-        if [[ -n "$found" ]]; then
-            ok "Installed to ${found}"
-        fi
-    fi
+    info "Installing to ${dest}..."
+    mkdir -p "$(dirname "$dest")"
+    rm -rf "$dest"
+    mv "$app" "$dest"
+    ok "Installed to ${dest}"
 
     # Save version
     mkdir -p "$(dirname "$VERSION_FILE")"
@@ -294,6 +363,7 @@ uninstall() {
         linux)
             rm -rf "$HOME/.local/share/${APP_NAME}"
             rm -f "$HOME/.local/bin/${APP_NAME}"
+            info "Your collections and history were kept in ${XDG_DATA_HOME:-$HOME/.local/share}/zm.co.cloud.dbug (delete it to remove all dbug data)."
             rm -f "$HOME/.local/share/applications/zm.co.cloud.dbug.desktop"
             find "$HOME/.local/share/icons/hicolor" -name "dbug*" -delete 2>/dev/null || true
             ok "Removed ${APP_NAME} from ~/.local/share/${APP_NAME}"
@@ -301,9 +371,9 @@ uninstall() {
             ok "Removed desktop entry and icons."
             ;;
         macos)
-            if [[ -d "/Applications/${APP_NAME}.app" ]]; then
-                rm -rf "/Applications/${APP_NAME}.app"
-                ok "Removed /Applications/${APP_NAME}.app"
+            if [[ -d "$INSTALL_DIR" ]]; then
+                rm -rf "$INSTALL_DIR"
+                ok "Removed ${INSTALL_DIR}"
             fi
             rm -f "$VERSION_FILE"
             ;;
@@ -337,10 +407,12 @@ main() {
     if [[ "$ACTION" == "check" ]]; then
         if [[ -z "$current_version" ]]; then
             info "${APP_NAME} is not installed."
-        elif [[ "$current_version" == "$target_version" ]]; then
-            ok "${APP_NAME} is up-to-date (v${current_version})."
         else
-            warn "Update available: v${current_version} -> v${target_version}"
+            case "$(compare_versions "$current_version" "$target_version")" in
+                0)  ok "${APP_NAME} is up-to-date (v${current_version})." ;;
+                -1) warn "Update available: v${current_version} -> v${target_version}" ;;
+                1)  ok "${APP_NAME} v${current_version} is newer than v${target_version}." ;;
+            esac
         fi
         exit 0
     fi
@@ -353,7 +425,11 @@ main() {
 
     # ── Install ──
     if [[ -n "$current_version" ]]; then
-        info "Updating ${APP_NAME} v${current_version} -> v${target_version}..."
+        if [[ "$(compare_versions "$current_version" "$target_version")" == 1 ]]; then
+            info "Downgrading ${APP_NAME} v${current_version} -> v${target_version}..."
+        else
+            info "Updating ${APP_NAME} v${current_version} -> v${target_version}..."
+        fi
     else
         info "Installing ${APP_NAME} v${target_version}..."
     fi
@@ -365,9 +441,6 @@ main() {
         macos)  install_macos "$INSTALL_DIR" "$target_version" ;;
     esac
 
-    # Cleanup
-    rm -rf "$TMP_DIR"
-
     echo ""
     ok "${APP_NAME} v${target_version} installed successfully!"
     echo ""
@@ -377,9 +450,9 @@ main() {
             info "Or search  'dbug' in your application menu."
             ;;
         macos)
-            info "Open from Applications or Spotlight."
+            info "Open ${INSTALL_DIR} from Finder or Spotlight."
             ;;
     esac
 }
 
-main
+main "$@"

@@ -26,6 +26,9 @@ _$HistoryEntryImpl _$$HistoryEntryImplFromJson(Map<String, dynamic> json) =>
       queryParams: json['queryParams'] as String? ?? '{}',
       authType: json['authType'] as String? ?? 'none',
       authData: json['authData'] as String? ?? '{}',
+      resolvedUrl: json['resolvedUrl'] as String?,
+      responseHeaders: json['responseHeaders'] as String? ?? '{}',
+      responseTruncated: json['responseTruncated'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$HistoryEntryImplToJson(_$HistoryEntryImpl instance) =>
@@ -48,4 +51,7 @@ Map<String, dynamic> _$$HistoryEntryImplToJson(_$HistoryEntryImpl instance) =>
       'queryParams': instance.queryParams,
       'authType': instance.authType,
       'authData': instance.authData,
+      'resolvedUrl': instance.resolvedUrl,
+      'responseHeaders': instance.responseHeaders,
+      'responseTruncated': instance.responseTruncated,
     };

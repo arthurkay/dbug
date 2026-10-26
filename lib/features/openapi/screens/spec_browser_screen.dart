@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../shared/utils/syntax_highlighter.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/window_title_provider.dart';
 import '../../../core/models/openapi_spec.dart';
-import '../../../core/models/request_model.dart';
+import '../../../shared/widgets/collection_picker_dialog.dart';
+import '../../environments/spec_environment_activation.dart';
+import '../data/endpoint_request.dart';
 import '../../../shared/widgets/toast_helper.dart';
 import '../../../shared/widgets/dbug_spinner.dart';
 import '../../../shared/utils/method_colors.dart';
@@ -19,13 +22,12 @@ class SpecBrowserScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final specAsync = ref.watch(allSpecsProvider);
+    final specAsync = ref.watch(specByIdProvider(specId));
 
     return specAsync.when(
       loading: () => const Center(child: DbugSpinner()),
       error: (e, _) => Center(child: Text('Error: $e')),
-      data: (specs) {
-        final spec = specs.where((s) => s.id == specId).firstOrNull;
+      data: (spec) {
         if (spec == null) {
           return Center(child: Text('Spec not found', style: TextStyle(color: colorScheme.onSurfaceVariant)));
         }
@@ -55,7 +57,7 @@ class _SpecBrowserBodyState extends ConsumerState<_SpecBrowserBody> with SingleT
     _detailTabController = TabController(length: 2, vsync: this);
     _searchController.addListener(() => setState(() => _searchQuery = _searchController.text));
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(windowTitleProvider.notifier).state = widget.spec.title ?? 'OpenAPI Spec';
+      if (mounted) ref.read(windowTitleProvider.notifier).state = widget.spec.title ?? 'OpenAPI Spec';
     });
   }
 
@@ -141,7 +143,7 @@ class _SpecBrowserBodyState extends ConsumerState<_SpecBrowserBody> with SingleT
           const SizedBox(height: 12),
           TextField(
             controller: _searchController,
-            decoration: const InputDecoration(hintText: 'Search endpoints by name, path, method, or description...', border: OutlineInputBorder(), isDense: true, prefixIcon: Icon(LucideIcons.search, size: 16)),
+            decoration: const InputDecoration(hintText: 'Search endpoints by name, path, method, or description...', isDense: true, prefixIcon: Icon(LucideIcons.search, size: 16)),
             style: const TextStyle(fontSize: 14),
           ),
           const SizedBox(height: 12),
@@ -188,6 +190,7 @@ class _SpecBrowserBodyState extends ConsumerState<_SpecBrowserBody> with SingleT
                           : _EndpointApiDetail(
                               endpoint: _selectedEndpoint!,
                               baseUrl: widget.spec.baseUrl ?? '',
+                              specId: widget.spec.id,
                             )
                       : Card(
                           child: Center(
@@ -251,7 +254,7 @@ class _EndpointTile extends StatelessWidget {
                 Expanded(
                   child: showPathAsPrimary
                       ? _tooltipWrap(
-                          child: Text(endpoint.path, style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.w500, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis, maxLines: 1),
+                          child: Text(endpoint.path, style: TextStyle(fontSize: 13, fontFamily: codeFontFamily, fontWeight: FontWeight.w500, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis, maxLines: 1),
                           tooltip: endpoint.path,
                         )
                       : _tooltipWrap(
@@ -277,7 +280,7 @@ class _EndpointTile extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 58),
                 child: _tooltipWrap(
-                  child: Text(endpoint.path, style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis, maxLines: 1),
+                  child: Text(endpoint.path, style: TextStyle(fontSize: 11, fontFamily: codeFontFamily, color: colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis, maxLines: 1),
                   tooltip: endpoint.path,
                 ),
               ),
@@ -327,7 +330,8 @@ class _EndpointTile extends StatelessWidget {
 class _EndpointApiDetail extends ConsumerWidget {
   final OpenApiEndpoint endpoint;
   final String baseUrl;
-  const _EndpointApiDetail({required this.endpoint, required this.baseUrl});
+  final String specId;
+  const _EndpointApiDetail({required this.endpoint, required this.baseUrl, required this.specId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -351,7 +355,7 @@ class _EndpointApiDetail extends ConsumerWidget {
                   child: SelectableText(endpoint.method, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: methodColor(endpoint.method))),
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: SelectableText(endpoint.path, style: TextStyle(fontSize: 14, fontFamily: 'monospace', fontWeight: FontWeight.w500, color: colorScheme.onSurface))),
+                Expanded(child: SelectableText(endpoint.path, style: TextStyle(fontSize: 14, fontFamily: codeFontFamily, fontWeight: FontWeight.w500, color: colorScheme.onSurface))),
               ],
             ),
             if (fullUrl.isNotEmpty) ...[
@@ -362,7 +366,7 @@ class _EndpointApiDetail extends ConsumerWidget {
                   color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: SelectableText(fullUrl, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant)),
+                child: SelectableText(fullUrl, style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, color: colorScheme.onSurfaceVariant)),
               ),
             ],
             if (endpoint.summary != null || endpoint.description != null) ...[
@@ -414,70 +418,14 @@ class _EndpointApiDetail extends ConsumerWidget {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: () {
-                      final url = _buildFullUrl();
-                      final req = RequestModel(
-                        id: '', name: endpoint.summary ?? '${endpoint.method} ${endpoint.path}',
-                        method: endpoint.method, url: url,
-                        createdAt: DateTime.now(), updatedAt: DateTime.now(),
-                      );
-                      context.go('/request', extra: req);
-                    },
+                    onPressed: () => _send(context, ref),
                     icon: const Icon(LucideIcons.send, size: 14),
                     label: const Text('Send'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
-                  onPressed: () async {
-                    final collections = await ref.read(collectionRepositoryProvider).getAllCollections();
-                    if (!context.mounted || collections.isEmpty) return;
-                    String? selectedId = collections.first.id;
-                    final picked = await showDialog<String>(
-                      context: context,
-                      builder: (ctx) => StatefulBuilder(
-                        builder: (ctx, setDialogState) => AlertDialog(
-                          title: const Text('Save to Collection'),
-                          content: SizedBox(
-                            width: 360,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text('Choose a collection for this endpoint.', style: Theme.of(ctx).textTheme.bodySmall),
-                                const SizedBox(height: 12),
-                                ...collections.map((c) => RadioListTile<String>(
-                                  title: Text(c.name, style: const TextStyle(fontSize: 13)),
-                                  subtitle: c.description != null ? Text(c.description!, style: const TextStyle(fontSize: 11)) : null,
-                                  value: c.id,
-                                  groupValue: selectedId,
-                                  dense: true,
-                                  onChanged: (v) => setDialogState(() => selectedId = v),
-                                )),
-                              ],
-                            ),
-                          ),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-                            FilledButton(
-                              onPressed: () => Navigator.pop(ctx, selectedId),
-                              child: const Text('Save'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                    if (picked == null || !context.mounted) return;
-                    final collection = collections.firstWhere((c) => c.id == picked);
-                    final requestRepo = ref.read(requestRepositoryProvider);
-                    await requestRepo.createRequest(
-                      collectionId: collection.id,
-                      name: endpoint.summary ?? '${endpoint.method} ${endpoint.path}',
-                      method: endpoint.method,
-                      url: _buildFullUrl(),
-                    );
-                    ref.invalidate(collectionsProvider);
-                    if (context.mounted) showDbugToast(context, message: 'Saved to ${collection.name}', type: ToastType.success);
-                  },
+                  onPressed: () => _save(context, ref),
                   icon: const Icon(LucideIcons.save, size: 14),
                   label: const Text('Save'),
                 ),
@@ -487,6 +435,66 @@ class _EndpointApiDetail extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Opens the endpoint in the request builder as part of the spec's
+  /// generated collection, so its global headers/auth apply and `{{baseUrl}}`
+  /// and path params resolve through the spec's environment.
+  Future<void> _send(BuildContext context, WidgetRef ref) async {
+    final collectionId = await ref.read(openApiRepositoryProvider).getCollectionForSpec(specId);
+    final collection = collectionId != null
+        ? await ref.read(collectionRepositoryProvider).getCollection(collectionId)
+        : null;
+    if (!context.mounted) return;
+
+    if (collection != null) {
+      await activateSpecEnvironmentIfNone(ref, context, collection.id);
+      if (!context.mounted) return;
+    }
+
+    final draft = endpointToRequestDraft(endpoint, hasBaseUrl: baseUrl.isNotEmpty, collectionId: collection?.id);
+    context.go('/request', extra: {
+      'request': draft,
+      'collectionHeaders': collection?.globalHeaders ?? const <String, String>{},
+      'collectionId': collection?.id,
+      'collectionAuthType': collection?.authType,
+      'collectionAuthData': collection?.authData,
+    });
+  }
+
+  Future<void> _save(BuildContext context, WidgetRef ref) async {
+    final collections = await ref.read(collectionRepositoryProvider).getAllCollections();
+    if (!context.mounted) return;
+    if (collections.isEmpty) {
+      showDbugToast(context, message: 'Create a collection first (Collections → New Collection)', type: ToastType.warning);
+      return;
+    }
+
+    final specCollectionId = await ref.read(openApiRepositoryProvider).getCollectionForSpec(specId);
+    if (!context.mounted) return;
+    final picked = await showCollectionPickerDialog(
+      context,
+      collections: collections,
+      initialId: specCollectionId,
+      message: 'Choose a collection for this endpoint.',
+    );
+    if (picked == null || !context.mounted) return;
+
+    final collection = collections.firstWhere((c) => c.id == picked);
+    final draft = endpointToRequestDraft(endpoint, hasBaseUrl: baseUrl.isNotEmpty);
+    await ref.read(requestRepositoryProvider).createRequest(
+      collectionId: collection.id,
+      name: draft.name,
+      method: draft.method,
+      url: draft.url,
+      headers: draft.headers,
+      queryParams: draft.queryParams,
+      bodyType: draft.bodyType,
+      body: draft.body,
+    );
+    ref.invalidate(collectionsProvider);
+    ref.invalidate(requestsByCollectionProvider(collection.id));
+    if (context.mounted) showDbugToast(context, message: 'Saved to ${collection.name}', type: ToastType.success);
   }
 
   String _buildFullUrl() {
@@ -567,7 +575,7 @@ class _ParameterRow extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    SelectableText(param.name, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+                    SelectableText(param.name, style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                     if (param.required) ...[
                       const SizedBox(width: 4),
                       Container(
@@ -590,7 +598,7 @@ class _ParameterRow extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(3)),
-              child: SelectableText(param.type ?? param.schemaType!, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant)),
+              child: SelectableText(param.type ?? param.schemaType!, style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, color: colorScheme.onSurfaceVariant)),
             ),
         ],
       ),
@@ -680,7 +688,7 @@ class _JsonSchemaPreview extends StatelessWidget {
                 children: [
                   Icon(LucideIcons.fileJson, size: 14, color: colorScheme.primary),
                   const SizedBox(width: 6),
-                  SelectableText(schemaName, style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: colorScheme.primary)),
+                  SelectableText(schemaName, style: TextStyle(fontSize: 13, fontFamily: codeFontFamily, fontWeight: FontWeight.w600, color: colorScheme.primary)),
                 ],
               ),
             ),
@@ -692,7 +700,7 @@ class _JsonSchemaPreview extends StatelessWidget {
                   for (var i = 0; i < jsonLines.length; i++) ...[
                     TextSpan(
                       text: '${(i + 1).toString().padLeft(3)}  ',
-                      style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
+                      style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
                     ),
                     ..._highlightJsonLine(jsonLines[i], colorScheme),
                     const TextSpan(text: '\n'),
@@ -758,7 +766,7 @@ class _JsonSchemaPreview extends StatelessWidget {
       if (keyMatch != null && keyMatch.start == 0) {
         spans.add(TextSpan(
           text: keyMatch.group(1)!,
-          style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: colorScheme.primary),
+          style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, fontWeight: FontWeight.w600, color: colorScheme.primary),
         ));
         remaining = remaining.substring(keyMatch.end);
         final valMatch = stringPattern.firstMatch(remaining);
@@ -767,7 +775,7 @@ class _JsonSchemaPreview extends StatelessWidget {
           final isType = !val.contains(' ') && val != '""';
           spans.add(TextSpan(
             text: val,
-            style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: isType ? const Color(0xFF22C55E) : colorScheme.onSurface),
+            style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, color: isType ? const Color(0xFF22C55E) : colorScheme.onSurface),
           ));
           remaining = remaining.substring(valMatch.end);
         }
@@ -778,7 +786,7 @@ class _JsonSchemaPreview extends StatelessWidget {
       if (stringMatch != null && stringMatch.start == 0) {
         spans.add(TextSpan(
           text: stringMatch.group(0)!,
-          style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: const Color(0xFF22C55E)),
+          style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, color: const Color(0xFF22C55E)),
         ));
         remaining = remaining.substring(stringMatch.end);
         continue;
@@ -788,7 +796,7 @@ class _JsonSchemaPreview extends StatelessWidget {
       if (bracketMatch != null && bracketMatch.start == 0) {
         spans.add(TextSpan(
           text: bracketMatch.group(0)!,
-          style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant),
+          style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, color: colorScheme.onSurfaceVariant),
         ));
         remaining = remaining.substring(bracketMatch.end);
         continue;
@@ -796,7 +804,7 @@ class _JsonSchemaPreview extends StatelessWidget {
 
       spans.add(TextSpan(
         text: remaining[0],
-        style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurface),
+        style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, color: colorScheme.onSurface),
       ));
       remaining = remaining.substring(1);
     }
@@ -902,7 +910,7 @@ class _EndpointDocDetail extends StatelessWidget {
                   child: SelectableText(endpoint.method, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: methodColor(endpoint.method))),
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: SelectableText(endpoint.path, style: TextStyle(fontSize: 14, fontFamily: 'monospace', fontWeight: FontWeight.w500, color: colorScheme.onSurface))),
+                Expanded(child: SelectableText(endpoint.path, style: TextStyle(fontSize: 14, fontFamily: codeFontFamily, fontWeight: FontWeight.w500, color: colorScheme.onSurface))),
               ],
             ),
           ),
@@ -1002,11 +1010,11 @@ class _EndpointDocDetail extends StatelessWidget {
                   for (var i = 0; i < lines.length; i++) ...[
                     TextSpan(
                       text: '${(i + 1).toString().padLeft(4)}  ',
-                      style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                      style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                     ),
                     TextSpan(
                       text: '${lines[i]}\n',
-                      style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurface),
+                      style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, color: colorScheme.onSurface),
                     ),
                   ],
                 ],
@@ -1041,7 +1049,7 @@ class _EndpointDocDetail extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    SelectableText(p.name, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+                    SelectableText(p.name, style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                     if (p.required) ...[
                       const SizedBox(width: 4),
                       SelectableText('*', style: TextStyle(fontSize: 12, color: colorScheme.error)),
@@ -1051,7 +1059,7 @@ class _EndpointDocDetail extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                         decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(3)),
-                        child: SelectableText(p.type!, style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant)),
+                        child: SelectableText(p.type!, style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, color: colorScheme.onSurfaceVariant)),
                       ),
                     ],
                   ],
@@ -1155,7 +1163,7 @@ class _SchemaView extends StatelessWidget {
         color: isRef ? colorScheme.primary.withValues(alpha: 0.08) : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(3),
       ),
-      child: SelectableText(label, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: isRef ? colorScheme.primary : colorScheme.onSurface)),
+      child: SelectableText(label, style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, fontWeight: FontWeight.w600, color: isRef ? colorScheme.primary : colorScheme.onSurface)),
     );
   }
 
@@ -1167,7 +1175,7 @@ class _SchemaView extends StatelessWidget {
         children: [
           const SizedBox(width: 4),
           SelectableText('\u2022 ', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
-          SelectableText(name, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
+          SelectableText(name, style: TextStyle(fontSize: 12, fontFamily: codeFontFamily, fontWeight: FontWeight.w500, color: colorScheme.onSurface)),
           if (isRequired) ...[
             const SizedBox(width: 4),
             SelectableText('*', style: TextStyle(fontSize: 12, color: colorScheme.error)),

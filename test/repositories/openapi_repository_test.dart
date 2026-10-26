@@ -104,6 +104,7 @@ void main() {
       final db = await DatabaseService.database;
       final envs = await db.query('environments', where: 'name = ? AND source_type = ?', whereArgs: ['Test API', 'openapi']);
       expect(envs, hasLength(1));
+      expect(envs.single['source_spec_id'], savedSpec.id);
     });
 
     test('does not create environment when no baseUrl or path params', () async {

@@ -40,6 +40,16 @@ mixin _$HistoryEntry {
   String get authType => throw _privateConstructorUsedError;
   String get authData => throw _privateConstructorUsedError;
 
+  /// The URL actually sent (variables substituted). [url] keeps the raw
+  /// `{{var}}` template so replaying an entry stays environment-agnostic.
+  String? get resolvedUrl => throw _privateConstructorUsedError;
+
+  /// Response headers as a JSON object string.
+  String get responseHeaders => throw _privateConstructorUsedError;
+
+  /// True when [responseBody] was cut to the history size cap.
+  bool get responseTruncated => throw _privateConstructorUsedError;
+
   /// Serializes this HistoryEntry to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -76,6 +86,9 @@ abstract class $HistoryEntryCopyWith<$Res> {
     String queryParams,
     String authType,
     String authData,
+    String? resolvedUrl,
+    String responseHeaders,
+    bool responseTruncated,
   });
 }
 
@@ -112,6 +125,9 @@ class _$HistoryEntryCopyWithImpl<$Res, $Val extends HistoryEntry>
     Object? queryParams = null,
     Object? authType = null,
     Object? authData = null,
+    Object? resolvedUrl = freezed,
+    Object? responseHeaders = null,
+    Object? responseTruncated = null,
   }) {
     return _then(
       _value.copyWith(
@@ -187,6 +203,18 @@ class _$HistoryEntryCopyWithImpl<$Res, $Val extends HistoryEntry>
                 ? _value.authData
                 : authData // ignore: cast_nullable_to_non_nullable
                       as String,
+            resolvedUrl: freezed == resolvedUrl
+                ? _value.resolvedUrl
+                : resolvedUrl // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            responseHeaders: null == responseHeaders
+                ? _value.responseHeaders
+                : responseHeaders // ignore: cast_nullable_to_non_nullable
+                      as String,
+            responseTruncated: null == responseTruncated
+                ? _value.responseTruncated
+                : responseTruncated // ignore: cast_nullable_to_non_nullable
+                      as bool,
           )
           as $Val,
     );
@@ -221,6 +249,9 @@ abstract class _$$HistoryEntryImplCopyWith<$Res>
     String queryParams,
     String authType,
     String authData,
+    String? resolvedUrl,
+    String responseHeaders,
+    bool responseTruncated,
   });
 }
 
@@ -256,6 +287,9 @@ class __$$HistoryEntryImplCopyWithImpl<$Res>
     Object? queryParams = null,
     Object? authType = null,
     Object? authData = null,
+    Object? resolvedUrl = freezed,
+    Object? responseHeaders = null,
+    Object? responseTruncated = null,
   }) {
     return _then(
       _$HistoryEntryImpl(
@@ -331,6 +365,18 @@ class __$$HistoryEntryImplCopyWithImpl<$Res>
             ? _value.authData
             : authData // ignore: cast_nullable_to_non_nullable
                   as String,
+        resolvedUrl: freezed == resolvedUrl
+            ? _value.resolvedUrl
+            : resolvedUrl // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        responseHeaders: null == responseHeaders
+            ? _value.responseHeaders
+            : responseHeaders // ignore: cast_nullable_to_non_nullable
+                  as String,
+        responseTruncated: null == responseTruncated
+            ? _value.responseTruncated
+            : responseTruncated // ignore: cast_nullable_to_non_nullable
+                  as bool,
       ),
     );
   }
@@ -358,6 +404,9 @@ class _$HistoryEntryImpl implements _HistoryEntry {
     this.queryParams = '{}',
     this.authType = 'none',
     this.authData = '{}',
+    this.resolvedUrl,
+    this.responseHeaders = '{}',
+    this.responseTruncated = false,
   });
 
   factory _$HistoryEntryImpl.fromJson(Map<String, dynamic> json) =>
@@ -405,9 +454,24 @@ class _$HistoryEntryImpl implements _HistoryEntry {
   @JsonKey()
   final String authData;
 
+  /// The URL actually sent (variables substituted). [url] keeps the raw
+  /// `{{var}}` template so replaying an entry stays environment-agnostic.
+  @override
+  final String? resolvedUrl;
+
+  /// Response headers as a JSON object string.
+  @override
+  @JsonKey()
+  final String responseHeaders;
+
+  /// True when [responseBody] was cut to the history size cap.
+  @override
+  @JsonKey()
+  final bool responseTruncated;
+
   @override
   String toString() {
-    return 'HistoryEntry(id: $id, requestId: $requestId, method: $method, url: $url, statusCode: $statusCode, responseTimeMs: $responseTimeMs, responseSize: $responseSize, responseBody: $responseBody, sentAt: $sentAt, requestName: $requestName, collectionId: $collectionId, headers: $headers, collectionHeaders: $collectionHeaders, body: $body, bodyType: $bodyType, queryParams: $queryParams, authType: $authType, authData: $authData)';
+    return 'HistoryEntry(id: $id, requestId: $requestId, method: $method, url: $url, statusCode: $statusCode, responseTimeMs: $responseTimeMs, responseSize: $responseSize, responseBody: $responseBody, sentAt: $sentAt, requestName: $requestName, collectionId: $collectionId, headers: $headers, collectionHeaders: $collectionHeaders, body: $body, bodyType: $bodyType, queryParams: $queryParams, authType: $authType, authData: $authData, resolvedUrl: $resolvedUrl, responseHeaders: $responseHeaders, responseTruncated: $responseTruncated)';
   }
 
   @override
@@ -444,12 +508,18 @@ class _$HistoryEntryImpl implements _HistoryEntry {
             (identical(other.authType, authType) ||
                 other.authType == authType) &&
             (identical(other.authData, authData) ||
-                other.authData == authData));
+                other.authData == authData) &&
+            (identical(other.resolvedUrl, resolvedUrl) ||
+                other.resolvedUrl == resolvedUrl) &&
+            (identical(other.responseHeaders, responseHeaders) ||
+                other.responseHeaders == responseHeaders) &&
+            (identical(other.responseTruncated, responseTruncated) ||
+                other.responseTruncated == responseTruncated));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     runtimeType,
     id,
     requestId,
@@ -469,7 +539,10 @@ class _$HistoryEntryImpl implements _HistoryEntry {
     queryParams,
     authType,
     authData,
-  );
+    resolvedUrl,
+    responseHeaders,
+    responseTruncated,
+  ]);
 
   /// Create a copy of HistoryEntry
   /// with the given fields replaced by the non-null parameter values.
@@ -505,6 +578,9 @@ abstract class _HistoryEntry implements HistoryEntry {
     final String queryParams,
     final String authType,
     final String authData,
+    final String? resolvedUrl,
+    final String responseHeaders,
+    final bool responseTruncated,
   }) = _$HistoryEntryImpl;
 
   factory _HistoryEntry.fromJson(Map<String, dynamic> json) =
@@ -546,6 +622,19 @@ abstract class _HistoryEntry implements HistoryEntry {
   String get authType;
   @override
   String get authData;
+
+  /// The URL actually sent (variables substituted). [url] keeps the raw
+  /// `{{var}}` template so replaying an entry stays environment-agnostic.
+  @override
+  String? get resolvedUrl;
+
+  /// Response headers as a JSON object string.
+  @override
+  String get responseHeaders;
+
+  /// True when [responseBody] was cut to the history size cap.
+  @override
+  bool get responseTruncated;
 
   /// Create a copy of HistoryEntry
   /// with the given fields replaced by the non-null parameter values.

@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +13,7 @@ import '../features/environments/screens/environments_screen.dart';
 import '../features/mock_server/screens/mock_server_screen.dart';
 import '../features/settings/screens/settings_screen.dart';
 import '../features/request_builder/screens/request_screen.dart';
+import '../core/security/secret_cipher.dart';
 import '../core/models/request_model.dart';
 import '../core/models/history_entry.dart';
 import '../core/providers/active_environment_provider.dart';
@@ -22,7 +25,8 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
-  initialLocation: '/request',
+  // DBUG_ROUTE picks the start screen in debug builds (handy for screenshots).
+  initialLocation: kDebugMode ? (Platform.environment['DBUG_ROUTE'] ?? '/request') : '/request',
   routes: [
     ShellRoute(
       navigatorKey: _shellNavigatorKey,
@@ -102,8 +106,10 @@ class AdaptiveShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final screenTitle = ref.watch(windowTitleProvider);
-    windowManager.setTitle('dbug — $screenTitle');
+    // Sync the OS window title as a listener, not as a side effect of build.
+    ref.listen(windowTitleProvider, (_, title) {
+      windowManager.setTitle('dbug — $title');
+    });
     final isWide = MediaQuery.of(context).size.width >= 900;
 
     if (isWide) {
@@ -127,39 +133,47 @@ class AdaptiveShell extends ConsumerWidget {
   }
 
   Widget _buildNarrowLayout(BuildContext context, Widget child) {
-    final currentIndex = _getNavIndex(GoRouterState.of(context).uri.toString());
-    final routes = ['/request', '/collections', '/history', '/openapi'];
-    final items = [
-      (LucideIcons.send, 'Request'),
-      (LucideIcons.folder, 'Collections'),
-      (LucideIcons.clock, 'History'),
-      (LucideIcons.globe, 'OpenAPI'),
-    ];
+    final currentPath = GoRouterState.of(context).uri.toString();
+    final index = _navDestinations.indexWhere((d) => currentPath.startsWith(d.path));
     return Scaffold(
       body: Column(
         children: [
           Expanded(child: child),
           NavigationBar(
-            selectedIndex: currentIndex,
-            onDestinationSelected: (i) => context.go(routes[i]),
-            destinations: items.map((item) => NavigationDestination(
-              icon: Icon(item.$1),
-              label: item.$2,
+            selectedIndex: index < 0 ? 0 : index,
+            labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+            onDestinationSelected: (i) => context.go(_navDestinations[i].path),
+            destinations: _navDestinations.map((d) => NavigationDestination(
+              icon: Icon(d.icon),
+              selectedIcon: Icon(d.selectedIcon),
+              label: d.shortLabel,
             )).toList(),
           ),
         ],
       ),
     );
   }
-
-  int _getNavIndex(String path) {
-    if (path.startsWith('/request')) return 0;
-    if (path.startsWith('/collections')) return 1;
-    if (path.startsWith('/history')) return 2;
-    if (path.startsWith('/openapi')) return 3;
-    return 0;
-  }
 }
+
+typedef _NavDestination = ({
+  String path,
+  IconData icon,
+  IconData selectedIcon,
+  String label,
+  String shortLabel,
+});
+
+/// Every top-level screen, shared by the sidebar and the narrow-layout
+/// navigation bar so neither can drift out of sync with the routes.
+const List<_NavDestination> _navDestinations = [
+  (path: '/request', icon: LucideIcons.send, selectedIcon: LucideIcons.send, label: 'Request Builder', shortLabel: 'Request'),
+  (path: '/collections', icon: LucideIcons.folder, selectedIcon: LucideIcons.folderOpen, label: 'Collections', shortLabel: 'Collections'),
+  (path: '/history', icon: LucideIcons.clock, selectedIcon: LucideIcons.clock, label: 'History', shortLabel: 'History'),
+  (path: '/openapi', icon: LucideIcons.globe, selectedIcon: LucideIcons.globe, label: 'OpenAPI Specs', shortLabel: 'OpenAPI'),
+  (path: '/environments', icon: LucideIcons.braces, selectedIcon: LucideIcons.braces, label: 'Environments', shortLabel: 'Envs'),
+  (path: '/mock-server', icon: LucideIcons.server, selectedIcon: LucideIcons.server, label: 'Mock Server', shortLabel: 'Mock'),
+  (path: '/settings', icon: LucideIcons.settings, selectedIcon: LucideIcons.settings, label: 'Settings', shortLabel: 'Settings'),
+];
 
 class _Sidebar extends ConsumerWidget {
   final String currentPath;
@@ -194,20 +208,30 @@ class _Sidebar extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                _SidebarItem(icon: LucideIcons.send, selectedIcon: LucideIcons.send, label: 'Request Builder', path: '/request', currentPath: currentPath),
-                _SidebarItem(icon: LucideIcons.folder, selectedIcon: LucideIcons.folderOpen, label: 'Collections', path: '/collections', currentPath: currentPath),
-                _SidebarItem(icon: LucideIcons.clock, selectedIcon: LucideIcons.clock, label: 'History', path: '/history', currentPath: currentPath),
-                _SidebarItem(icon: LucideIcons.globe, selectedIcon: LucideIcons.globe, label: 'OpenAPI Specs', path: '/openapi', currentPath: currentPath),
-                _SidebarItem(icon: LucideIcons.braces, selectedIcon: LucideIcons.braces, label: 'Environments', path: '/environments', currentPath: currentPath),
-                _SidebarItem(icon: LucideIcons.server, selectedIcon: LucideIcons.server, label: 'Mock Server', path: '/mock-server', currentPath: currentPath),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Divider(),
-                ),
-                _SidebarItem(icon: LucideIcons.settings, selectedIcon: LucideIcons.settings, label: 'Settings', path: '/settings', currentPath: currentPath),
+                for (final d in _navDestinations) ...[
+                  if (d.path == '/settings')
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Divider(),
+                    ),
+                  _SidebarItem(icon: d.icon, selectedIcon: d.selectedIcon, label: d.label, path: d.path, currentPath: currentPath),
+                ],
               ],
             ),
           ),
+          if (Secrets.isLocked)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                tileColor: colorScheme.error.withValues(alpha: 0.12),
+                leading: Icon(LucideIcons.shieldOff, size: 16, color: colorScheme.error),
+                title: Text('Credentials locked', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.error)),
+                onTap: () => context.go('/settings'),
+              ),
+            ),
           Container(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
             decoration: BoxDecoration(
@@ -215,7 +239,7 @@ class _Sidebar extends ConsumerWidget {
             ),
             child: envsAsync.when(
               loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (envs) {
                 if (envs.isEmpty) return const SizedBox.shrink();
                 final activeName = activeEnv != null

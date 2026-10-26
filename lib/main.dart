@@ -1,9 +1,10 @@
-import 'dart:ui';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'app/app.dart';
+import 'core/database/database_service.dart';
+import 'features/request_builder/screens/request_screen.dart';
 
 const _defaultWidth = 1200.0;
 const _defaultHeight = 800.0;
@@ -32,6 +33,11 @@ Future<void> main() async {
   if (isMaximized) {
     await windowManager.maximize();
   }
+
+  // Open the database (and resolve the credential encryption key) before
+  // any screen reads stored data or the sealed request draft.
+  await DatabaseService.database;
+  await sealLegacyRequestDraft();
 
   runApp(
     const ProviderScope(

@@ -787,6 +787,9 @@ mixin _$OpenApiParameter {
   String? get type => throw _privateConstructorUsedError;
   String? get schemaType => throw _privateConstructorUsedError;
 
+  /// Example or default value from the spec, used to prefill requests.
+  String? get example => throw _privateConstructorUsedError;
+
   /// Serializes this OpenApiParameter to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -811,6 +814,7 @@ abstract class $OpenApiParameterCopyWith<$Res> {
     bool required,
     String? type,
     String? schemaType,
+    String? example,
   });
 }
 
@@ -835,6 +839,7 @@ class _$OpenApiParameterCopyWithImpl<$Res, $Val extends OpenApiParameter>
     Object? required = null,
     Object? type = freezed,
     Object? schemaType = freezed,
+    Object? example = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -862,6 +867,10 @@ class _$OpenApiParameterCopyWithImpl<$Res, $Val extends OpenApiParameter>
                 ? _value.schemaType
                 : schemaType // ignore: cast_nullable_to_non_nullable
                       as String?,
+            example: freezed == example
+                ? _value.example
+                : example // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -884,6 +893,7 @@ abstract class _$$OpenApiParameterImplCopyWith<$Res>
     bool required,
     String? type,
     String? schemaType,
+    String? example,
   });
 }
 
@@ -907,6 +917,7 @@ class __$$OpenApiParameterImplCopyWithImpl<$Res>
     Object? required = null,
     Object? type = freezed,
     Object? schemaType = freezed,
+    Object? example = freezed,
   }) {
     return _then(
       _$OpenApiParameterImpl(
@@ -934,6 +945,10 @@ class __$$OpenApiParameterImplCopyWithImpl<$Res>
             ? _value.schemaType
             : schemaType // ignore: cast_nullable_to_non_nullable
                   as String?,
+        example: freezed == example
+            ? _value.example
+            : example // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -949,6 +964,7 @@ class _$OpenApiParameterImpl implements _OpenApiParameter {
     this.required = false,
     this.type,
     this.schemaType,
+    this.example,
   });
 
   factory _$OpenApiParameterImpl.fromJson(Map<String, dynamic> json) =>
@@ -968,9 +984,13 @@ class _$OpenApiParameterImpl implements _OpenApiParameter {
   @override
   final String? schemaType;
 
+  /// Example or default value from the spec, used to prefill requests.
+  @override
+  final String? example;
+
   @override
   String toString() {
-    return 'OpenApiParameter(name: $name, location: $location, description: $description, required: $required, type: $type, schemaType: $schemaType)';
+    return 'OpenApiParameter(name: $name, location: $location, description: $description, required: $required, type: $type, schemaType: $schemaType, example: $example)';
   }
 
   @override
@@ -987,7 +1007,8 @@ class _$OpenApiParameterImpl implements _OpenApiParameter {
                 other.required == required) &&
             (identical(other.type, type) || other.type == type) &&
             (identical(other.schemaType, schemaType) ||
-                other.schemaType == schemaType));
+                other.schemaType == schemaType) &&
+            (identical(other.example, example) || other.example == example));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1000,6 +1021,7 @@ class _$OpenApiParameterImpl implements _OpenApiParameter {
     required,
     type,
     schemaType,
+    example,
   );
 
   /// Create a copy of OpenApiParameter
@@ -1027,6 +1049,7 @@ abstract class _OpenApiParameter implements OpenApiParameter {
     final bool required,
     final String? type,
     final String? schemaType,
+    final String? example,
   }) = _$OpenApiParameterImpl;
 
   factory _OpenApiParameter.fromJson(Map<String, dynamic> json) =
@@ -1044,6 +1067,10 @@ abstract class _OpenApiParameter implements OpenApiParameter {
   String? get type;
   @override
   String? get schemaType;
+
+  /// Example or default value from the spec, used to prefill requests.
+  @override
+  String? get example;
 
   /// Create a copy of OpenApiParameter
   /// with the given fields replaced by the non-null parameter values.

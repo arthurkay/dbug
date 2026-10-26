@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import '../database/database_service.dart';
+import '../security/secret_cipher.dart';
 import '../models/request_model.dart';
 
 class RequestRepository {
@@ -15,6 +16,8 @@ class RequestRepository {
     String? bodyType,
     String? body,
     Map<String, String> queryParams = const {},
+    String authType = 'none',
+    String authData = '{}',
   }) async {
     final db = await DatabaseService.database;
     final id = _uuid.v4();
@@ -26,10 +29,12 @@ class RequestRepository {
       'name': name,
       'method': method,
       'url': url,
-      'headers': jsonEncode(headers),
+      'headers': Secrets.sealForInsert(jsonEncode(headers)),
       'body_type': bodyType,
       'body': body,
       'query_params': jsonEncode(queryParams),
+      'auth_type': authType,
+      'auth_data': Secrets.sealForInsert(authData),
       'created_at': now.millisecondsSinceEpoch,
       'updated_at': now.millisecondsSinceEpoch,
     });
@@ -44,6 +49,8 @@ class RequestRepository {
       bodyType: bodyType,
       body: body,
       queryParams: queryParams,
+      authType: authType,
+      authData: authData,
       createdAt: now,
       updatedAt: now,
     );
@@ -53,17 +60,20 @@ class RequestRepository {
     final db = await DatabaseService.database;
     await db.update(
       'requests',
-      {
+      Secrets.sealedUpdate({
         'collection_id': request.collectionId,
         'name': request.name,
         'method': request.method,
         'url': request.url,
-        'headers': jsonEncode(request.headers),
         'body_type': request.bodyType,
         'body': request.body,
         'query_params': jsonEncode(request.queryParams),
+        'auth_type': request.authType,
         'updated_at': DateTime.now().millisecondsSinceEpoch,
-      },
+      }, {
+        'headers': jsonEncode(request.headers),
+        'auth_data': request.authData,
+      }),
       where: 'id = ?',
       whereArgs: [request.id],
     );
@@ -114,7 +124,7 @@ class RequestRepository {
   }
 
   RequestModel _rowToRequest(Map<String, dynamic> row) {
-    final headersRaw = row['headers'] as String? ?? '{}';
+    final headersRaw = Secrets.openOr(row['headers'] as String?, '{}');
     final queryParamsRaw = row['query_params'] as String? ?? '{}';
 
     return RequestModel(
@@ -127,6 +137,8 @@ class RequestRepository {
       bodyType: row['body_type'] as String?,
       body: row['body'] as String?,
       queryParams: Map<String, String>.from(jsonDecode(queryParamsRaw)),
+      authType: row['auth_type'] as String? ?? 'none',
+      authData: Secrets.openOr(row['auth_data'] as String?, '{}'),
       createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at'] as int),
     );

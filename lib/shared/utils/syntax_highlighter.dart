@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/widgets.dart';
 
 class SyntaxColors {
@@ -28,6 +29,34 @@ class SyntaxColors {
   });
 }
 
+/// Base style for code views. Highlighted spans only set color and weight,
+/// so family, size and line height come from here and stay consistent.
+TextStyle codeTextStyle({required Color color, double fontSize = 13, double height = 1.5}) {
+  return TextStyle(
+    fontFamily: codeFontFamily,
+    fontFamilyFallback: const ['DejaVu Sans Mono', 'Liberation Mono', 'Noto Mono', 'Menlo', 'Consolas', 'monospace'],
+    fontSize: fontSize,
+    height: height,
+    color: color,
+  );
+}
+
+/// Forces every line to the same height regardless of glyph fallback or
+/// weight, so a line-number gutter rendered with the same strut lines up.
+StrutStyle codeStrutStyle({double fontSize = 13, double height = 1.5}) {
+  return StrutStyle(fontFamily: codeFontFamily, fontSize: fontSize, height: height, forceStrutHeight: true);
+}
+
+/// A concrete monospace family per platform. The generic 'monospace' name
+/// is not resolved by Flutter's font manager — it silently falls back to the
+/// proportional UI font, and fontFamilyFallback is never consulted because
+/// that fallback font has every glyph.
+String get codeFontFamily => switch (defaultTargetPlatform) {
+      TargetPlatform.macOS || TargetPlatform.iOS => 'Menlo',
+      TargetPlatform.windows => 'Consolas',
+      _ => 'DejaVu Sans Mono',
+    };
+
 const syntaxThemeNames = ['Default', 'GitHub', 'Monokai', 'Dracula', 'OneDark', 'Solarized'];
 
 const _defaultDark = SyntaxColors(
@@ -39,22 +68,22 @@ const _defaultDark = SyntaxColors(
   tag: Color(0xFF7DD3FC),
   attrName: Color(0xFF93C5FD),
   attrValue: Color(0xFF86EFAC),
-  comment: Color(0xFF71717A),
+  comment: Color(0xFF8B8B94),
   punctuation: Color(0xFFA1A1AA),
   defaultText: Color(0xFFFAFAFA),
 );
 
 const _defaultLight = SyntaxColors(
   key: Color(0xFF2563EB),
-  string: Color(0xFF16A34A),
+  string: Color(0xFF15803D),
   number: Color(0xFF7C3AED),
   boolValue: Color(0xFFDC2626),
   nullValue: Color(0xFFDC2626),
   tag: Color(0xFF2563EB),
   attrName: Color(0xFF7C3AED),
-  attrValue: Color(0xFF16A34A),
-  comment: Color(0xFF9CA3AF),
-  punctuation: Color(0xFF6B7280),
+  attrValue: Color(0xFF15803D),
+  comment: Color(0xFF6B7280),
+  punctuation: Color(0xFF52525B),
   defaultText: Color(0xFF09090B),
 );
 
@@ -228,7 +257,7 @@ class SyntaxHighlighter {
     } else if (contentType.contains('yaml') || contentType.contains('yml') || _looksLikeYaml(body)) {
       return _highlightYaml(body, c);
     }
-    return [TextSpan(text: body, style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12))];
+    return [TextSpan(text: body, style: TextStyle(color: c.defaultText))];
   }
 
   static bool _looksLikeJson(String body) {
@@ -263,7 +292,7 @@ class SyntaxHighlighter {
 
     for (final match in regex.allMatches(body)) {
       if (match.start > lastEnd) {
-        spans.add(TextSpan(text: body.substring(lastEnd, match.start), style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
+        spans.add(TextSpan(text: body.substring(lastEnd, match.start), style: TextStyle(color: c.defaultText)));
       }
 
       final token = match.group(0)!;
@@ -300,14 +329,14 @@ class SyntaxHighlighter {
 
       spans.add(TextSpan(
         text: token,
-        style: TextStyle(color: color, fontFamily: 'monospace', fontSize: 12, fontWeight: weight),
+        style: TextStyle(color: color, fontWeight: weight),
       ));
 
       lastEnd = match.end;
     }
 
     if (lastEnd < body.length) {
-      spans.add(TextSpan(text: body.substring(lastEnd), style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
+      spans.add(TextSpan(text: body.substring(lastEnd), style: TextStyle(color: c.defaultText)));
     }
 
     return spans;
@@ -330,7 +359,7 @@ class SyntaxHighlighter {
 
     for (final match in regex.allMatches(body)) {
       if (match.start > lastEnd) {
-        spans.add(TextSpan(text: body.substring(lastEnd, match.start), style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
+        spans.add(TextSpan(text: body.substring(lastEnd, match.start), style: TextStyle(color: c.defaultText)));
       }
 
       final token = match.group(0)!;
@@ -354,12 +383,12 @@ class SyntaxHighlighter {
         color = c.defaultText;
       }
 
-      spans.add(TextSpan(text: token, style: TextStyle(color: color, fontFamily: 'monospace', fontSize: 12)));
+      spans.add(TextSpan(text: token, style: TextStyle(color: color)));
       lastEnd = match.end;
     }
 
     if (lastEnd < body.length) {
-      spans.add(TextSpan(text: body.substring(lastEnd), style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
+      spans.add(TextSpan(text: body.substring(lastEnd), style: TextStyle(color: c.defaultText)));
     }
 
     return spans;
@@ -371,10 +400,10 @@ class SyntaxHighlighter {
 
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i];
-      if (i > 0) spans.add(TextSpan(text: '\n', style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
+      if (i > 0) spans.add(TextSpan(text: '\n', style: TextStyle(color: c.defaultText)));
 
       if (line.trimLeft().startsWith('#')) {
-        spans.add(TextSpan(text: line, style: TextStyle(color: c.comment, fontFamily: 'monospace', fontSize: 12)));
+        spans.add(TextSpan(text: line, style: TextStyle(color: c.comment)));
         continue;
       }
 
@@ -383,7 +412,7 @@ class SyntaxHighlighter {
         final key = line.substring(0, colonIndex + 1);
         final value = line.substring(colonIndex + 1);
 
-        spans.add(TextSpan(text: key, style: TextStyle(color: c.key, fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.w600)));
+        spans.add(TextSpan(text: key, style: TextStyle(color: c.key, fontWeight: FontWeight.w600)));
 
         if (value.isNotEmpty) {
           final trimmedValue = value.trimLeft();
@@ -401,14 +430,14 @@ class SyntaxHighlighter {
             valueColor = c.defaultText;
           }
 
-          spans.add(TextSpan(text: value, style: TextStyle(color: valueColor, fontFamily: 'monospace', fontSize: 12)));
+          spans.add(TextSpan(text: value, style: TextStyle(color: valueColor)));
         }
       } else if (line.trimLeft().startsWith('- ')) {
         final dashEnd = line.indexOf('- ') + 2;
         final indent = line.substring(0, dashEnd);
         final rest = line.substring(dashEnd);
 
-        spans.add(TextSpan(text: indent, style: TextStyle(color: c.punctuation, fontFamily: 'monospace', fontSize: 12)));
+        spans.add(TextSpan(text: indent, style: TextStyle(color: c.punctuation)));
 
         if (rest.isNotEmpty) {
           final trimmedRest = rest.trimLeft();
@@ -424,10 +453,10 @@ class SyntaxHighlighter {
             valueColor = c.string;
           }
 
-          spans.add(TextSpan(text: rest, style: TextStyle(color: valueColor, fontFamily: 'monospace', fontSize: 12)));
+          spans.add(TextSpan(text: rest, style: TextStyle(color: valueColor)));
         }
       } else {
-        spans.add(TextSpan(text: line, style: TextStyle(color: c.defaultText, fontFamily: 'monospace', fontSize: 12)));
+        spans.add(TextSpan(text: line, style: TextStyle(color: c.defaultText)));
       }
     }
 

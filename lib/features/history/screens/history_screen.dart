@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../shared/widgets/page_header.dart';
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/window_title_provider.dart';
 import '../../../core/models/history_entry.dart';
@@ -47,16 +48,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('History', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text('Recent requests and responses', style: Theme.of(context).textTheme.bodyMedium),
-                  ],
-                ),
-              ),
+              Expanded(child: PageHeader(title: 'History', subtitle: 'Recent requests and responses')),
               OutlinedButton.icon(
                 onPressed: () async {
                   final confirmed = await showDialog<bool>(
@@ -121,6 +113,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         return (e.requestName ?? '').toLowerCase().contains(q) ||
                             e.method.toLowerCase().contains(q) ||
                             e.url.toLowerCase().contains(q) ||
+                            (e.resolvedUrl ?? '').toLowerCase().contains(q) ||
                             (e.statusCode?.toString().contains(q) ?? false);
                       }).toList();
                 if (filtered.isEmpty) {
@@ -146,15 +139,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                             final entry = filtered[index];
                             return _HistoryTile(
                               entry: entry,
-                              onTap: () {
+                              onTap: () async {
+                                // List rows omit the response body; load the full entry.
+                                final full = await ref.read(historyRepositoryProvider).getEntry(entry.id) ?? entry;
+                                if (!context.mounted) return;
                                 final collHeaders = <String, String>{};
                                 try {
-                                  final decoded = jsonDecode(entry.collectionHeaders);
+                                  final decoded = jsonDecode(full.collectionHeaders);
                                   collHeaders.addAll(Map<String, String>.from(decoded));
                                 } catch (e) { debugPrint('Failed to parse collection headers: $e'); }
                                 context.go('/request', extra: {
-                                  'historyEntry': entry,
-                                  'collectionId': entry.collectionId,
+                                  'historyEntry': full,
+                                  'collectionId': full.collectionId,
                                   'collectionHeaders': collHeaders,
                                 });
                               },
@@ -257,7 +253,14 @@ class _HistoryTile extends StatelessWidget {
         child: Text(entry.method, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: methodColor(entry.method)), textAlign: TextAlign.center),
       ),
       title: Text(displayName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis, maxLines: 1),
-      subtitle: Text(entry.url, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis, maxLines: 1),
+      // The template URL is what gets replayed; show the resolved one too
+      // when variables were substituted.
+      subtitle: Text(
+        entry.resolvedUrl != null && entry.resolvedUrl != entry.url ? '${entry.url}  →  ${entry.resolvedUrl}' : entry.url,
+        style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -274,9 +277,28 @@ class _HistoryTile extends StatelessWidget {
             const SizedBox(width: 8),
             Text('${entry.responseTimeMs}ms', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
           ],
+          if (entry.responseSize != null) ...[
+            const SizedBox(width: 8),
+            Text(_formatSize(entry.responseSize!), style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+          ],
+          if (entry.responseTruncated) ...[
+            const SizedBox(width: 6),
+            Tooltip(
+              message: 'Only the first part of this response body was stored',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: const Text('TRUNCATED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.orange)),
+              ),
+            ),
+          ],
           const SizedBox(width: 4),
           IconButton(
             icon: const Icon(LucideIcons.x, size: 12),
+            tooltip: 'Delete entry',
             onPressed: onDelete,
             visualDensity: VisualDensity.compact,
           ),
@@ -284,5 +306,11 @@ class _HistoryTile extends StatelessWidget {
       ),
       onTap: onTap,
     );
+  }
+
+  static String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }

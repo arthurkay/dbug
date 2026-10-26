@@ -1,10 +1,11 @@
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/models/mock_endpoint.dart';
 import '../../../core/providers/repository_providers.dart';
+import '../data/mock_matcher.dart';
 
 class MockServerState {
   final bool isRunning;
@@ -18,6 +19,13 @@ class MockServerState {
 final mockServerProvider =
     StateNotifierProvider<MockServerController, MockServerState>((ref) {
   final controller = MockServerController(ref);
+  // Keep the in-memory endpoint list in step with the database: every
+  // add/edit/delete invalidates mockEndpointsProvider, which lands here.
+  ref.listen<AsyncValue<List<MockEndpoint>>>(
+    mockEndpointsProvider,
+    (_, next) => next.whenData(controller.updateEndpoints),
+    fireImmediately: true,
+  );
   ref.onDispose(controller.stop);
   return controller;
 });
@@ -25,6 +33,7 @@ final mockServerProvider =
 class MockServerController extends StateNotifier<MockServerState> {
   final Ref _ref;
   HttpServer? _server;
+  List<MockEndpoint> _endpoints = const [];
 
   MockServerController(this._ref)
       : super(const MockServerState(
@@ -32,39 +41,22 @@ class MockServerController extends StateNotifier<MockServerState> {
           port: AppConstants.defaultMockPort,
         ));
 
+  void updateEndpoints(List<MockEndpoint> endpoints) => _endpoints = endpoints;
+
   /// Starts the server on [port]. Returns null on success, otherwise an
   /// error message for the UI.
   Future<String?> start(int port) async {
     if (_server != null) return 'Mock server is already running';
 
-    final repo = _ref.read(mockEndpointRepositoryProvider);
-
-    Future<shelf.Response> handler(shelf.Request request) async {
-      // Look up the endpoint per request so additions and edits made while
-      // the server is running take effect immediately.
-      final match =
-          await repo.matchEndpoint(request.method, request.requestedUri.path);
-
-      if (match == null) {
-        return shelf.Response.notFound(
-          '{"error": "Not found"}',
-          headers: {'content-type': 'application/json'},
-        );
-      }
-
-      if (match.delayMs > 0) {
-        await Future.delayed(Duration(milliseconds: match.delayMs));
-      }
-
-      return shelf.Response(
-        match.statusCode,
-        body: match.body ?? '{"status": "ok"}',
-        headers: {'content-type': 'application/json', ...match.headers},
-      );
-    }
+    // Load fresh rather than trusting the cache, which may still be loading.
+    _endpoints = await _ref.read(mockEndpointRepositoryProvider).getAllEndpoints();
 
     try {
-      _server = await shelf_io.serve(handler, 'localhost', port);
+      _server = await shelf_io.serve(
+        (request) => handleMockRequest(request, _endpoints),
+        'localhost',
+        port,
+      );
     } catch (e) {
       return 'Failed to start server: $e';
     }

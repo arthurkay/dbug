@@ -224,20 +224,11 @@ class _JsonBodyEditorState extends ConsumerState<JsonBodyEditor> {
               maxLines: null,
               expands: true,
               textAlignVertical: TextAlignVertical.top,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                color: colorScheme.onSurface,
-                height: 1.5,
-              ),
+              style: codeTextStyle(color: colorScheme.onSurface),
+              strutStyle: codeStrutStyle(),
               decoration: InputDecoration(
                 hintText: widget.hintText,
-                hintStyle: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                  height: 1.5,
-                ),
+                hintStyle: codeTextStyle(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -295,12 +286,8 @@ class _JsonBodyEditorState extends ConsumerState<JsonBodyEditor> {
                 padding: const EdgeInsets.all(14),
                 child: SelectableText.rich(
                   TextSpan(children: spans),
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                    color: colorScheme.onSurface,
-                    height: 1.5,
-                  ),
+                  style: codeTextStyle(color: colorScheme.onSurface),
+                  strutStyle: codeStrutStyle(),
                 ),
               ),
             ),
@@ -314,20 +301,17 @@ class _JsonBodyEditorState extends ConsumerState<JsonBodyEditor> {
     final lineCount = (lines ?? body.split('\n')).length;
     return Container(
       width: 48,
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: const EdgeInsets.fromLTRB(4, 14, 10, 14),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         border: Border(right: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4))),
       ),
-      child: Column(
-        children: List.generate(lineCount, (i) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 0),
-          child: Text(
-            '${i + 1}',
-            style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: colorScheme.onSurfaceVariant, height: 1.5),
-            textAlign: TextAlign.right,
-          ),
-        )),
+      // Same style and strut as the code so each number sits on its line.
+      child: Text(
+        List.generate(lineCount, (i) => '${i + 1}').join('\n'),
+        style: codeTextStyle(color: colorScheme.onSurfaceVariant),
+        strutStyle: codeStrutStyle(),
+        textAlign: TextAlign.right,
       ),
     );
   }

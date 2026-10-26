@@ -360,12 +360,34 @@
 
   <div class="changelog">
 
+    <!-- v0.2.0 -->
+    <div class="release">
+      <div class="release-dot"></div>
+      <div class="release-header">
+        <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.2.0">v0.2.0</a></span>
+        <span class="release-tag release-latest"><span class="dot"></span> Latest</span>
+        <span class="release-date">October 2026</span>
+      </div>
+      <p class="release-summary">Encrypted credentials, Postman import/export, much faster large responses, a refreshed UI, and a safer installer.</p>
+      <ul class="change-list">
+        <li><span class="change-tag feat">Feat</span> Credentials (auth, headers, environment variables, history) are encrypted with AES-256-GCM, with the key in the system keychain</li>
+        <li><span class="change-tag feat">Feat</span> Postman v2.1 collection import and export; rename, duplicate, move and delete requests</li>
+        <li><span class="change-tag feat">Feat</span> Swagger 2.0 import; imported requests come prefilled with params, headers and a JSON body skeleton</li>
+        <li><span class="change-tag feat">Feat</span> Mock server: edit endpoints, path parameters (<code>/users/:id</code>), delays, headers, CORS and HEAD support</li>
+        <li><span class="change-tag feat">Feat</span> Cancel in-flight requests, request timeout and self-signed certificate settings, binary response handling</li>
+        <li><span class="change-tag feat">Feat</span> Refreshed UI: unified URL bar with Send, tab badges, masked secrets, consistent cards and page headers in light and dark mode</li>
+        <li><span class="change-tag feat">Feat</span> Large responses render in the background and scroll smoothly; history is capped and pruned</li>
+        <li><span class="change-tag fix">Fix</span> Saved requests keep their own auth; stale data after deleting specs, collections or environments</li>
+        <li><span class="change-tag fix">Fix</span> The database moved out of ~/Documents to the app data directory (migrated automatically)</li>
+        <li><span class="change-tag fix">Fix</span> Installer verifies checksums, upgrades atomically and never deletes your data; macOS builds can reach the network</li>
+      </ul>
+    </div>
+
     <!-- v0.1.6 -->
     <div class="release">
       <div class="release-dot"></div>
       <div class="release-header">
         <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.1.6">v0.1.6</a></span>
-        <span class="release-tag release-latest"><span class="dot"></span> Latest</span>
         <span class="release-date">August 2026</span>
       </div>
       <p class="release-summary">Global auth &amp; headers visible on the request page, UI polish, and stability fixes.</p>

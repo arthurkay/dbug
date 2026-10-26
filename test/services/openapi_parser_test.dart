@@ -228,10 +228,10 @@ void main() {
         expect(spec, isNull);
       });
 
-      test('returns null for OpenAPI 2.x (swagger)', () {
+      test('returns null for unsupported versions (Swagger 1.2)', () {
         final spec = OpenApiParser.parse('''
 {
-  "swagger": "2.0",
+  "swagger": "1.2",
   "info": { "title": "API" }
 }
 ''');

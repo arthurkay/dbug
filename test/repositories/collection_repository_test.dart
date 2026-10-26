@@ -59,9 +59,7 @@ void main() {
       final third = await repo.createCollection(name: 'Third');
 
       final colls = await repo.getAllCollections();
-      expect(colls, hasLength(3));
-      expect(colls.first.name, 'Third');
-      expect(colls.last.name, 'First');
+      expect(colls.map((c) => c.id), [third.id, second.id, first.id]);
     });
   });
 

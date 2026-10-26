@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dbug/core/repositories/environment_repository.dart';
-import 'package:dbug/core/models/environment_model.dart';
 import '../helpers/test_database.dart';
 
 void main() {

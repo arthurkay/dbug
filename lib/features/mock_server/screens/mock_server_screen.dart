@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../shared/widgets/page_header.dart';
+import '../../../shared/utils/syntax_highlighter.dart';
 
 import '../../../core/providers/repository_providers.dart';
 import '../../../core/providers/window_title_provider.dart';
@@ -10,6 +12,7 @@ import '../../../shared/widgets/toast_helper.dart';
 import '../../../shared/widgets/dbug_spinner.dart';
 import '../../../shared/utils/method_colors.dart';
 import '../providers/mock_server_provider.dart';
+import '../widgets/mock_endpoint_dialog.dart';
 
 class MockServerScreen extends ConsumerStatefulWidget {
   const MockServerScreen({super.key});
@@ -78,16 +81,7 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Mock Server', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text('Define mock endpoints for local testing', style: Theme.of(context).textTheme.bodyMedium),
-                  ],
-                ),
-              ),
+              Expanded(child: PageHeader(title: 'Mock Server', subtitle: 'Define mock endpoints for local testing')),
               SizedBox(
                 width: 80,
                 child: TextField(
@@ -99,9 +93,8 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
                     hintText: 'Port',
                     isDense: true,
                     contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    border: OutlineInputBorder(),
                   ),
-                  style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                  style: TextStyle(fontSize: 12, fontFamily: codeFontFamily),
                 ),
               ),
               const SizedBox(width: 8),
@@ -123,7 +116,7 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
                 const SizedBox(width: 8),
               ],
               FilledButton.icon(
-                onPressed: () => _showAddEndpointDialog(context),
+                onPressed: () => showMockEndpointDialog(context),
                 icon: const Icon(LucideIcons.plus, size: 16),
                 label: const Text('Add Endpoint'),
               ),
@@ -144,10 +137,8 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
                       final ep = endpoints[index];
                       return _EndpointTile(
                         endpoint: ep,
-                        onDelete: () async {
-                          await ref.read(mockEndpointRepositoryProvider).deleteEndpoint(ep.id);
-                          ref.invalidate(mockEndpointsProvider);
-                        },
+                        onEdit: () => showMockEndpointDialog(context, existing: ep),
+                        onDelete: () => _deleteEndpoint(ep),
                       );
                     },
                   ),
@@ -173,7 +164,7 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
             Text('Add endpoints to simulate API responses', style: TextStyle(color: colorScheme.onSurfaceVariant)),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: () => _showAddEndpointDialog(context),
+              onPressed: () => showMockEndpointDialog(context),
               icon: const Icon(LucideIcons.plus, size: 16),
               label: const Text('Add Endpoint'),
             ),
@@ -183,96 +174,39 @@ class _MockServerScreenState extends ConsumerState<MockServerScreen> {
     );
   }
 
-  void _showAddEndpointDialog(BuildContext context) {
-    final pathController = TextEditingController(text: '/api/');
-    final bodyController = TextEditingController(text: '{"status": "ok"}');
-    String method = 'GET';
-    int statusCode = 200;
-    int delayMs = 0;
-
-    showDialog(
+  Future<void> _deleteEndpoint(MockEndpoint ep) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add Mock Endpoint'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: ['GET', 'POST', 'PUT', 'DELETE'].map((m) => Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: method == m
-                      ? FilledButton.tonal(
-                          onPressed: () => setDialogState(() => method = m),
-                          child: Text(m, style: const TextStyle(fontSize: 11)),
-                        )
-                      : OutlinedButton(
-                          onPressed: () => setDialogState(() => method = m),
-                          child: Text(m, style: const TextStyle(fontSize: 11)),
-                        ),
-                )).toList(),
-              ),
-              const SizedBox(height: 12),
-              TextField(controller: pathController, decoration: const InputDecoration(hintText: '/api/path')),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Text('Status: ', style: TextStyle(fontSize: 12)),
-                  Expanded(
-                    child: DropdownButtonFormField<int>(
-                      value: statusCode,
-                      isDense: true,
-                      items: [200, 201, 204, 400, 401, 403, 404, 500].map((c) =>
-                        DropdownMenuItem(value: c, child: Text('$c'))
-                      ).toList(),
-                      onChanged: (v) { if (v != null) setDialogState(() => statusCode = v); },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(controller: bodyController, decoration: const InputDecoration(hintText: 'Response body (JSON)')),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () async {
-                if (pathController.text.isNotEmpty) {
-                  await ref.read(mockEndpointRepositoryProvider).createEndpoint(
-                    method: method,
-                    path: pathController.text,
-                    statusCode: statusCode,
-                    body: bodyController.text,
-                    delayMs: delayMs,
-                  );
-                  ref.invalidate(mockEndpointsProvider);
-                  if (context.mounted) Navigator.pop(context);
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        ),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Endpoint'),
+        content: Text('Delete ${ep.method} ${ep.path}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
       ),
     );
+    if (confirmed != true) return;
+    await ref.read(mockEndpointRepositoryProvider).deleteEndpoint(ep.id);
+    ref.invalidate(mockEndpointsProvider);
   }
 }
 
 class _EndpointTile extends StatelessWidget {
   final MockEndpoint endpoint;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  const _EndpointTile({required this.endpoint, required this.onDelete});
+  const _EndpointTile({required this.endpoint, required this.onEdit, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       dense: true,
       visualDensity: VisualDensity.compact,
+      onTap: onEdit,
       leading: Container(
-        width: 60,
+        width: 64,
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
           color: methodColor(endpoint.method).withValues(alpha: 0.12),
@@ -280,7 +214,16 @@ class _EndpointTile extends StatelessWidget {
         ),
         child: Text(endpoint.method, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: methodColor(endpoint.method)), textAlign: TextAlign.center),
       ),
-      title: Text(endpoint.path, style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+      title: Text(endpoint.path, style: TextStyle(fontSize: 12, fontFamily: codeFontFamily)),
+      subtitle: endpoint.delayMs > 0 || endpoint.headers.isNotEmpty
+          ? Text(
+              [
+                if (endpoint.delayMs > 0) '${endpoint.delayMs} ms delay',
+                if (endpoint.headers.isNotEmpty) '${endpoint.headers.length} header${endpoint.headers.length == 1 ? '' : 's'}',
+              ].join(' · '),
+              style: const TextStyle(fontSize: 11),
+            )
+          : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -297,7 +240,8 @@ class _EndpointTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          IconButton(icon: const Icon(LucideIcons.trash2, size: 14), onPressed: onDelete, visualDensity: VisualDensity.compact),
+          IconButton(icon: const Icon(LucideIcons.pencil, size: 14), tooltip: 'Edit', onPressed: onEdit, visualDensity: VisualDensity.compact),
+          IconButton(icon: const Icon(LucideIcons.trash2, size: 14), tooltip: 'Delete', onPressed: onDelete, visualDensity: VisualDensity.compact),
         ],
       ),
     );

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:uuid/uuid.dart';
 import '../database/database_service.dart';
+import '../security/secret_cipher.dart';
 import '../models/collection_model.dart';
 
 class CollectionRepository {
@@ -26,9 +27,9 @@ class CollectionRepository {
       'description': description,
       'source_type': sourceType,
       'source_spec_id': sourceSpecId,
-      'global_headers': jsonEncode(globalHeaders),
+      'global_headers': Secrets.sealForInsert(jsonEncode(globalHeaders)),
       'auth_type': authType,
-      'auth_data': authData,
+      'auth_data': Secrets.sealForInsert(authData),
       'created_at': now.millisecondsSinceEpoch,
       'updated_at': now.millisecondsSinceEpoch,
     });
@@ -58,16 +59,17 @@ class CollectionRepository {
     final db = await DatabaseService.database;
     await db.update(
       'collections',
-      {
+      Secrets.sealedUpdate({
         'name': collection.name,
         'description': collection.description,
         'source_type': collection.sourceType,
         'source_spec_id': collection.sourceSpecId,
-        'global_headers': jsonEncode(collection.globalHeaders),
         'auth_type': collection.authType,
-        'auth_data': collection.authData,
         'updated_at': DateTime.now().millisecondsSinceEpoch,
-      },
+      }, {
+        'global_headers': jsonEncode(collection.globalHeaders),
+        'auth_data': collection.authData,
+      }),
       where: 'id = ?',
       whereArgs: [collection.id],
     );
@@ -86,7 +88,7 @@ class CollectionRepository {
   }
 
   Collection _rowToCollection(Map<String, dynamic> row) {
-    final headersRaw = row['global_headers'] as String? ?? '{}';
+    final headersRaw = Secrets.openOr(row['global_headers'] as String?, '{}');
     Map<String, String> globalHeaders = {};
     try {
       globalHeaders = Map<String, String>.from(jsonDecode(headersRaw));
@@ -100,7 +102,7 @@ class CollectionRepository {
       sourceSpecId: row['source_spec_id'] as String?,
       globalHeaders: globalHeaders,
       authType: row['auth_type'] as String? ?? 'none',
-      authData: row['auth_data'] as String? ?? '{}',
+      authData: Secrets.openOr(row['auth_data'] as String?, '{}'),
       createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at'] as int),
     );

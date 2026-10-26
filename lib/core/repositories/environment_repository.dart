@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import '../database/database_service.dart';
+import '../security/secret_cipher.dart';
 import '../models/environment_model.dart';
 
 class EnvironmentRepository {
@@ -18,7 +19,7 @@ class EnvironmentRepository {
     await db.insert('environments', {
       'id': id,
       'name': name,
-      'variables': jsonEncode(variables),
+      'variables': Secrets.sealForInsert(jsonEncode(variables)),
       'is_active': 0,
       'source_type': sourceType,
       'source_spec_id': sourceSpecId,
@@ -31,13 +32,14 @@ class EnvironmentRepository {
     final db = await DatabaseService.database;
     await db.update(
       'environments',
-      {
+      Secrets.sealedUpdate({
         'name': env.name,
-        'variables': jsonEncode(env.variables),
         'is_active': env.isActive ? 1 : 0,
         'source_type': env.sourceType,
         'source_spec_id': env.sourceSpecId,
-      },
+      }, {
+        'variables': jsonEncode(env.variables),
+      }),
       where: 'id = ?',
       whereArgs: [env.id],
     );
@@ -105,7 +107,7 @@ class EnvironmentRepository {
     return Environment(
       id: row['id'] as String,
       name: row['name'] as String,
-      variables: Map<String, String>.from(jsonDecode(row['variables'] as String? ?? '{}')),
+      variables: Map<String, String>.from(jsonDecode(Secrets.openOr(row['variables'] as String?, '{}'))),
       isActive: (row['is_active'] as int?) == 1,
       sourceType: row['source_type'] as String? ?? 'user',
       sourceSpecId: row['source_spec_id'] as String?,

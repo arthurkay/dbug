@@ -25,6 +25,8 @@ _$RequestModelImpl _$$RequestModelImplFromJson(Map<String, dynamic> json) =>
             (k, e) => MapEntry(k, e as String),
           ) ??
           const {},
+      authType: json['authType'] as String? ?? 'none',
+      authData: json['authData'] as String? ?? '{}',
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
@@ -40,6 +42,8 @@ Map<String, dynamic> _$$RequestModelImplToJson(_$RequestModelImpl instance) =>
       'bodyType': instance.bodyType,
       'body': instance.body,
       'queryParams': instance.queryParams,
+      'authType': instance.authType,
+      'authData': instance.authData,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
     };

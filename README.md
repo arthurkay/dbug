@@ -4,13 +4,13 @@ A local API testing tool like Postman, built with Flutter.
 
 ## Features
 
-- **Request Builder** -- Send HTTP requests (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS) with headers, query parameters, body (JSON, form data, raw), and authentication (Bearer, Basic, API Key).
-- **Collections** -- Organize requests into collections, import/export as JSON files.
-- **History** -- Automatic logging of all sent requests with response details.
-- **OpenAPI Specs** -- Import OpenAPI/Swagger specs from files or URLs, browse endpoints, and generate requests from them.
+- **Request Builder** -- Send HTTP requests (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS) with headers, query parameters, body (JSON, form data, raw), and authentication (Bearer, Basic, API Key). In-flight requests can be cancelled.
+- **Collections** -- Organize requests into collections with shared global headers and auth. Import and export Postman v2.1 collections; rename, duplicate, move and delete requests.
+- **History** -- Automatic logging of sent requests with response details, capped in size and count (configurable in Settings).
+- **OpenAPI Specs** -- Import OpenAPI 3.x and Swagger 2.0 specs from files, URLs or pasted text, browse endpoints, and generate prefilled requests from them.
 - **Environments** -- Define environment variables and switch between environments. Use `{{variable}}` syntax in URLs, headers, and body.
-- **Mock Server** -- Built-in mock server (port 3001) for defining custom endpoints with fixed or variable-based responses.
-- **Settings** -- Light/dark theme toggle, environment management.
+- **Mock Server** -- Built-in mock server (port 3001) with editable endpoints, path parameters (`/users/:id`), response delays and CORS support.
+- **Settings** -- Theme and syntax theme, request timeout, self-signed TLS certificates, history limits.
 
 ## Installation
 
@@ -106,7 +106,9 @@ cp -r icons/* ~/.local/share/icons/hicolor/
 
 ### Build from Source
 
-Requires [Flutter SDK](https://docs.flutter.dev/get-started/install) (3.24+).
+Requires [Flutter SDK](https://docs.flutter.dev/get-started/install) 3.44+ (CI builds with 3.44.6).
+
+On Linux, building also needs `libsecret-1-dev` (for the system keychain): `sudo apt install libsecret-1-dev`.
 
 ```bash
 # Clone the repository
@@ -158,36 +160,36 @@ rm -rf ~/.local/share/dbug
 1. Select an HTTP method from the dropdown (GET, POST, etc.).
 2. Enter the request URL. Use `{{variable}}` syntax to reference environment variables.
 3. Optionally add query parameters, headers, and a request body.
-4. Click **Send** (or press Enter) to execute the request.
+4. Click **Send** to execute the request (click **Cancel** to abort it).
 5. The response panel shows status code, headers, body, size, and timing.
 
 ### Collections
 
 - Create collections to group related requests.
-- Import/export collections as JSON files.
-- Click a collection item to load it into the Request Builder.
-- Each collection item stores the full request configuration.
+- Import and export collections in Postman v2.1 format. Nested Postman folders become collections named `Parent / Child`. Collection global headers are not included in exports.
+- Click a request to load it into the Request Builder. Use its menu to rename, duplicate, move or delete it.
+- Each request stores its full configuration, including its own auth. Request auth overrides the collection's global auth.
 
 ### Environments
 
 1. Go to **Environments** in the sidebar.
 2. Create an environment with a name and key-value variable pairs.
 3. Select the active environment from the dropdown at the bottom of the sidebar.
-4. Reference variables in requests using `{{variable_name}}`.
+4. Reference variables in requests using `{{variable_name}}`. Names may contain letters, digits, `_`, `.` and `-`.
 
 ### OpenAPI Specs
 
 1. Go to **OpenAPI** in the sidebar.
-2. Import a spec by file, URL, or pasting JSON/YAML content.
-3. Browse endpoints grouped by tags.
-4. Click an endpoint to load it into the Request Builder with pre-filled parameters.
+2. Import an OpenAPI 3.x or Swagger 2.0 spec by file, URL, or pasting JSON/YAML content.
+3. Importing creates a collection with one request per endpoint (query/header parameters and a JSON body skeleton prefilled) and an environment holding `baseUrl` and the path parameters.
+4. Browse endpoints grouped by tags, and click one to load it into the Request Builder.
 
 ### Mock Server
 
 1. Go to **Mock Server** in the sidebar.
-2. Add mock endpoints with a method, path, status code, and response body.
+2. Add mock endpoints with a method, path, status code, headers, response body and optional delay. Paths may contain parameters (`/users/:id` or `/users/{id}`), and `{{params.id}}` in the body is replaced with the captured value.
 3. Start the server (runs on `http://localhost:3001`).
-4. Send requests to `http://localhost:3001/<path>` to get mock responses.
+4. Send requests to `http://localhost:3001/<path>` to get mock responses. CORS headers are added to every response, so browser apps can call it directly.
 
 ## Development
 
@@ -196,30 +198,41 @@ rm -rf ~/.local/share/dbug
 ```
 lib/
   app/              # App widget, theme, routing
-  core/             # Database, HTTP client, models, providers, repositories
+  core/             # Database, HTTP client, models, providers, repositories, request composition
   features/
-    collections/    # Collection CRUD
+    collections/    # Collection CRUD, Postman import/export
     environments/   # Environment variable management
     history/        # Request history
     mock_server/    # Built-in mock server
-    openapi/        # OpenAPI spec import and browsing
+    openapi/        # OpenAPI/Swagger parsing, import and browsing
     request_builder/# HTTP request builder
-    response_viewer/# Response display
-    scripts/        # (Planned) Scripting support
     settings/       # App settings
-  shared/           # Reusable widgets and utilities
+  shared/           # Reusable widgets (response view, editors) and utilities
 ```
 
 ### Tech Stack
 
 - **Flutter** -- Cross-platform UI framework
-- **shadcn_flutter** -- UI component library
+- **Yaru** -- Material theme base
 - **Riverpod** -- State management
 - **GoRouter** -- Declarative routing
 - **sqflite** -- Local SQLite database
 - **Dio** -- HTTP client
 - **Freezed** -- Immutable data classes
 - **Shelf** -- Mock HTTP server
+
+### Data location
+
+dbug stores its SQLite database (`dbug.db`) in the platform's application-support directory (for example `~/.local/share/zm.co.cloud.dbug/` on Linux). Older versions kept it in `~/Documents`; it is moved automatically on first launch. Credential-bearing fields (auth, request and collection headers, environment variables, and history headers and resolved URLs) are encrypted with AES-256-GCM. The key is kept in the system keychain (Secret Service/GNOME Keyring on Linux, Keychain on macOS, Credential Manager on Windows). If no keychain is available, it falls back to a private key file (`.data-key`, mode 0600) next to the database, and Settings shows which one is in use. Request bodies, query parameters and response bodies are not encrypted.
+
+### Checks
+
+```bash
+flutter analyze
+flutter test
+```
+
+CI runs both on every push and pull request, and a release is only built when they pass and the tag matches the `version:` in `pubspec.yaml`.
 
 ### License
 

@@ -30,6 +30,8 @@ mixin _$RequestModel {
   String? get bodyType => throw _privateConstructorUsedError;
   String? get body => throw _privateConstructorUsedError;
   Map<String, String> get queryParams => throw _privateConstructorUsedError;
+  String get authType => throw _privateConstructorUsedError;
+  String get authData => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime get updatedAt => throw _privateConstructorUsedError;
 
@@ -60,6 +62,8 @@ abstract class $RequestModelCopyWith<$Res> {
     String? bodyType,
     String? body,
     Map<String, String> queryParams,
+    String authType,
+    String authData,
     DateTime createdAt,
     DateTime updatedAt,
   });
@@ -89,6 +93,8 @@ class _$RequestModelCopyWithImpl<$Res, $Val extends RequestModel>
     Object? bodyType = freezed,
     Object? body = freezed,
     Object? queryParams = null,
+    Object? authType = null,
+    Object? authData = null,
     Object? createdAt = null,
     Object? updatedAt = null,
   }) {
@@ -130,6 +136,14 @@ class _$RequestModelCopyWithImpl<$Res, $Val extends RequestModel>
                 ? _value.queryParams
                 : queryParams // ignore: cast_nullable_to_non_nullable
                       as Map<String, String>,
+            authType: null == authType
+                ? _value.authType
+                : authType // ignore: cast_nullable_to_non_nullable
+                      as String,
+            authData: null == authData
+                ? _value.authData
+                : authData // ignore: cast_nullable_to_non_nullable
+                      as String,
             createdAt: null == createdAt
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
@@ -163,6 +177,8 @@ abstract class _$$RequestModelImplCopyWith<$Res>
     String? bodyType,
     String? body,
     Map<String, String> queryParams,
+    String authType,
+    String authData,
     DateTime createdAt,
     DateTime updatedAt,
   });
@@ -191,6 +207,8 @@ class __$$RequestModelImplCopyWithImpl<$Res>
     Object? bodyType = freezed,
     Object? body = freezed,
     Object? queryParams = null,
+    Object? authType = null,
+    Object? authData = null,
     Object? createdAt = null,
     Object? updatedAt = null,
   }) {
@@ -232,6 +250,14 @@ class __$$RequestModelImplCopyWithImpl<$Res>
             ? _value._queryParams
             : queryParams // ignore: cast_nullable_to_non_nullable
                   as Map<String, String>,
+        authType: null == authType
+            ? _value.authType
+            : authType // ignore: cast_nullable_to_non_nullable
+                  as String,
+        authData: null == authData
+            ? _value.authData
+            : authData // ignore: cast_nullable_to_non_nullable
+                  as String,
         createdAt: null == createdAt
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
@@ -258,6 +284,8 @@ class _$RequestModelImpl implements _RequestModel {
     this.bodyType,
     this.body,
     final Map<String, String> queryParams = const {},
+    this.authType = 'none',
+    this.authData = '{}',
     required this.createdAt,
     required this.updatedAt,
   }) : _headers = headers,
@@ -299,13 +327,19 @@ class _$RequestModelImpl implements _RequestModel {
   }
 
   @override
+  @JsonKey()
+  final String authType;
+  @override
+  @JsonKey()
+  final String authData;
+  @override
   final DateTime createdAt;
   @override
   final DateTime updatedAt;
 
   @override
   String toString() {
-    return 'RequestModel(id: $id, collectionId: $collectionId, name: $name, method: $method, url: $url, headers: $headers, bodyType: $bodyType, body: $body, queryParams: $queryParams, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'RequestModel(id: $id, collectionId: $collectionId, name: $name, method: $method, url: $url, headers: $headers, bodyType: $bodyType, body: $body, queryParams: $queryParams, authType: $authType, authData: $authData, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -327,6 +361,10 @@ class _$RequestModelImpl implements _RequestModel {
               other._queryParams,
               _queryParams,
             ) &&
+            (identical(other.authType, authType) ||
+                other.authType == authType) &&
+            (identical(other.authData, authData) ||
+                other.authData == authData) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -346,6 +384,8 @@ class _$RequestModelImpl implements _RequestModel {
     bodyType,
     body,
     const DeepCollectionEquality().hash(_queryParams),
+    authType,
+    authData,
     createdAt,
     updatedAt,
   );
@@ -375,6 +415,8 @@ abstract class _RequestModel implements RequestModel {
     final String? bodyType,
     final String? body,
     final Map<String, String> queryParams,
+    final String authType,
+    final String authData,
     required final DateTime createdAt,
     required final DateTime updatedAt,
   }) = _$RequestModelImpl;
@@ -400,6 +442,10 @@ abstract class _RequestModel implements RequestModel {
   String? get body;
   @override
   Map<String, String> get queryParams;
+  @override
+  String get authType;
+  @override
+  String get authData;
   @override
   DateTime get createdAt;
   @override

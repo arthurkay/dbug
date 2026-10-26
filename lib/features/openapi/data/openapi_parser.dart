@@ -4,25 +4,44 @@ import 'package:yaml/yaml.dart';
 import '../../../core/models/openapi_spec.dart';
 
 class OpenApiParser {
+  /// Parses an OpenAPI 3.x or Swagger 2.0 document (JSON or YAML), returning
+  /// null on any failure. Use [parseOrThrow] to learn why parsing failed.
   static ParsedSpec? parse(String content) {
     try {
-      Map<String, dynamic> json;
-      if (content.trimLeft().startsWith('{') || content.trimLeft().startsWith('[')) {
-        json = jsonDecode(content) as Map<String, dynamic>;
-      } else {
-        final yaml = loadYaml(content);
-        json = _yamlToMap(yaml);
-      }
-
-      final openapi = json['openapi']?.toString() ?? '';
-      if (!openapi.startsWith('3.')) {
-        return null;
-      }
-
-      return _parseSpec(json, content);
-    } catch (e) {
+      return parseOrThrow(content);
+    } catch (_) {
       return null;
     }
+  }
+
+  /// Like [parse], but throws a [FormatException] whose message explains the
+  /// failure ("Invalid JSON: ...", "Not an OpenAPI 3.x or Swagger 2.0
+  /// document", ...), suitable for showing to the user.
+  static ParsedSpec parseOrThrow(String content) {
+    final trimmed = content.trimLeft();
+    if (trimmed.isEmpty) throw const FormatException('The document is empty');
+
+    final dynamic decoded;
+    final isJson = trimmed.startsWith('{') || trimmed.startsWith('[');
+    try {
+      decoded = isJson ? jsonDecode(content) : _yamlToMap(loadYaml(content));
+    } catch (e) {
+      final detail = e is FormatException ? e.message : e.toString();
+      throw FormatException('Invalid ${isJson ? 'JSON' : 'YAML'}: $detail');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Not an OpenAPI 3.x or Swagger 2.0 document');
+    }
+
+    final openapi = decoded['openapi']?.toString() ?? '';
+    final swagger = decoded['swagger']?.toString() ?? '';
+    if (openapi.startsWith('3.')) return _parseSpec(decoded, content, isSwagger2: false);
+    if (swagger.startsWith('2.')) return _parseSpec(decoded, content, isSwagger2: true);
+    throw FormatException(
+      openapi.isNotEmpty || swagger.isNotEmpty
+          ? 'Unsupported spec version ${openapi.isNotEmpty ? 'OpenAPI $openapi' : 'Swagger $swagger'}'
+          : 'Not an OpenAPI 3.x or Swagger 2.0 document',
+    );
   }
 
   static dynamic _yamlToMap(dynamic yaml) {
@@ -48,10 +67,38 @@ class OpenApiParser {
     return current is Map<String, dynamic> ? current : null;
   }
 
-  static ParsedSpec _parseSpec(Map<String, dynamic> json, String rawContent) {
-    final info = json['info'] as Map<String, dynamic>? ?? {};
+  /// OpenAPI 3: the first server, with `{variables}` replaced by their
+  /// defaults. Swagger 2: `scheme://host` + `basePath`. Relative URLs are kept
+  /// as-is.
+  static String? _baseUrl(Map<String, dynamic> json, bool isSwagger2) {
+    if (isSwagger2) {
+      final host = json['host']?.toString();
+      final basePath = json['basePath']?.toString() ?? '';
+      if (host == null || host.isEmpty) return basePath.isEmpty ? null : basePath;
+      final schemes = _stringList(json['schemes']);
+      final scheme = schemes.contains('https') ? 'https' : (schemes.isNotEmpty ? schemes.first : 'https');
+      return '$scheme://$host$basePath';
+    }
+
     final servers = (json['servers'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
-    final baseUrl = servers.isNotEmpty ? servers.first['url']?.toString() : null;
+    if (servers.isEmpty) return null;
+    final server = servers.first;
+    var url = server['url']?.toString();
+    if (url == null) return null;
+    final variables = server['variables'];
+    if (variables is Map) {
+      url = url.replaceAllMapped(RegExp(r'\{([^}]+)\}'), (m) {
+        final variable = variables[m.group(1)];
+        final value = variable is Map ? variable['default'] : null;
+        return value?.toString() ?? m.group(0)!;
+      });
+    }
+    return url;
+  }
+
+  static ParsedSpec _parseSpec(Map<String, dynamic> json, String rawContent, {required bool isSwagger2}) {
+    final info = json['info'] as Map<String, dynamic>? ?? {};
+    final baseUrl = _baseUrl(json, isSwagger2);
 
     final paths = json['paths'] as Map<String, dynamic>? ?? {};
     final endpoints = <OpenApiEndpoint>[];
@@ -64,14 +111,29 @@ class OpenApiParser {
         final operation = item[method] as Map<String, dynamic>?;
         if (operation == null) continue;
 
+        final rawParams = [
+          ...(item['parameters'] as List? ?? []),
+          ...(operation['parameters'] as List? ?? []),
+        ].map((p) => _resolveParam(json, p)).whereType<Map<String, dynamic>>().toList();
+
         final parameters = _parseParameters(
           json,
-          operation['parameters'] as List? ?? [],
-          item['parameters'] as List? ?? [],
+          rawParams.where((p) => p['in'] != 'body' && p['in'] != 'formData').toList(),
         );
 
-        final requestBody = operation['requestBody'] as Map<String, dynamic>?;
-        final requestBodySchema = _extractSchema(json, requestBody);
+        OpenApiSchema? requestBodySchema;
+        if (isSwagger2) {
+          final bodyParam = rawParams.where((p) => p['in'] == 'body').firstOrNull;
+          if (bodyParam != null && bodyParam['schema'] is Map) {
+            requestBodySchema = _parseSchema(json, bodyParam['schema'] as Map<String, dynamic>);
+          }
+        } else {
+          final requestBody = operation['requestBody'];
+          final resolvedBody = requestBody is Map<String, dynamic> && requestBody['\$ref'] != null
+              ? _resolveRef(json, requestBody['\$ref'].toString())
+              : requestBody as Map<String, dynamic>?;
+          requestBodySchema = _extractSchema(json, resolvedBody);
+        }
 
         final responses = operation['responses'] as Map<String, dynamic>? ?? {};
         final responseSchemas = <String, OpenApiSchema>{};
@@ -107,33 +169,57 @@ class OpenApiParser {
     );
   }
 
+  /// Resolves a `$ref` parameter (e.g. `#/components/parameters/Limit`).
+  static Map<String, dynamic>? _resolveParam(Map<String, dynamic> root, dynamic param) {
+    if (param is! Map<String, dynamic>) return null;
+    final ref = param['\$ref']?.toString();
+    if (ref == null) return param;
+    return _resolveRef(root, ref);
+  }
+
   static List<OpenApiParameter> _parseParameters(
     Map<String, dynamic> root,
-    List operationParams,
-    List pathParams,
+    List<Map<String, dynamic>> params,
   ) {
-    final allParams = [...pathParams, ...operationParams];
-    return allParams.whereType<Map>().map((p) {
+    return params.map((p) {
       final schema = p['schema'] is Map
           ? _parseSchema(root, p['schema'] as Map<String, dynamic>)
           : null;
+      // Swagger 2 puts type/default on the parameter itself.
+      final type = schema?.type ?? p['type']?.toString();
+      final rawSchema = p['schema'] is Map ? p['schema'] as Map : const {};
+      final example = p['example'] ?? rawSchema['example'] ?? rawSchema['default'] ?? p['default'];
       return OpenApiParameter(
         name: p['name']?.toString() ?? '',
         location: p['in']?.toString() ?? 'query',
         description: p['description']?.toString(),
         required: p['required'] == true,
-        type: schema?.type,
-        schemaType: schema?.type,
+        type: type,
+        schemaType: type,
+        example: example?.toString(),
       );
     }).toList();
   }
 
   static OpenApiSchema? _extractSchema(Map<String, dynamic> root, Map<String, dynamic>? container) {
     if (container == null) return null;
+
+    final ref = container['\$ref']?.toString();
+    if (ref != null) {
+      return _extractSchema(root, _resolveRef(root, ref));
+    }
+
+    // Swagger 2 responses carry the schema directly.
+    if (container['schema'] is Map<String, dynamic>) {
+      return _parseSchema(root, container['schema'] as Map<String, dynamic>);
+    }
+
     final content = container['content'] as Map<String, dynamic>?;
     if (content == null) return null;
 
-    final jsonContent = content['application/json'] ?? content['*/*'];
+    final jsonContent = content['application/json'] ??
+        content.entries.where((e) => e.key.contains('json')).map((e) => e.value).firstOrNull ??
+        content['*/*'];
     if (jsonContent is! Map) return null;
 
     final schema = jsonContent['schema'] as Map<String, dynamic>?;

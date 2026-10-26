@@ -1,7 +1,7 @@
 name: dbug
 description: "A local API testing tool like Postman, built with Flutter."
 publish_to: 'none'
-version: 0.1.6
+version: 0.2.0
 
 environment:
   sdk: ^3.11.4
@@ -13,7 +13,6 @@ dependencies:
   # UI
   yaru: ^10.2.0
   lucide_icons_flutter: ^3.1.15
-  dynamic_color: ^1.7.0
   window_manager: ^0.5.2
 
   # State Management
@@ -37,7 +36,6 @@ dependencies:
 
   # Utilities
   uuid: ^4.5.0
-  intl: ^0.20.2
   file_picker: ^8.0.0
   shared_preferences: ^2.3.0
 
@@ -46,6 +44,8 @@ dependencies:
 
   # OpenAPI / YAML
   yaml: ^3.1.0
+  flutter_secure_storage: ^10.3.4
+  cryptography: ^2.9.0
 
 dev_dependencies:
   flutter_test:

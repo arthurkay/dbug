@@ -49,6 +49,8 @@ class OpenApiParameter with _$OpenApiParameter {
     @Default(false) bool required,
     String? type,
     String? schemaType,
+    /// Example or default value from the spec, used to prefill requests.
+    String? example,
   }) = _OpenApiParameter;
 
   factory OpenApiParameter.fromJson(Map<String, dynamic> json) =>

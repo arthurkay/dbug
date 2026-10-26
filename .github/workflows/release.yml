@@ -9,25 +9,47 @@ permissions:
   contents: write
 
 env:
-  FLUTTER_VERSION: "3.41.x"
+  FLUTTER_VERSION: "3.44.6"
   FLUTTER_CHANNEL: "stable"
 
 jobs:
-  build-linux:
+  verify-version:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Check tag matches pubspec version
+        # A mismatch would publish a release whose About screen and installer
+        # report a different version than install.sh records.
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pubspec=$(sed -nE 's/^version:[[:space:]]*([^+[:space:]]+).*/\1/p' pubspec.yaml)
+          if [[ "$tag" != "$pubspec" ]]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match pubspec version ${pubspec}"
+            exit 1
+          fi
+          echo "Releasing version ${pubspec}"
+
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  build-linux:
+    needs: [verify-version, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
 
       - name: Install Linux system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libgtk-3-dev pkg-config
+          sudo apt-get install -y ninja-build libgtk-3-dev pkg-config libsecret-1-dev
 
       - name: Install dependencies
         run: flutter pub get
@@ -48,21 +70,23 @@ jobs:
         run: tar -czf build/dbug-linux-x64.tar.gz -C build/linux/x64/release/bundle .
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: linux-x64
           path: build/dbug-linux-x64.tar.gz
 
   build-macos:
+    needs: [verify-version, test]
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
@@ -74,23 +98,25 @@ jobs:
         run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/dbug.app build/dbug-macos.zip
 
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: macos-universal
           path: build/dbug-macos.zip
 
   build-windows:
+    needs: [verify-version, test]
     runs-on: windows-2022
     env:
       SQLITE3_LIB_DIR: "C:\\sqlite3"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
@@ -101,8 +127,16 @@ jobs:
           $dest = "C:\sqlite3"
           New-Item -ItemType Directory -Path $dest -Force | Out-Null
           $url = "https://www.sqlite.org/2024/sqlite-dll-win-x64-3460000.zip"
+          # Pinned so a tampered or replaced download can't be bundled into
+          # the release. Update together with the URL.
+          $expected = "87C8394712418DCC4A608FDC34C0A23A89A41E626B9E3294C0978BB2BDA0A0D1"
           $zip = "$env:RUNNER_TEMP\sqlite3.zip"
           Invoke-WebRequest -Uri $url -OutFile $zip
+          $actual = (Get-FileHash -Path $zip -Algorithm SHA256).Hash
+          if ($actual -ne $expected) {
+            Write-Error "sqlite3 zip checksum mismatch: expected $expected, got $actual"
+            exit 1
+          }
           Expand-Archive -Path $zip -DestinationPath $dest -Force
           dir $dest
 
@@ -116,17 +150,19 @@ jobs:
         run: choco install innosetup -y
 
       - name: Build Windows installer
+        shell: pwsh
         run: |
-          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' 'windows\installer\dbug.iss'
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' "/DAppVer=$version" 'windows\installer\dbug.iss'
 
       - name: Upload Windows zip
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: windows-x64
           path: build/dbug-windows-x64.zip
 
       - name: Upload Windows installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: windows-x64-setup
           path: build/dbug-windows-x64-setup.exe
@@ -136,14 +172,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+
+      - name: Collect assets and generate checksums
+        # install.sh verifies downloads against SHA256SUMS by bare file name.
+        run: |
+          mkdir dist
+          cp linux-x64/dbug-linux-x64.tar.gz \
+             macos-universal/dbug-macos.zip \
+             windows-x64/dbug-windows-x64.zip \
+             windows-x64-setup/dbug-windows-x64-setup.exe \
+             dist/
+          cd dist
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           generate_release_notes: true
           files: |
-            linux-x64/dbug-linux-x64.tar.gz
-            macos-universal/dbug-macos.zip
-            windows-x64/dbug-windows-x64.zip
-            windows-x64-setup/dbug-windows-x64-setup.exe
+            dist/dbug-linux-x64.tar.gz
+            dist/dbug-macos.zip
+            dist/dbug-windows-x64.zip
+            dist/dbug-windows-x64-setup.exe
+            dist/SHA256SUMS

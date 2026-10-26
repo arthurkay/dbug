@@ -42,8 +42,22 @@ final requestsByCollectionProvider = FutureProvider.family((ref, String collecti
   return ref.watch(requestRepositoryProvider).getRequestsByCollection(collectionId);
 });
 
-final allSpecsProvider = FutureProvider((ref) {
-  return ref.watch(openApiRepositoryProvider).getAllSpecs();
+/// Lightweight list rows (no raw content or parsed endpoints).
+final specSummariesProvider = FutureProvider((ref) {
+  return ref.watch(openApiRepositoryProvider).getSpecSummaries();
+});
+
+final specByIdProvider = FutureProvider.family((ref, String specId) {
+  return ref.watch(openApiRepositoryProvider).getSpec(specId);
+});
+
+/// The collection generated when the spec was imported, if it still exists.
+final collectionForSpecProvider = FutureProvider.family((ref, String specId) {
+  return ref.watch(openApiRepositoryProvider).getCollectionForSpec(specId);
+});
+
+final historyEntryProvider = FutureProvider.family((ref, String id) {
+  return ref.watch(historyRepositoryProvider).getEntry(id);
 });
 
 final historyProvider = FutureProvider((ref) {
@@ -54,8 +68,10 @@ final environmentsProvider = FutureProvider((ref) {
   return ref.watch(environmentRepositoryProvider).getAllEnvironments();
 });
 
-final userEnvironmentsProvider = FutureProvider((ref) {
-  return ref.watch(environmentRepositoryProvider).getUserEnvironments();
+/// Derived from [environmentsProvider] so it refreshes whenever that does.
+final userEnvironmentsProvider = FutureProvider((ref) async {
+  final envs = await ref.watch(environmentsProvider.future);
+  return envs.where((e) => e.isUserDefined).toList();
 });
 
 final mockEndpointsProvider = FutureProvider((ref) {

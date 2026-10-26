@@ -31,8 +31,17 @@ class _FileExplorerState extends State<FileExplorer> {
   @override
   void initState() {
     super.initState();
-    _currentDirectory = Directory(widget.initialDirectory ?? Directory.current.path);
+    _currentDirectory = Directory(widget.initialDirectory ?? _homeDirectory());
     _loadDirectory();
+  }
+
+  /// The user's home folder. Directory.current is often `/` or the app
+  /// bundle for an installed app, which is a useless place to start.
+  static String _homeDirectory() {
+    final env = Platform.environment;
+    final home = env['HOME'] ?? env['USERPROFILE'];
+    if (home != null && home.isNotEmpty && Directory(home).existsSync()) return home;
+    return Directory.current.path;
   }
 
   Future<void> _loadDirectory() async {
