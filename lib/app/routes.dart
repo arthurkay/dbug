@@ -85,6 +85,16 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/environments',
           pageBuilder: (context, state) => const NoTransitionPage(child: EnvironmentsScreen()),
+          routes: [
+            GoRoute(
+              path: ':envId',
+              // Unsaved variable edits prompt before leaving, whichever way.
+              onExit: (context, state) => environmentEditorExitGuard?.call() ?? true,
+              pageBuilder: (context, state) => NoTransitionPage(
+                child: EnvironmentsScreen(editingEnvId: state.pathParameters['envId']),
+              ),
+            ),
+          ],
         ),
         GoRoute(
           path: '/mock-server',

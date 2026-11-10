@@ -47,7 +47,7 @@ class OpenApiRepository {
     final nowMs = now.millisecondsSinceEpoch;
 
     final endpointsJson = parsed.endpoints.map((e) => e.toJson()).toList();
-    final baseUrl = parsed.baseUrl ?? '';
+    final baseUrl = parsed.baseUrlTemplate ?? parsed.baseUrl ?? '';
     final allPathParams = <String>{};
 
     await db.transaction((txn) async {
@@ -103,7 +103,10 @@ class OpenApiRepository {
 
       if (baseUrl.isNotEmpty || allPathParams.isNotEmpty) {
         final variables = <String, String>{};
-        if (baseUrl.isNotEmpty) variables['baseUrl'] = baseUrl;
+        if (baseUrl.isNotEmpty) {
+          variables['baseUrl'] = baseUrl;
+          variables.addAll(parsed.serverVariables);
+        }
         for (final param in allPathParams) {
           variables[param] = '';
         }

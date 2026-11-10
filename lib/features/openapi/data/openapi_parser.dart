@@ -80,25 +80,48 @@ class OpenApiParser {
       return '$scheme://$host$basePath';
     }
 
+    final server = _firstServer(json);
+    if (server == null) return null;
+    final variables = server.variables;
+    return server.url.replaceAllMapped(_serverVariable, (m) {
+      final value = variables[m.group(1)];
+      return value == null || value.isEmpty ? m.group(0)! : value;
+    });
+  }
+
+  static final _serverVariable = RegExp(r'\{([^{}]+)\}');
+
+  static ({String url, Map<String, String> variables})? _firstServer(Map<String, dynamic> json) {
     final servers = (json['servers'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
     if (servers.isEmpty) return null;
     final server = servers.first;
-    var url = server['url']?.toString();
+    final url = server['url']?.toString();
     if (url == null) return null;
-    final variables = server['variables'];
-    if (variables is Map) {
-      url = url.replaceAllMapped(RegExp(r'\{([^}]+)\}'), (m) {
-        final variable = variables[m.group(1)];
-        final value = variable is Map ? variable['default'] : null;
-        return value?.toString() ?? m.group(0)!;
-      });
-    }
-    return url;
+    final declared = server['variables'];
+    final variables = <String, String>{
+      for (final m in _serverVariable.allMatches(url)) m.group(1)!: '',
+      if (declared is Map)
+        for (final e in declared.entries)
+          e.key.toString(): (e.value is Map ? e.value['default'] : null)?.toString() ?? '',
+    };
+    return (url: url, variables: variables);
+  }
+
+  /// OpenAPI 3 server variables (`https://{host}:{port}`) become `{{host}}`
+  /// placeholders, so environments can override them; their defaults are
+  /// returned in [ParsedSpec.serverVariables]. Swagger 2 has none.
+  static String? _baseUrlTemplate(Map<String, dynamic> json, bool isSwagger2) {
+    if (isSwagger2) return _baseUrl(json, true);
+    final server = _firstServer(json);
+    if (server == null) return null;
+    return server.url.replaceAllMapped(_serverVariable, (m) => '{{${m.group(1)}}}');
   }
 
   static ParsedSpec _parseSpec(Map<String, dynamic> json, String rawContent, {required bool isSwagger2}) {
     final info = json['info'] as Map<String, dynamic>? ?? {};
     final baseUrl = _baseUrl(json, isSwagger2);
+    final baseUrlTemplate = _baseUrlTemplate(json, isSwagger2);
+    final serverVariables = isSwagger2 ? const <String, String>{} : (_firstServer(json)?.variables ?? const <String, String>{});
 
     final paths = json['paths'] as Map<String, dynamic>? ?? {};
     final endpoints = <OpenApiEndpoint>[];
@@ -164,6 +187,8 @@ class OpenApiParser {
       title: info['title']?.toString(),
       version: info['version']?.toString(),
       baseUrl: baseUrl,
+      baseUrlTemplate: baseUrlTemplate,
+      serverVariables: serverVariables,
       endpoints: endpoints,
       rawContent: rawContent,
     );
@@ -295,7 +320,16 @@ class OpenApiParser {
 class ParsedSpec {
   final String? title;
   final String? version;
+  /// The first server URL with variables replaced by their defaults (those
+  /// without a default stay as `{name}`), for display.
   final String? baseUrl;
+
+  /// The first server URL with variables as `{{name}}` placeholders; what
+  /// the spec environment's `baseUrl` is set to.
+  final String? baseUrlTemplate;
+
+  /// Server variables and their defaults (blank when the spec has none).
+  final Map<String, String> serverVariables;
   final List<OpenApiEndpoint> endpoints;
   final String rawContent;
 
@@ -303,6 +337,8 @@ class ParsedSpec {
     this.title,
     this.version,
     this.baseUrl,
+    this.baseUrlTemplate,
+    this.serverVariables = const {},
     required this.endpoints,
     required this.rawContent,
   });

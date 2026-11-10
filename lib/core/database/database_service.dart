@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -53,6 +54,7 @@ class DatabaseService {
         },
       );
       await setUpSecrets(db, KeyStore(dir.path));
+      await upgradeSpecServerVariables(db);
       return db;
     } catch (e) {
       debugPrint('Failed to initialize database: $e');
@@ -366,6 +368,46 @@ class DatabaseService {
       await db.execute('VACUUM');
       debugPrint('Encrypted credentials in $changed rows');
     }
+    return changed;
+  }
+
+  /// Spec environments imported before server variables were supported
+  /// hold `baseUrl` values like `https://{host}:{port}/api`, which no
+  /// environment can fill in. Rewrites those to `{{host}}` placeholders and
+  /// adds the names (blank) so they show up in the spec environment. Runs
+  /// once; skipped while credentials are locked (variables are encrypted).
+  @visibleForTesting
+  static Future<int> upgradeSpecServerVariables(Database db) async {
+    const flag = 'spec_server_variables_v1';
+    if (Secrets.isLocked) return 0;
+    final done = await db.query('app_meta', where: 'key = ?', whereArgs: [flag]);
+    if (done.isNotEmpty) return 0;
+
+    final singleBrace = RegExp(r'(?<!\{)\{([\w.\-]+)\}(?!\})');
+    var changed = 0;
+    await db.transaction((txn) async {
+      final rows = await txn.query('environments',
+          columns: ['id', 'variables'], where: "source_type = 'openapi'");
+      for (final row in rows) {
+        final plain = Secrets.cipher.open(row['variables'] as String?);
+        if (plain == null) continue;
+        final decoded = jsonDecode(plain);
+        if (decoded is! Map) continue;
+        final variables = decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
+        final baseUrl = variables['baseUrl'];
+        if (baseUrl == null || !singleBrace.hasMatch(baseUrl)) continue;
+        for (final m in singleBrace.allMatches(baseUrl)) {
+          variables.putIfAbsent(m.group(1)!, () => '');
+        }
+        variables['baseUrl'] = baseUrl.replaceAllMapped(singleBrace, (m) => '{{${m.group(1)}}}');
+        await txn.update('environments', {'variables': Secrets.cipher.seal(jsonEncode(variables))},
+            where: 'id = ?', whereArgs: [row['id']]);
+        changed++;
+      }
+      await txn.insert('app_meta', {'key': flag, 'value': '1'},
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+    if (changed > 0) debugPrint('Converted server variables in $changed spec environments');
     return changed;
   }
 

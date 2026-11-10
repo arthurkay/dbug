@@ -445,7 +445,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       auth: draft.auth,
       collectionHeaders: _collectionHeaders,
       collectionAuth: _collectionAuth,
-      variables: ref.read(activeVariablesProvider),
+      variables: ref.read(requestVariablesProvider(_collectionId)),
     );
     final client = ref.read(httpClientProvider);
     final historyRepo = ref.read(historyRepositoryProvider);
@@ -688,6 +688,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                     ),
                   ),
                 _buildMethodUrlBar(colorScheme),
+                _buildResolvedUrlLine(colorScheme),
                 const SizedBox(height: 12),
                 _buildTabs(colorScheme),
                 const SizedBox(height: 10),
@@ -1063,10 +1064,62 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     );
   }
 
+  /// The URL as it will be sent, under the URL bar, whenever it contains
+  /// `{{variables}}`; names no environment defines are called out.
+  Widget _buildResolvedUrlLine(ColorScheme colorScheme) {
+    final variables = ref.watch(requestVariablesProvider(_collectionId));
+    final envName = ref.watch(activeEnvironmentProvider)?.name;
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _urlController,
+      builder: (context, value, _) {
+        final raw = value.text;
+        if (placeholderNames(raw).isEmpty) return const SizedBox.shrink();
+        final resolved = substituteVariables(raw, variables);
+        final missing = placeholderNames(resolved);
+        final muted = colorScheme.onSurfaceVariant;
+        return Padding(
+          padding: const EdgeInsets.only(top: 6, left: 4, right: 4),
+          child: Row(
+            children: [
+              Icon(LucideIcons.cornerDownRight, size: 13, color: muted),
+              const SizedBox(width: 6),
+              Expanded(
+                child: SelectableText(
+                  resolved,
+                  maxLines: 1,
+                  style: TextStyle(fontFamily: codeFontFamily, fontSize: 12, color: muted),
+                ),
+              ),
+              if (missing.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: envName == null
+                      ? 'No environment is active'
+                      : 'Not defined in "$envName" or the spec\'s environment',
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.triangleAlert, size: 13, color: colorScheme.error),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Unset: ${missing.join(', ')}',
+                        style: TextStyle(fontSize: 12, color: colorScheme.error, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   String _buildResolvedUrlPreview() {
     final raw = _urlController.text;
     if (raw.isEmpty) return 'Enter URL (supports {{variables}})';
-    final variables = ref.read(activeVariablesProvider);
+    final variables = ref.read(requestVariablesProvider(_collectionId));
     if (variables.isEmpty) return raw;
     final resolved = substituteVariables(raw, variables);
     if (resolved == raw) return raw;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../shared/widgets/page_header.dart';
@@ -11,15 +12,24 @@ import '../../../shared/widgets/key_value_editor.dart';
 import '../../../shared/widgets/toast_helper.dart';
 import '../../../shared/widgets/dbug_spinner.dart';
 
+/// Asks the open environment editor whether it may be left (prompting about
+/// unsaved changes); used by the `/environments/:envId` route's `onExit`, so
+/// leaving through the sidebar is guarded as well as the Back button.
+Future<bool> Function()? environmentEditorExitGuard;
+
 class EnvironmentsScreen extends ConsumerStatefulWidget {
-  const EnvironmentsScreen({super.key});
+  /// The environment being edited (from `/environments/:envId`); null shows
+  /// the list.
+  final String? editingEnvId;
+
+  const EnvironmentsScreen({super.key, this.editingEnvId});
 
   @override
   ConsumerState<EnvironmentsScreen> createState() => _EnvironmentsScreenState();
 }
 
 class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
-  String? _editingEnvId;
+  String? get _editingEnvId => widget.editingEnvId;
 
   @override
   void initState() {
@@ -75,7 +85,7 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
                     return _EnvironmentEditor(
                       key: ValueKey(editingEnv.id),
                       env: editingEnv,
-                      onClose: () => setState(() => _editingEnvId = null),
+                      onClose: () => context.go('/environments'),
                     );
                   }
                 }
@@ -92,7 +102,7 @@ class _EnvironmentsScreenState extends ConsumerState<EnvironmentsScreen> {
                         onActivate: () {
                           ref.read(activeEnvironmentProvider.notifier).setActive(env);
                         },
-                        onEdit: () => setState(() => _editingEnvId = env.id),
+                        onEdit: () => context.go('/environments/${env.id}'),
                         onDelete: env.isOpenApiDefined ? null : () async {
                           final confirmed = await showDialog<bool>(
                             context: context,
@@ -201,10 +211,12 @@ class _EnvironmentEditorState extends ConsumerState<_EnvironmentEditor> {
     _saved = Map.of(widget.env.variables);
     _entries = mapToEntries(_saved);
     if (_entries.isEmpty) _entries.add(KeyValueEntry());
+    environmentEditorExitGuard = _confirmLeave;
   }
 
   @override
   void dispose() {
+    if (environmentEditorExitGuard == _confirmLeave) environmentEditorExitGuard = null;
     for (final e in _entries) {
       e.dispose();
     }
@@ -237,23 +249,26 @@ class _EnvironmentEditorState extends ConsumerState<_EnvironmentEditor> {
     }
   }
 
-  Future<void> _close() async {
-    if (_isDirty) {
-      final discard = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Discard changes?'),
-          content: Text('"${widget.env.name}" has unsaved variable changes.'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep editing')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Discard')),
-          ],
-        ),
-      );
-      if (discard != true || !mounted) return;
-    }
-    widget.onClose();
+  /// True when the editor may be left: nothing unsaved, or the user agreed
+  /// to discard it.
+  Future<bool> _confirmLeave() async {
+    if (!_isDirty || !mounted) return true;
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard changes?'),
+        content: Text('"${widget.env.name}" has unsaved variable changes.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep editing')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Discard')),
+        ],
+      ),
+    );
+    return discard == true;
   }
+
+  // The route's onExit runs _confirmLeave.
+  void _close() => widget.onClose();
 
   @override
   Widget build(BuildContext context) {
@@ -336,6 +351,8 @@ class _EnvironmentTile extends StatelessWidget {
     return ListTile(
       dense: true,
       visualDensity: VisualDensity.compact,
+      onTap: onEdit,
+      mouseCursor: SystemMouseCursors.click,
       // Every state uses the same IconButton footprint so names line up.
       leading: IconButton(
         tooltip: isActive ? 'Active environment' : (canActivate ? 'Make active' : null),

@@ -283,8 +283,8 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                   label: const Text('Add Var', style: TextStyle(fontSize: 11)),
                 ),
                 TextButton(
-                  onPressed: () => context.go('/environments'),
-                  child: const Text('Manage', style: TextStyle(fontSize: 11)),
+                  onPressed: () => context.go('/environments/${activeEnv.id}'),
+                  child: const Text('Edit', style: TextStyle(fontSize: 11)),
                 ),
               ],
             ),
