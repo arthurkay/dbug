@@ -366,20 +366,23 @@
       <div class="release-header">
         <span class="release-version"><a href="https://github.com/arthurkay/dbug/releases/tag/v0.2.0">v0.2.0</a></span>
         <span class="release-tag release-latest"><span class="dot"></span> Latest</span>
-        <span class="release-date">October 2026</span>
+        <span class="release-date">November 2026</span>
       </div>
-      <p class="release-summary">Encrypted credentials, Postman import/export, much faster large responses, a refreshed UI, and a safer installer.</p>
+      <p class="release-summary">Encrypted credentials, Postman import/export, environment-aware spec requests, much faster large responses, a refreshed UI, and a safer installer.</p>
       <ul class="change-list">
         <li><span class="change-tag feat">Feat</span> Credentials (auth, headers, environment variables, history) are encrypted with AES-256-GCM, with the key in the system keychain</li>
         <li><span class="change-tag feat">Feat</span> Postman v2.1 collection import and export; rename, duplicate, move and delete requests</li>
         <li><span class="change-tag feat">Feat</span> Swagger 2.0 import; imported requests come prefilled with params, headers and a JSON body skeleton</li>
         <li><span class="change-tag feat">Feat</span> Mock server: edit endpoints, path parameters (<code>/users/:id</code>), delays, headers, CORS and HEAD support</li>
         <li><span class="change-tag feat">Feat</span> Cancel in-flight requests, request timeout and self-signed certificate settings, binary response handling</li>
+        <li><span class="change-tag feat">Feat</span> Spec requests resolve through the active environment over the spec's own; OpenAPI server variables (<code>{host}</code>, <code>{port}</code>) become environment variables; variables can reference each other; the resolved URL shows under the URL bar</li>
+        <li><span class="change-tag feat">Feat</span> Request builder shows the collection and lets you add, rename, duplicate and delete its requests; click an environment row to edit it</li>
         <li><span class="change-tag feat">Feat</span> Refreshed UI: unified URL bar with Send, tab badges, masked secrets, consistent cards and page headers in light and dark mode</li>
         <li><span class="change-tag feat">Feat</span> Large responses render in the background and scroll smoothly; history is capped and pruned</li>
         <li><span class="change-tag fix">Fix</span> Saved requests keep their own auth; stale data after deleting specs, collections or environments</li>
         <li><span class="change-tag fix">Fix</span> The database moved out of ~/Documents to the app data directory (migrated automatically)</li>
-        <li><span class="change-tag fix">Fix</span> Installer verifies checksums, upgrades atomically and never deletes your data; macOS builds can reach the network</li>
+        <li><span class="change-tag fix">Fix</span> Variable names match case-insensitively; tooltips and right-click menus appear at the cursor</li>
+        <li><span class="change-tag fix">Fix</span> Installer verifies checksums, upgrades atomically and never deletes your data; macOS builds can reach the network, ask for Local Network access, and open without Gatekeeper blocks when installed by script</li>
       </ul>
     </div>
 
