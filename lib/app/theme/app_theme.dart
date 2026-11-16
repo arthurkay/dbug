@@ -196,6 +196,8 @@ class DbugTheme {
         decoration: BoxDecoration(color: scheme.inverseSurface, borderRadius: BorderRadius.circular(6)),
         textStyle: TextStyle(color: scheme.onInverseSurface, fontSize: 12),
         waitDuration: const Duration(milliseconds: 400),
+        // Closer to the hovered control than the 24px desktop default.
+        verticalOffset: 14,
       ),
     );
   }

@@ -42,3 +42,34 @@ jobs:
 
       - name: Test
         run: flutter test
+
+  build-macos:
+    # Catches macOS-only build breaks (plugins, entitlements, Info.plist) on
+    # every push instead of at release time.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build macOS
+        run: flutter build macos --release
+
+      - name: Check signature, entitlements and Info.plist
+        run: |
+          app=build/macos/Build/Products/Release/dbug.app
+          codesign --verify --deep --strict "$app"
+          entitlements=$(codesign -d --entitlements - "$app" 2>&1)
+          echo "$entitlements"
+          for key in app-sandbox network.client network.server files.user-selected.read-write; do
+            grep -q "com.apple.security.$key" <<<"$entitlements" || { echo "missing entitlement: $key"; exit 1; }
+          done
+          plutil -extract NSLocalNetworkUsageDescription raw "$app/Contents/Info.plist"

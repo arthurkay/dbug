@@ -97,7 +97,12 @@ cp -r icons/* ~/.local/share/icons/hicolor/
 
 1. Unzip `dbug-macos.zip`
 2. Drag `dbug.app` to your Applications folder
-3. On first launch, right-click > Open to bypass Gatekeeper
+3. If macOS says the app can't be opened (it isn't notarised), open **System Settings → Privacy & Security** and click **Open Anyway**. The install script clears this flag for you, so it only applies to manual downloads.
+
+What macOS will ask for:
+
+- **Keychain access** — dbug keeps its encryption key in your login keychain. The builds are ad-hoc signed, so after each update macOS asks whether dbug may use its keychain item; enter your password and choose **Always Allow**. If you deny it, dbug still runs but saved credentials stay locked until you allow it on a later launch.
+- **Local Network** (macOS 15+) — asked the first time you send a request to a machine on your LAN (e.g. `192.168.x.x`, `*.local`). `localhost` and internet hosts don't need it. Change it later under Privacy & Security → Local Network.
 
 ### Windows
 
@@ -151,6 +156,8 @@ find ~/.local/share/icons/hicolor -name "dbug*" -delete
 ```bash
 rm -rf /Applications/dbug.app
 rm -rf ~/.local/share/dbug
+# Optional: also delete your collections, history and settings
+rm -rf ~/Library/Containers/zm.co.cloud.dbug
 ```
 
 ## Usage

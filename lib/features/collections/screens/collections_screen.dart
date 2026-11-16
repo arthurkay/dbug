@@ -730,10 +730,12 @@ class _RequestList extends ConsumerWidget {
   }
 
   Future<void> _showRequestMenu(BuildContext context, WidgetRef ref, RequestModel req, Offset position) async {
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    // Positions are relative to the navigator's overlay (beside the sidebar).
+    final overlay = Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
+    final local = overlay.globalToLocal(position);
     final action = await showMenu<String>(
       context: context,
-      position: RelativeRect.fromRect(position & const Size(1, 1), Offset.zero & overlay.size),
+      position: RelativeRect.fromRect(local & Size.zero, Offset.zero & overlay.size),
       items: const [
         PopupMenuItem(value: 'rename', child: _MenuRow(LucideIcons.pencil, 'Rename')),
         PopupMenuItem(value: 'duplicate', child: _MenuRow(LucideIcons.copy, 'Duplicate')),

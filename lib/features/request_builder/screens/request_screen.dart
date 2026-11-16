@@ -585,7 +585,10 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
       authData: draft.auth.storedData,
     );
     if (!mounted) return true;
-    setState(() => _currentRequestId = req.id);
+    setState(() {
+      _currentRequestId = req.id;
+      if (collectionId != null && widget.collectionId == null) _restoredCollectionId = collectionId;
+    });
     ref.invalidate(collectionsProvider);
     if (collectionId != null) {
       ref.invalidate(requestsByCollectionProvider(collectionId));
@@ -644,7 +647,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (widget.initialRequest != null)
+                if (widget.initialRequest != null || _collectionId != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
@@ -665,17 +668,29 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                               ),
                             ),
                           ),
-                        Icon(
-                          LucideIcons.globe,
-                          size: 14,
-                          color: colorScheme.primary,
-                        ),
-                        const SizedBox(width: 6),
+                        if (_liveCollection != null) ...[
+                          Icon(LucideIcons.folder, size: 14, color: colorScheme.primary),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              _liveCollection!.name,
+                              style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Icon(LucideIcons.chevronRight, size: 14, color: colorScheme.onSurfaceVariant),
+                          ),
+                        ] else ...[
+                          Icon(LucideIcons.globe, size: 14, color: colorScheme.primary),
+                          const SizedBox(width: 6),
+                        ],
                         Expanded(
                           child: Text(
                             _requestNameController.text.isNotEmpty
                                 ? _requestNameController.text
-                                : widget.initialRequest?.name ?? '',
+                                : widget.initialRequest?.name ?? (_currentRequestId == null ? 'Unsaved request' : ''),
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -721,17 +736,42 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
             child: Row(
               children: [
-                Text(
-                  'ENDPOINTS',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.6,
-                    color: colorScheme.onSurfaceVariant,
+                Icon(LucideIcons.folderOpen, size: 14, color: colorScheme.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _liveCollection?.name ?? 'Collection',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${requestsAsync.valueOrNull?.length ?? 0} endpoints',
+                        style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Collection settings (headers, auth)',
+                  icon: const Icon(LucideIcons.settings2, size: 15),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _editCollectionSettings(),
+                ),
+                IconButton(
+                  tooltip: 'Add a request to this collection',
+                  icon: const Icon(LucideIcons.plus, size: 16),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _addRequestToCollection(_collectionId!),
                 ),
               ],
             ),
@@ -808,6 +848,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                     final isActive = req.id == _currentRequestId;
                     return GestureDetector(
                       onTap: () => _switchToRequest(req),
+                      onSecondaryTapUp: (d) => _showEndpointMenuAt(req, d.globalPosition),
                       behavior: HitTestBehavior.opaque,
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 1),
@@ -859,6 +900,18 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: PopupMenuButton<String>(
+                                tooltip: 'Edit, duplicate or delete',
+                                padding: EdgeInsets.zero,
+                                iconSize: 14,
+                                icon: Icon(LucideIcons.ellipsis, size: 14, color: colorScheme.onSurfaceVariant),
+                                itemBuilder: (_) => _endpointMenuItems(),
+                                onSelected: (action) => _onEndpointAction(req, action),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -871,6 +924,130 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
         ],
       ),
     );
+  }
+
+  /// Creates a request in [collectionId] from a name + method dialog and
+  /// opens it. The URL starts with `{{baseUrl}}/` when the collection's
+  /// requests use it, so the environment supplies the host.
+  Future<void> _addRequestToCollection(String collectionId) async {
+    if (!await _confirmDiscardChanges() || !mounted) return;
+
+    final existing = ref.read(requestsByCollectionProvider(collectionId)).valueOrNull ?? const [];
+    final usesBaseUrl = existing.any((r) => r.url.toLowerCase().startsWith('{{baseurl}}'));
+    final result = await showDialog<({String name, String method})>(
+      context: context,
+      builder: (ctx) => _NewRequestDialog(collectionName: _liveCollection?.name),
+    );
+    if (result == null || !mounted) return;
+
+    final req = await ref.read(requestRepositoryProvider).createRequest(
+      collectionId: collectionId,
+      name: result.name,
+      method: result.method,
+      url: usesBaseUrl ? '{{baseUrl}}/' : '',
+    );
+    if (!mounted) return;
+    ref.invalidate(requestsByCollectionProvider(collectionId));
+    ref.invalidate(collectionsProvider);
+    setState(() {
+      _currentRequestId = req.id;
+      _lastResponse = null;
+      _applyDraft(_draftFromRequest(req));
+      _markClean();
+    });
+    _setWindowTitle(req.name);
+    _saveBuilderState();
+    showDbugToast(context, message: 'Added "${req.name}" to ${_liveCollection?.name ?? 'the collection'}', type: ToastType.success);
+  }
+
+  List<PopupMenuEntry<String>> _endpointMenuItems() => const [
+        PopupMenuItem(value: 'edit', child: ListTile(dense: true, leading: Icon(LucideIcons.pencil, size: 16), title: Text('Rename / change method'))),
+        PopupMenuItem(value: 'duplicate', child: ListTile(dense: true, leading: Icon(LucideIcons.copy, size: 16), title: Text('Duplicate'))),
+        PopupMenuDivider(),
+        PopupMenuItem(value: 'delete', child: ListTile(dense: true, leading: Icon(LucideIcons.trash2, size: 16), title: Text('Delete'))),
+      ];
+
+  Future<void> _showEndpointMenuAt(RequestModel req, Offset position) async {
+    // showMenu positions relative to the navigator's overlay, which starts
+    // beside the sidebar, not at the window origin; convert the click.
+    final overlay = Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
+    final local = overlay.globalToLocal(position);
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(local & Size.zero, Offset.zero & overlay.size),
+      items: _endpointMenuItems(),
+    );
+    if (action != null && mounted) await _onEndpointAction(req, action);
+  }
+
+  Future<void> _onEndpointAction(RequestModel req, String action) async {
+    final repo = ref.read(requestRepositoryProvider);
+    void refresh() {
+      if (req.collectionId != null) ref.invalidate(requestsByCollectionProvider(req.collectionId!));
+      ref.invalidate(collectionsProvider);
+    }
+
+    switch (action) {
+      case 'edit':
+        final result = await showDialog<({String name, String method})>(
+          context: context,
+          builder: (_) => _NewRequestDialog(initialName: req.name, initialMethod: req.method),
+        );
+        if (result == null || !mounted) return;
+        if (result.name == req.name && result.method == req.method) return;
+        await repo.updateRequest(req.copyWith(name: result.name, method: result.method, updatedAt: DateTime.now()));
+        if (!mounted) return;
+        refresh();
+        if (req.id == _currentRequestId) {
+          // Update the open request too, keeping any other unsaved edits
+          // marked as unsaved.
+          setState(() {
+            _requestNameController.text = result.name;
+            if (_methods.contains(result.method)) _selectedMethod = result.method;
+            _cleanSnapshot = _cleanSnapshot?.copyWith(name: result.name, method: result.method);
+          });
+          _setWindowTitle(result.name);
+          _saveBuilderState();
+        }
+      case 'duplicate':
+        final copy = await repo.createRequest(
+          collectionId: req.collectionId,
+          name: '${req.name} (copy)',
+          method: req.method,
+          url: req.url,
+          headers: req.headers,
+          bodyType: req.bodyType,
+          body: req.body,
+          queryParams: req.queryParams,
+          authType: req.authType,
+          authData: req.authData,
+        );
+        if (!mounted) return;
+        refresh();
+        await _switchToRequest(copy);
+      case 'delete':
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete request'),
+            content: Text('Delete "${req.name}" from ${_liveCollection?.name ?? 'the collection'}?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+            ],
+          ),
+        );
+        if (confirmed != true || !mounted) return;
+        await repo.deleteRequest(req.id);
+        if (!mounted) return;
+        refresh();
+        if (req.id == _currentRequestId) {
+          // Keep the builder contents as an unsaved request.
+          setState(() => _currentRequestId = null);
+          _saveBuilderState();
+        }
+        showDbugToast(context, message: 'Deleted "${req.name}"', type: ToastType.success);
+    }
   }
 
   Future<void> _switchToRequest(RequestModel req) async {
@@ -1536,10 +1713,15 @@ class _UrlTooltipState extends State<_UrlTooltip> {
   void _showOverlay() {
     final text = widget.tooltipText();
     if (text.isEmpty) return;
+    final overlay = Overlay.of(context);
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        left: _mousePos.dx + 12,
-        top: _mousePos.dy - 8,
+        // The pointer position is global; the overlay may not start at the
+        // window origin (it sits beside the sidebar), so convert first.
+        // Kept on-screen near the right edge (the box is at most 400 wide).
+        left: (_toOverlay(overlay).dx + 12)
+            .clamp(0.0, ((overlay.context.size?.width ?? 1e6) - 410).clamp(0.0, double.infinity)),
+        top: _toOverlay(overlay).dy + 18,
         child: Material(
           color: Colors.transparent,
           child: Container(
@@ -1568,7 +1750,12 @@ class _UrlTooltipState extends State<_UrlTooltip> {
         ),
       ),
     );
-    Overlay.of(context).insert(_overlayEntry!);
+    overlay.insert(_overlayEntry!);
+  }
+
+  Offset _toOverlay(OverlayState overlay) {
+    final box = overlay.context.findRenderObject() as RenderBox?;
+    return box == null ? _mousePos : box.globalToLocal(_mousePos);
   }
 
   void _removeOverlay() {
@@ -1585,13 +1772,102 @@ class _UrlTooltipState extends State<_UrlTooltip> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) => _showOverlay(),
+      onEnter: (e) {
+        _mousePos = e.position;
+        _showOverlay();
+      },
       onHover: (e) {
         _mousePos = e.position;
         _overlayEntry?.markNeedsBuild();
       },
       onExit: (_) => _removeOverlay(),
       child: widget.child,
+    );
+  }
+}
+
+
+/// Name + method for a new request in a collection.
+class _NewRequestDialog extends StatefulWidget {
+  final String? collectionName;
+
+  /// Set when editing an existing request.
+  final String? initialName;
+  final String? initialMethod;
+
+  const _NewRequestDialog({this.collectionName, this.initialName, this.initialMethod});
+
+  bool get isEdit => initialName != null;
+
+  @override
+  State<_NewRequestDialog> createState() => _NewRequestDialogState();
+}
+
+class _NewRequestDialogState extends State<_NewRequestDialog> {
+  static const _methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+  late final _name = TextEditingController(text: widget.initialName);
+  late String _method =
+      _methods.contains(widget.initialMethod) ? widget.initialMethod! : 'GET';
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _name.text.trim();
+    if (name.isEmpty) return;
+    Navigator.pop(context, (name: name, method: _method));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.isEdit
+          ? 'Edit request'
+          : widget.collectionName != null
+              ? 'New request in ${widget.collectionName}'
+              : 'New request'),
+      content: SizedBox(
+        width: 420,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 120,
+              child: DropdownButtonFormField<String>(
+                initialValue: _method,
+                decoration: const InputDecoration(labelText: 'Method', isDense: true),
+                items: [
+                  for (final m in _methods)
+                    DropdownMenuItem(
+                      value: m,
+                      child: Text(m, style: TextStyle(color: methodColor(m), fontWeight: FontWeight.w700, fontSize: 13)),
+                    ),
+                ],
+                onChanged: (v) => setState(() => _method = v ?? _method),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _name,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Name', hintText: 'e.g. Refund a payment', isDense: true),
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _submit(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: _name.text.trim().isEmpty ? null : _submit,
+          child: Text(widget.isEdit ? 'Save' : 'Add'),
+        ),
+      ],
     );
   }
 }

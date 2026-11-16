@@ -256,7 +256,15 @@ extract_archive() {
     info "Extracting to ${dest}..."
     case "$ARCHIVE_NAME" in
         *.tar.gz) tar -xzf "$archive_path" -C "$dest" ;;
-        *.zip)    unzip -oq "$archive_path" -d "$dest" ;;
+        *.zip)
+            # ditto restores the extended attributes and resource data the
+            # app's code signature covers; unzip can drop them.
+            if [[ "$PLATFORM" == "macos" ]] && command -v ditto >/dev/null 2>&1; then
+                ditto -x -k "$archive_path" "$dest"
+            else
+                unzip -oq "$archive_path" -d "$dest"
+            fi
+            ;;
     esac
 }
 
@@ -342,6 +350,13 @@ install_macos() {
 
     info "Installing to ${dest}..."
     mkdir -p "$(dirname "$dest")"
+    # A zip fetched by a browser (and anything extracted from it) carries the
+    # quarantine flag, which makes Gatekeeper block this unnotarised app.
+    xattr -dr com.apple.quarantine "$app" 2>/dev/null || true
+    if ! codesign --verify --deep "$app" >/dev/null 2>&1; then
+        warn "The app's code signature did not verify; macOS may refuse to open it."
+    fi
+
     rm -rf "$dest"
     mv "$app" "$dest"
     ok "Installed to ${dest}"
@@ -351,8 +366,14 @@ install_macos() {
     echo "$version" > "$VERSION_FILE"
 
     echo ""
-    warn "On first launch, macOS may block the app."
-    warn "Right-click the app in Finder > Open > Open to bypass Gatekeeper."
+    info "First launch on macOS:"
+    info "  • If macOS says the app can't be opened, open System Settings >"
+    info "    Privacy & Security and click 'Open Anyway' next to dbug."
+    info "  • After an update, macOS asks to let dbug use its keychain item: enter"
+    info "    your password and choose 'Always Allow' (Deny leaves saved"
+    info "    credentials locked until you allow it)."
+    info "  • Requests to machines on your local network ask for Local Network"
+    info "    access once; allow it, or change it later in Privacy & Security."
 }
 
 # ─── Uninstall ───────────────────────────────────────────────────────────────
@@ -376,6 +397,7 @@ uninstall() {
                 ok "Removed ${INSTALL_DIR}"
             fi
             rm -f "$VERSION_FILE"
+            info "Your collections and history were kept in ~/Library/Containers/zm.co.cloud.dbug (delete it to remove all dbug data)."
             ;;
     esac
 
