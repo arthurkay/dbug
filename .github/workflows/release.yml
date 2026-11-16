@@ -143,6 +143,15 @@ jobs:
       - name: Build Windows release
         run: flutter build windows --release
 
+      - name: Check bundled VC++ runtime
+        shell: pwsh
+        run: |
+          $dir = "build/windows/x64/runner/Release"
+          $missing = @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll") |
+            Where-Object { -not (Test-Path (Join-Path $dir $_)) }
+          Get-ChildItem $dir -Filter *.dll | Select-Object Name, Length | Format-Table
+          if ($missing) { Write-Error "Missing from the bundle: $($missing -join ', ')"; exit 1 }
+
       - name: Package Windows build (zip)
         run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/dbug-windows-x64.zip
 

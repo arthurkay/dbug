@@ -73,3 +73,53 @@ jobs:
             grep -q "com.apple.security.$key" <<<"$entitlements" || { echo "missing entitlement: $key"; exit 1; }
           done
           plutil -extract NSLocalNetworkUsageDescription raw "$app/Contents/Info.plist"
+
+  build-windows:
+    # Builds the Windows bundle and checks it carries the VC++ runtime, so the
+    # app starts on PCs without the VC++ Redistributable.
+    runs-on: windows-2022
+    env:
+      SQLITE3_LIB_DIR: "C:\\sqlite3"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Prepare sqlite3 native library
+        shell: pwsh
+        run: |
+          $dest = "C:\sqlite3"
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
+          $url = "https://www.sqlite.org/2024/sqlite-dll-win-x64-3460000.zip"
+          # Pinned so a tampered or replaced download can't be bundled into
+          # the release. Update together with the URL.
+          $expected = "87C8394712418DCC4A608FDC34C0A23A89A41E626B9E3294C0978BB2BDA0A0D1"
+          $zip = "$env:RUNNER_TEMP\sqlite3.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          $actual = (Get-FileHash -Path $zip -Algorithm SHA256).Hash
+          if ($actual -ne $expected) {
+            Write-Error "sqlite3 zip checksum mismatch: expected $expected, got $actual"
+            exit 1
+          }
+          Expand-Archive -Path $zip -DestinationPath $dest -Force
+          dir $dest
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Check bundled VC++ runtime
+        shell: pwsh
+        run: |
+          $dir = "build/windows/x64/runner/Release"
+          $missing = @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll") |
+            Where-Object { -not (Test-Path (Join-Path $dir $_)) }
+          Get-ChildItem $dir -Filter *.dll | Select-Object Name, Length | Format-Table
+          if ($missing) { Write-Error "Missing from the bundle: $($missing -join ', ')"; exit 1 }
