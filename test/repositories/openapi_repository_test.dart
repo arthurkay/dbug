@@ -143,6 +143,16 @@ void main() {
       expect(specs.last.title, 'First');
     });
 
+    test('specs imported in the same millisecond list newest first', () async {
+      await repo.saveParsedSpec(createTestParsedSpec(title: 'First'));
+      await repo.saveParsedSpec(createTestParsedSpec(title: 'Second'));
+      final db = await DatabaseService.database;
+      await db.update('openapi_specs', {'imported_at': 1000});
+
+      final specs = await repo.getAllSpecs();
+      expect(specs.map((s) => s.title), ['Second', 'First']);
+    });
+
     test('returns empty list when no specs', () async {
       final specs = await repo.getAllSpecs();
       expect(specs, isEmpty);

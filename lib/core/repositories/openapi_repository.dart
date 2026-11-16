@@ -139,7 +139,7 @@ class OpenApiRepository {
 
   Future<List<OpenApiSpec>> getAllSpecs() async {
     final db = await DatabaseService.database;
-    final rows = await db.query('openapi_specs', orderBy: 'imported_at DESC');
+    final rows = await db.query('openapi_specs', orderBy: 'imported_at DESC, rowid DESC');
     return rows.map(_rowToSpec).toList();
   }
 
@@ -151,7 +151,7 @@ class OpenApiRepository {
       rows = await db.rawQuery(
         'SELECT id, title, version, imported_at, '
         'json_array_length(parsed_endpoints) AS endpoint_count '
-        'FROM openapi_specs ORDER BY imported_at DESC',
+        'FROM openapi_specs ORDER BY imported_at DESC, rowid DESC',
       );
     } on DatabaseException {
       // System SQLite built without JSON1: count in Dart (still skips the
@@ -159,7 +159,7 @@ class OpenApiRepository {
       final full = await db.query(
         'openapi_specs',
         columns: ['id', 'title', 'version', 'imported_at', 'parsed_endpoints'],
-        orderBy: 'imported_at DESC',
+        orderBy: 'imported_at DESC, rowid DESC',
       );
       rows = full
           .map((r) => {
@@ -224,7 +224,7 @@ class OpenApiRepository {
       columns: ['id'],
       where: 'source_spec_id = ?',
       whereArgs: [specId],
-      orderBy: 'created_at ASC',
+      orderBy: 'created_at ASC, rowid ASC',
       limit: 1,
     );
     return rows.isEmpty ? null : rows.first['id'] as String;

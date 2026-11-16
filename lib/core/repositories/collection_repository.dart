@@ -50,7 +50,7 @@ class CollectionRepository {
 
   Future<List<Collection>> getAllCollections() async {
     final db = await DatabaseService.database;
-    final rows = await db.query('collections', orderBy: 'created_at DESC');
+    final rows = await db.query('collections', orderBy: 'created_at DESC, rowid DESC');
 
     return rows.map(_rowToCollection).toList();
   }

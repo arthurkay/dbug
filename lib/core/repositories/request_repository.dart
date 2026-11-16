@@ -85,7 +85,7 @@ class RequestRepository {
       'requests',
       where: 'collection_id = ?',
       whereArgs: [collectionId],
-      orderBy: 'created_at ASC',
+      orderBy: 'created_at ASC, rowid ASC',
     );
 
     return rows.map(_rowToRequest).toList();
@@ -93,7 +93,7 @@ class RequestRepository {
 
   Future<List<RequestModel>> getAllRequests() async {
     final db = await DatabaseService.database;
-    final rows = await db.query('requests', orderBy: 'created_at DESC');
+    final rows = await db.query('requests', orderBy: 'created_at DESC, rowid DESC');
     return rows.map(_rowToRequest).toList();
   }
 
